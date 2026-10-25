@@ -115,6 +115,7 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 | 字幕 | 内嵌字幕轨与外挂字幕（同目录 + 用户上传过的）合成一份菜单，走 `<track>` + `/subtitle-vtt` 出 WebVTT——切换即时、不用重连流、原画路径也不被破坏。可选字号/位置/颜色/背景/描边与 ±10s 延时。图像字幕（PGS/VOBSUB）在菜单里禁用并说明原因，不给「选了没反应」的死选项。另支持上传字幕与在线搜索（迅雷字幕服务） |
 | 音轨 | 多音轨（国语/英语/导演评论）列出语言 + 编码 + 声道数，切换时服务端按 `audioMapIndex` 重封装并从当前位置续上 |
 | 倍速与播放行为 | 0.5x–3x 八档；「自动跳过片头」「自动连播下一集」两个开关。片头片尾区间来自 `video_index.open_skip_*_sec`，播放中浮出「跳过片头」按钮 |
+| 片头片尾 | 顶栏「片头片尾」菜单可查看与修改当前区间：片头（起点/终点）与片尾（起点）三个输入框，接受 `90` / `1:30` / `01:30` / `1:02:03` 四种写法；三个「= 当前」按钮直接把播放位置填进去；「全部清除」一键清掉。片头区间内浮出「跳过片头」，片尾区间内浮出「跳过片尾」（点下去直接走连播分支，片尾本就是结尾字幕，跳过去等于这一集看完）。保存走 `POST /api/video/detail/open_skip/set`，需管理员 |
 | 画面比例 | 七档：**自动**（按片源比例、留黑边）、**16:9** / **16:10** / **4:3** / **1:1**（强制显示宽高比）、**裁剪填充**（填满播放区、裁掉多余）、**拉伸填充**（拉满、不管比例）。快捷键 `R` 在常用几档间循环 |
 
 播放器另有缓冲进度条、起播/缓冲加载态、音量与静音、全屏、画中画，
@@ -129,6 +130,38 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 比如标成 16:9 实际是老 4:3 转的，人整个被拉宽），`cover` 则填满播放区并裁掉多余部分。
 强制比例时要把 `width`/`height` 从 `100%` 放开成 `auto`，否则 `aspect-ratio` 会被顶掉、看不出效果。
 这个偏好和音量一样只存 `localStorage`（显示偏好跟设备相关，没必要同步到服务端）。
+
+#### 片头片尾
+
+上游有片头两列（`open_skip_start_sec` / `open_skip_end_sec`）和设置接口，但**没有片尾**——
+连播时最有用的那段（正文结束、开始滚字幕）完全没有地方存，播放器也就无从判断
+「现在已经在片尾了」。所以新增第三列 `open_skip_outro_start_sec`（老库自动补列，默认 0）。
+
+| 段 | 列 | 播放器行为 |
+|---|---|---|
+| 片头 | `open_skip_start_sec` → `open_skip_end_sec` | 区间内浮出「跳过片头」；开了自动跳过则在起点处直接跳 |
+| 片尾 | `open_skip_outro_start_sec` → 片源结束 | 区间内浮出「跳过片尾」，点下去直接走连播分支 |
+
+片尾和片头的用处不一样：片头是**被动等待**（用户只想快点看正片），片尾是**主动结束**
+（看完正文就该进下一集了），所以片尾按钮点下去不等播放到底，直接触发 `ended` 的连播逻辑。
+
+设置面板在顶栏「片头片尾」菜单里。三个输入框都接受 `90` / `1:30` / `01:30` / `1:02:03`
+四种写法，旁边三个「= 当前」按钮把当前播放位置直接填进去——手动输入分秒很反人类，
+而「看到片头结束了按一下」才是自然的操作。非管理员看到的是禁用态和一句说明
+（设置会同步到同一剧集的全部分集，属元数据编辑）。
+
+区间合法性在服务端判，规则是**清空而不是夹紧**：
+
+- 片头终点必须晚于起点至少 1 秒，否则「跳过片头」跳了个寂寞
+- 片尾起点必须晚于片头终点至少 1 秒，否则两段重叠、播放会来回横跳
+
+为什么不夹紧：夹紧会留下一个用户没设过的区间，下次打开播放器莫名冒出个跳过按钮，
+比没有更难排查。清空 + 提示「区间不合法已清空」至少是可复现的。
+保存后前端按服务端返回的 `open_skip` 刷新界面，不照自己提交的那份——
+两边不一致时用户会以为没保存上。
+
+同步范围沿用上游语义：设**单集**只改这一集（各集片头长度经常不一样），
+设**season / tv 行**才批量覆盖其下所有分集。
 
 上游的转码接口只接受 `width` / `resolution` / `bitrate` 三个裸参数，其中 `resolution` 还只认
 `1920x1080` 这种 WxH 写法——传 `"1080p"` 会被 `parseResolution` 静默忽略，结果是「选了清晰度但没有任何变化」。
@@ -249,6 +282,7 @@ HEVC，被误判的代价尤其大——4K HEVC 去走 libx264 实时编码，�
 | `POST /api/videoPlayer/downloadSearchedSubtitle` | 同上 | 把搜到的字幕下载到上传目录 |
 | `POST /api/videoPlayer/deleteExternalSubtitle` | 同上 | 删除自己上传的字幕 |
 | `POST /api/videoPlayer/preference` | 同上 | 续播位置 + 清晰度/字幕/音轨/倍速偏好 |
+| `POST /api/video/detail/open_skip/set` | 管理员 | 设片头片尾（`index_id` + `open_skip_start_sec` / `open_skip_end_sec` / `open_skip_outro_start_sec`）。区间不合法时清空而非夹紧；设 season/tv 行会批量同步其下分集；返回落库后的实际值 |
 | `POST /api/music/playlist/index/reorder` | 登录用户 | 整体重排，`index_ids` 为完整顺序（可为子集） |
 | `POST /api/music/playlist/index/move` | 登录用户 | 单曲移到 `to_position`（0 基，越界夹紧） |
 | `POST /api/music/playlist/index/clear` | 登录用户 | 清空歌单曲目，不动歌单本身 |
@@ -774,13 +808,16 @@ server {
 | `src/api/modules/videoPlayer/videoPlayerController.js` | `/transcode` 新增 `quality` 参数并映射到 resolution/bitrate/maxrate/bufsize；新增 `GET /qualities`（返回档位表与整份偏好）与 `GET /tracks`（音轨/字幕轨清单 + 片头片尾 + 视频轨编码 + `directPlay`）；`/info` 附带档位表；`/stream-mp4` 支持 `width`/`bitrate`/`quality`/`audioMapIndex`（带缩放参数时自动从 `mode=copy` 退到重编码，避免「选了 720p 出来还是原画」）；`/preference` 持久化清晰度/字幕/音轨/倍速；`/subtitle-vtt` 文件不存在时返回 404 而非默认 500。`_isMp4CompatibleAudioCodec` 改为委托 `webPlayableUtil`（原 `.mov` 音频回退逻辑保持不变——曾改成按编码判断、与容器无关，那会让每个容器都多跑一次 ffprobe，原画直连的关键路径上平白多一次探测） |
 | `src/workers/transcodeWorker.js` | 透出 `options.maxrate`/`options.bufsize` 到 `-maxrate`/`-bufsize`（只有 `-b:v` 时 x264 在复杂场景会冲到远超目标值，流式播放表现为带宽抖动） |
 | `src/db/table/tableVideoPlayPreference.js` | 新增 `quality`、`subtitle_ref`、`audio_index`、`speed` 四列，老库逐列自动 `ADD COLUMN`（幂等） |
-| `src/api/modules/videoPlayer/videoPlayerService.js` | 偏好读写带上四列，落库前归一化：清晰度过 `normalizeQualityKey`、字幕引用只认 `emb:<流号>`/`ext:<文件名>`、音轨序号带上限、倍速过白名单——脏值一律落空而不是把任意字符串存进库；`getTrackInfo` 汇总音轨/字幕轨清单，并返回视频轨编码与 `directPlay`（含 `mimeCandidates`，供前端实测浏览器能力） |
+| `src/db/table/tableVideoIndex.js` | **新增 `open_skip_outro_start_sec` 列**（片尾开始秒），老库自动补列、默认 0。上游只有片头两列，片尾没有地方存，播放器也就无从判断「现在已经在片尾了」 |
+| `src/api/modules/video/detail/detailService.js` | `setOpenSkip` 接受并落 `open_skip_outro_start_sec`；区间合法性改为**清空而非夹紧**（片头终点须晚于起点 1 秒以上、片尾起点须晚于片头终点 1 秒以上，否则清空该段）——夹紧会留下用户没设过的区间，下次播放莫名冒出跳过按钮更难排查；返回值加 `open_skip`（落库后的实际值），前端照它刷新而不是照自己提交的那份 |
+| `src/api/modules/video/detail/detailController.js` | 透传 `open_skip_outro_start_sec`；没传时按 0 处理（清空），不默认沿用旧值——否则用户无法表达「清掉片尾」 |
+| `src/api/modules/videoPlayer/videoPlayerService.js` | 偏好读写带上四列，落库前归一化：清晰度过 `normalizeQualityKey`、字幕引用只认 `emb:<流号>`/`ext:<文件名>`、音轨序号带上限、倍速过白名单——脏值一律落空而不是把任意字符串存进库；`getTrackInfo` 汇总音轨/字幕轨清单，并返回视频轨编码与 `directPlay`（含 `mimeCandidates`，供前端实测浏览器能力）；`openSkip` 增加 `outroStartSec` |
 | `src/db/table/tableMusicPlayList2Index.js` | **新增 `position` 列**（播放顺序），老库自动补列并按 `create_time` + `index_id` 回填；新增 `(list_id, position)` 索引 |
 | `src/api/modules/music/playlist/playListService.js` | 加歌按调用方传入的顺序分配 position；新增 `reorderIndexes`（整体重排，提交子集时未提到的按原相对次序移到队尾）、`moveIndex`（单曲移到指定位置，越界夹紧）、`clearIndexes`（清空曲目）；`getList` 现在返回曲目列表；歌单预览图改按播放顺序取 |
 | `src/api/modules/music/playlist/playListController.js`、`musicRouter.js` | 新增 `playlist/index/reorder`、`playlist/index/move`、`playlist/index/clear` 三个接口 |
 | `src/api/modules/music/list/musicListService.js` | 带 `list_id` 时按 `pl.position` 排序——**改造前固定 `m.id desc`，用户在歌单里排的顺序完全不会生效** |
-| `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度、分集列表）+ 全屏播放器（清晰度选择、字幕菜单与外观调节、音轨切换、倍速、**画面比例七档**、跳过片头、自动连播、画中画/全屏、缓冲进度、完整快捷键、断点续播）。播放器用 `/tracks` 的 `directPlay.mimeCandidates` **问浏览器自己**能不能放，浏览器放不了才切到转码档位（点名具体编码），转码失败回落原画、原画仍不行才报错 |
-| `web/console/console.js`、`console.css`、`index.html` | 导航新增「媒体」分组（影视/音乐）；补足播放器栏、队列抽屉、歌词面板、海报墙、清晰度/字幕/音轨/倍速菜单、加载态、缓冲条、跳过片头、分集列表的样式（同样走设计令牌，暗色自动生效） |
+| `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度、分集列表）+ 全屏播放器（清晰度选择、字幕菜单与外观调节、音轨切换、倍速、**画面比例七档**、**片头片尾设置**、跳过片头、自动连播、画中画/全屏、缓冲进度、完整快捷键、断点续播）。播放器用 `/tracks` 的 `directPlay.mimeCandidates` **问浏览器自己**能不能放，浏览器放不了才切到转码档位（点名具体编码），转码失败回落原画、原画仍不行才报错 |
+| `web/console/console.js`、`console.css`、`index.html` | 导航新增「媒体」分组（影视/音乐）；补足播放器栏、队列抽屉、歌词面板、海报墙、清晰度/字幕/音轨/倍速菜单、加载态、缓冲条、跳过片头/跳过片尾、分集列表、片头片尾设置面板（.skipset*）的样式（同样走设计令牌，暗色自动生效） |
 | `electron_server/language/*.json` | 新增 `videoPlayer.QUALITY_ORIGINAL_USE_RAW`（原画不走转码，应改走原画直链） |
 | `src/api/modules/photo/timeline/photoTimeLineService.js` | **`getTimelinePhotoList` 实现分页**——注释里一直写着 `page`/`pageSize`，实现却一个都没用，时间轴因此无法滚动加载；新增 `hasPaging`/`resolvePaging`（单页上限 500、兼容 `page_size`/`page_index` 写法），传了 `pageSize` 就分页并在响应里带 `hasMore`，不传时保持原行为返回全部；`loadTheDay` 兼容字符串 `'1'`/`'true'`。清掉 4 处 `console.log` 调试输出（含每次查询都打印的 `query.toString()`） |
 | `src/api/modules/photo/timeline/photoTimeLineController.js` | 透传 `page`；适配服务端新的 `{list, hasMore}` 返回，响应体加 `hasMore` |
@@ -840,9 +877,25 @@ server {
 - 画面比例七档：默认「自动」被标记为当前；切 4:3 同时写 `aspect-ratio: 4 / 3` 与 `object-fit: fill`，按钮标签跟着变、有 toast、写进 `localStorage`；「裁剪填充」不碰 `aspect-ratio` 只改 `object-fit: cover`；回「自动」两个属性都清掉
 - 切比例**不重连流**（`src` 不变）——比例是纯显示层的事，重连会让播放位置和缓冲全部作废
 - 快捷键 `R` 在「自动 → 16:9 → 4:3 → 裁剪填充 → 拉伸填充」间循环，循环到的那一档 `aspect-ratio` 正确；重开播放器恢复上次的比例（含元素上的 `aspect-ratio`）
+- 片头片尾面板：三个输入框按库里值显示成 mm:ss（`0:30` / `1:35` / `43:40`）；「= 当前」把播放位置填进去，值与进度条左边显示的时间一致；保存时带 `index_id` 与三个字段；保存成功后按**服务端返回值**刷新界面；「全部清除」三个字段都提交 0
+- 片尾按钮：进入片尾区间才浮出（片头按钮此时不出现），离开区间收起，清除设置后也收起
 - 快捷键全表无运行时错误；数字键 `5` 重连流的 `src` 带 `seek=3600`（7200 秒的 50%）
 - 剧集：详情弹层列出分集，点某一集直接起播并把标题换成该集名字
 - 用 CDP 驱动无头 Chrome 截图核对播放器各状态（播放器/字幕菜单/倍速菜单/清晰度菜单/音轨菜单），以及 780px 窄屏下顶栏自动收起文字标签只留图标、浅色主题下菜单跟随主题而视频区保持深色
+
+### 片头片尾（本轮新增）
+
+以下在本机实测通过（Node 22.20.0，真实 SQLite + 真实启动的服务端 + jsdom）：
+
+- 三列都能落库：片头起/止/片尾起；`setOpenSkip` 返回 `open_skip`（落库后的实际值）与 `updated_count`
+- 同步范围：设**单集**只改这一集（`updated_count=1`，同季另一集不变）；设 **season 行**覆盖本季全部分集（`updated_count=3`，含 season 行自身）；设 **tv 行**覆盖所有季（`updated_count=4`）；别的剧始终不受影响；电影（`media_type=movie`）只改自己
+- 片尾：只设片尾时片头两列为 0；片头片尾可一起设
+- 区间不合法时**清空而非夹紧**：片头终点早于起点 → 片头清空、片尾保留；片尾起点落在片头区间内 → 片尾清空、片头保留；片尾与片头终点相差 1 秒内 → 片尾清空。三种情况返回的 `open_skip` 都是清空后的值（前端据此刷新，两边不会不一致）
+- 脏值：负数与非数字当 0（区间随即不合法而整体清空）、字符串数字能接受、小数向下取整
+- **不传片尾参数即清空片尾**——不能默认沿用库里的旧值，否则用户想清掉片尾时没有途径表达「清空」
+- 错误路径：`indexId=0` 报 `common.PARAM_ERROR`，不存在的索引报 `common.NOT_FOUND`
+- 老库补列：只有上游两列的库 `createTable` 后补上 `open_skip_outro_start_sec`，原有片头数据不丢、新列默认 0，补列后 `setOpenSkip` 立即可写片尾
+- 一个测试自身踩过的坑：同步逻辑用 `path.join` 拼下级目录（Windows 出反斜杠），测试数据手写正斜杠时同步会**静默失效**——数据也必须用 `path.join` 造
 
 ### 源编码浏览器不支持（本轮新增）
 
@@ -953,17 +1006,17 @@ server {
 
 ### 测试套件总览
 
-`tools_nascab/` 下共 10 个套件、**738 项断言**全部通过：
+`tools_nascab/` 下共 10 个套件、**792 项断言**全部通过：
 
 | 套件 | 断言数 | 覆盖 | 需要服务 |
 |---|---|---|---|
 | `test_deploy_config.js` | 57 | 配置层三级优先级、worker 数决策、外部二进制路径 | 否 |
 | `test_console.js` | 38 | 控制台三个接口、CORS 白名单、安全响应头 | 是 |
-| `test_console_dom.js` | 164 | jsdom 真实加载全部页面脚本：登录/向导、10 个系统页、文件管理、音乐/影视/相册三页与播放器全控件（含源编码不支持时「浏览器能解就不切 / 解不了才切」两条对照、画面比例七档与快捷键循环）、主题、轮询不重建 DOM | 是 |
+| `test_console_dom.js` | 186 | jsdom 真实加载全部页面脚本：登录/向导、10 个系统页、文件管理、音乐/影视/相册三页与播放器全控件（含源编码不支持时「浏览器能解就不切 / 解不了才切」两条对照、画面比例七档与快捷键循环、片头片尾设置面板与片尾按钮）、主题、轮询不重建 DOM | 是 |
 | `test_file_manager.js` | 23 | 文件管理全链路（列目录/上传/下载/新建/重命名/删除/缩略图） | 否（自造数据） |
 | `test_console_wizard.js` | 13 | 首次部署初始化向导（需另起空数据目录服务并清空 `user` 表） | 是 |
 | `test_control_api.js` | 61 | `/api/control` 21 个端点、三种令牌传递方式、权限隔离 | 是（控制端口） |
-| `test_media.js` | 196 | 清晰度档位纯函数、标签映射、偏好归一化、播放列表真实 SQLite 全链路、老库补列迁移、**浏览器可解码编码判定（手搓 streams + 真 ffmpeg 造片真 ffprobe 探测）** | 否 |
+| `test_media.js` | 228 | 清晰度档位纯函数、标签映射、偏好归一化、播放列表真实 SQLite 全链路、老库补列迁移、**浏览器可解码编码判定（手搓 streams + 真 ffmpeg 造片真 ffprobe 探测）、片头片尾 setOpenSkip 真实 SQLite 全链路（含剧集层级同步与老库补列）** | 否 |
 | `test_media_api.js` | 65 | 音乐播放列表与影视播放器接口端到端，**含 `/tracks` 的 `directPlay` 与 `/stream-mp4` 原画档位的实际输出编码** | 是 |
 | `test_photo.js` | 79 | 时间线分页纯函数、真实 SQLite 全链路（分页/筛选/收藏/回收站/相册）、缩略图缓存键含尺寸 | 否 |
 | `test_photo_api.js` | 42 | 相册接口端到端（自起服务、往照片库塞真实数据）、鉴权 | 自起 |

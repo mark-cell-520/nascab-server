@@ -507,11 +507,12 @@ class VideoPlayerService {
     }
     const indexRow = await db('video_index')
       .where({ file_hash: logicalFileHash, is_file: 1 })
-      .first('open_skip_start_sec', 'open_skip_end_sec')
+      .first('open_skip_start_sec', 'open_skip_end_sec', 'open_skip_outro_start_sec')
       .catch(() => null);
     videoInfo.openSkip = {
       startSec: Math.max(0, Number(indexRow && indexRow.open_skip_start_sec) || 0),
       endSec: Math.max(0, Number(indexRow && indexRow.open_skip_end_sec) || 0),
+      outroStartSec: Math.max(0, Number(indexRow && indexRow.open_skip_outro_start_sec) || 0),
     };
     if (Array.isArray(source.playableFiles) && source.playableFiles.length > 0) {
       videoInfo.playableFiles = source.playableFiles;
@@ -679,6 +680,7 @@ class VideoPlayerService {
       openSkip: {
         startSec: Math.max(0, Number(skip.startSec) || 0),
         endSec: Math.max(0, Number(skip.endSec) || 0),
+        outroStartSec: Math.max(0, Number(skip.outroStartSec) || 0),
       },
       source: { width: Number(info.width) || 0, height: Number(info.height) || 0 },
       video: videoStream

@@ -519,7 +519,7 @@ class VideoDetailService {
     this.knexVideo = knexVideo;
   }
 
-  async setOpenSkip({ indexId, openSkipStartSec, openSkipEndSec }) {
+  async setOpenSkip({ indexId, openSkipStartSec, openSkipEndSec, openSkipOutroStartSec }) {
     const id = Number(indexId || 0) || 0;
     if (!id) {
       const err = new Error('common.PARAM_ERROR');
@@ -553,13 +553,25 @@ class VideoDetailService {
 
     const safeStart = _normalizeNonNegativeInt(openSkipStartSec);
     const safeEnd = _normalizeNonNegativeInt(openSkipEndSec);
+    const safeOutro = _normalizeNonNegativeInt(openSkipOutroStartSec);
+    // 片头区间本身要合理：结束必须晚于开始至少 1 秒，否则「跳过片头」跳了个寂寞。
+    // 不合法时把片头整个清空（而不是夹紧）——夹紧会留下一个用户没设过的区间，
+    // 下次打开播放器莫名冒出个跳过按钮，比没有更难排查。
+    const introValid = safeEnd > safeStart + 1;
+    const finalStart = introValid ? safeStart : 0;
+    const finalEnd = introValid ? safeEnd : 0;
+    // 片尾必须晚于片头结束，否则两段重叠，播放会来回横跳。
+    // 同样不夹紧：片尾不合法就清空，保留片头。
+    const outroValid = safeOutro > finalEnd + 1;
+    const finalOutro = outroValid ? safeOutro : 0;
 
     await this.knexVideo.transaction(async trx => {
       await trx('video_index')
         .whereIn('id', safeTargetIds)
         .update({
-          open_skip_start_sec: safeStart,
-          open_skip_end_sec: safeEnd,
+          open_skip_start_sec: finalStart,
+          open_skip_end_sec: finalEnd,
+          open_skip_outro_start_sec: finalOutro,
         });
     });
 
@@ -571,6 +583,13 @@ class VideoDetailService {
     return {
       updated_count: safeTargetIds.length,
       media_type: item.media_type,
+      // 落库后的实际值。前端要照这个刷新界面，别用自己提交的那份——
+      // 区间不合法时服务端清空而没夹紧，两边会不一致。
+      open_skip: {
+        start_sec: finalStart,
+        end_sec: finalEnd,
+        outro_start_sec: finalOutro,
+      },
       item: _normalizeIndexRow(updated || row),
     };
   }

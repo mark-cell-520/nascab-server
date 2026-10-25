@@ -35,6 +35,7 @@ function __register(N) {
     mute: '<svg viewBox="0 0 20 20"><path d="M10 4.2L6.4 7.2H4v5.6h2.4L10 15.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13.4 8l4 4M17.4 8l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     speed: '<svg viewBox="0 0 20 20"><path d="M3.6 14.4a7 7 0 1112.8 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 10.6l3.4-2.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="11.4" r="1.2" fill="currentColor"/></svg>',
     ratio: '<svg viewBox="0 0 20 20"><rect x="2.6" y="4.6" width="14.8" height="10.8" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.8 13.4V7.2l4.4 3.4 2.2-1.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    skip: '<svg viewBox="0 0 20 20"><path d="M5.4 5.2l6.2 4.8-6.2 4.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13.4 5.2v9.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     fs: '<svg viewBox="0 0 20 20"><path d="M4 8V4.6h4M16 12v3.4h-4M16 8V4.6h-4M4 12v3.4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     pip: '<svg viewBox="0 0 20 20"><rect x="2.6" y="4.4" width="14.8" height="11.2" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="11.4" y="9.6" width="4.6" height="4" rx=".8" fill="currentColor"/></svg>',
     text: '<svg viewBox="0 0 20 20"><path d="M4.5 5.5h11M10 5.5v10M7.4 15.5h5.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
@@ -874,7 +875,7 @@ function __register(N) {
     /* 画面比例：'auto' 表示按片源自带比例，其余强制成指定宽高比 */
     aspect: 'auto',
     /* 片头片尾（video_index.open_skip_*_sec） */
-    openSkip: { startSec: 0, endSec: 0 },
+    openSkip: { startSec: 0, endSec: 0, outroStartSec: 0 },
     autoSkipIntro: false,
     /* 连播：tvPlayInfo 的 playlist */
     episodes: [],
@@ -1109,12 +1110,17 @@ function __register(N) {
             <button class="qsel__btn" id="vstage-pbtn" title="画面比例">${I.ratio}<span id="vstage-plabel">比例</span></button>
             <div class="qsel__menu" id="vstage-pmenu" hidden></div>
           </div>
+          <div class="qsel" id="vstage-ksel">
+            <button class="qsel__btn" id="vstage-kbtn" title="片头片尾">${I.skip}<span id="vstage-klabel">片头片尾</span></button>
+            <div class="qsel__menu qsel__menu--wide" id="vstage-kmenu" hidden></div>
+          </div>
           <button class="vstage__btn" id="vstage-pip" title="画中画">${I.pip}</button>
           <button class="vstage__btn" id="vstage-fs" title="全屏 (F)">${I.fs}</button>
           <button class="vstage__btn" id="vstage-close" title="退出播放 (Esc)">${I.close}</button>
         </div>
       </div>
       <button class="vstage__skip" id="vstage-skipintro" hidden>跳过片头</button>
+      <button class="vstage__skip vstage__skip--outro" id="vstage-skipoutro" hidden>跳过片尾</button>
       <div class="vstage__next" id="vstage-next" hidden></div>
       <div class="vstage__err" id="vstage-err" hidden></div>
       <div class="vstage__bottom">
@@ -1160,6 +1166,13 @@ function __register(N) {
     $('#vstage-fs').addEventListener('click', toggleFullscreen);
     $('#vstage-pip').addEventListener('click', togglePip);
     $('#vstage-skipintro').addEventListener('click', () => seekVideo(V.openSkip.endSec));
+    $('#vstage-skipoutro').addEventListener('click', () => {
+      // 片尾通常是结尾字幕，跳过去就等于这一集看完：直接走 ended 的连播分支
+      const v = $('#vstage-video');
+      try { v.currentTime = Math.max(0, (V.duration || 0) - 0.1); } catch (_) {}
+      $('#vstage-skipoutro').hidden = true;
+      onVideoEnded();
+    });
     $('#vstage-prev').addEventListener('click', () => playEpisode(V.epIndex - 1));
     $('#vstage-next').addEventListener('click', () => playEpisode(V.epIndex + 1));
 
@@ -1168,6 +1181,7 @@ function __register(N) {
     bindMenu('#vstage-asel', '#vstage-amenu', '#vstage-abtn');
     bindMenu('#vstage-rsel', '#vstage-rmenu', '#vstage-rbtn');
     bindMenu('#vstage-psel', '#vstage-pmenu', '#vstage-pbtn');
+    bindMenu('#vstage-ksel', '#vstage-kmenu', '#vstage-kbtn');
 
     document.addEventListener('click', e => {
       $$('.qsel__menu').forEach(m => {
@@ -1240,6 +1254,13 @@ function __register(N) {
     // 断点续播：整数秒时落一次，关掉页面也不丢
     if (V.filePath && Math.floor(pos) % 10 === 0) saveVideoProgress(pos);
     paintSkipIntro(pos);
+    paintSkipOutro(pos);
+    // 起播后才拿得到真实片长（详情接口里的 duration 可能没填），
+    // 拿到就补一次——片尾区间判断强依赖片长
+    if (V.duration <= 0 && Number(v.duration) > 0) {
+      V.duration = Number(v.duration);
+      paintSkipOutro(pos);
+    }
   }
 
   function paintSkipIntro(pos) {
@@ -1253,6 +1274,167 @@ function __register(N) {
       V._introSkipped = true;
       seekVideo(endSec);
       toast('已自动跳过片头', 'ok');
+    }
+  }
+
+  /**
+   * 片尾区间内浮出「跳过片尾」。
+   * 片尾的用处和片头不一样：片头是被动等待（用户只想快点看正片），
+   * 片尾是主动结束（看完正文就该进下一集了），所以点下去直接走 ended 的连播分支。
+   */
+  function paintSkipOutro(pos) {
+    const btn = $('#vstage-skipoutro');
+    if (!btn) return;
+    const outro = Number(V.openSkip.outroStartSec) || 0;
+    const dur = Number(V.duration) || 0;
+    // 区间必须在片长内才有意义；拿不到片长时保守起见不显示
+    const inOutro = outro > 0 && dur > outro + 1 && pos >= outro - 0.5 && pos < dur;
+    btn.hidden = !inOutro;
+  }
+
+  /* ---------------- 片头片尾设置 ---------------- */
+  /** 秒 → mm:ss（给人看的）。超过一小时才补上小时位 */
+  function fmtClock(sec) {
+    const s = Math.max(0, Math.floor(Number(sec) || 0));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    const pad = n => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`;
+  }
+
+  /**
+   * 解析用户输入的时间。支持 90 / 1:30 / 01:30 / 1:02:03 四种写法，
+   * 空串与非数字返回 0。不做 strict 校验——这个输入框的错误提示应该由
+   * 「保存后服务端怎么落」来给，而不是在每个按键上跟用户较劲。
+   */
+  function parseClock(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) return 0;
+    if (/^\d+(\.\d+)?$/.test(s)) return Math.max(0, Math.floor(Number(s)));
+    const parts = s.split(':');
+    if (parts.length < 2 || parts.length > 3) return 0;
+    let total = 0;
+    for (const p of parts) {
+      if (!/^\d{1,2}$/.test(p)) return 0;
+      total = total * 60 + Number(p);
+    }
+    return total;
+  }
+
+  function isVideoAdmin() {
+    const u = (window.NasCab && window.NasCab.state && window.NasCab.state.user) || {};
+    const t = String(u.type || u.role || '');
+    return t === 'super_admin' || t === 'admin';
+  }
+
+  function paintSkipMenu() {
+    const menu = $('#vstage-kmenu');
+    if (!menu) return;
+    const sk = V.openSkip || {};
+    const admin = isVideoAdmin();
+    menu.innerHTML = `
+      <div class="skipset">
+        <div class="skipset__row">
+          <span class="skipset__lb">片头</span>
+          <input class="input input--sm skipset__in" id="sk-intro-start" type="text" inputmode="numeric"
+                 placeholder="0:00" value="${escapeHtml(fmtClock(sk.startSec))}" ${admin ? '' : 'disabled'}>
+          <span class="skipset__to">至</span>
+          <input class="input input--sm skipset__in" id="sk-intro-end" type="text" inputmode="numeric"
+                 placeholder="1:30" value="${escapeHtml(fmtClock(sk.endSec))}" ${admin ? '' : 'disabled'}>
+        </div>
+        <div class="skipset__row">
+          <span class="skipset__lb">片尾</span>
+          <input class="input input--sm skipset__in" id="sk-outro-start" type="text" inputmode="numeric"
+                 placeholder="不设" value="${sk.outroStartSec > 0 ? escapeHtml(fmtClock(sk.outroStartSec)) : ''}" ${admin ? '' : 'disabled'}>
+          <span class="skipset__to">至结尾</span>
+        </div>
+        <div class="skipset__acts">
+          <button class="btn btn--ghost btn--sm" id="sk-use-intro-start" ${admin ? '' : 'disabled'}>片头起点=当前</button>
+          <button class="btn btn--ghost btn--sm" id="sk-use-intro-end" ${admin ? '' : 'disabled'}>片头终点=当前</button>
+          <button class="btn btn--ghost btn--sm" id="sk-use-outro" ${admin ? '' : 'disabled'}>片尾起点=当前</button>
+        </div>
+        <div class="skipset__acts">
+          <button class="btn btn--primary btn--sm" id="sk-save" ${admin ? '' : 'disabled'}>保存</button>
+          <button class="btn btn--ghost btn--sm" id="sk-clear" ${admin ? '' : 'disabled'}>全部清除</button>
+        </div>
+        <label class="vswitch"><input type="checkbox" id="sk-auto" ${V.autoSkipIntro ? 'checked' : ''}><span>自动跳过片头</span></label>
+        ${admin ? '' : '<div class="skipset__hint">只有管理员可以修改片头片尾（会同步到同一剧集的全部分集）</div>'}
+      </div>`;
+
+    const fill = (inputId, sec) => {
+      const el = $(inputId);
+      if (el) el.value = fmtClock(sec);
+    };
+    const useCur = id => { fill(id, currentPos()); };
+    const bindUse = (btnId, inputId) => {
+      const b = $(btnId);
+      if (b) b.addEventListener('click', e => { e.stopPropagation(); useCur(inputId); });
+    };
+    bindUse('#sk-use-intro-start', '#sk-intro-start');
+    bindUse('#sk-use-intro-end', '#sk-intro-end');
+    bindUse('#sk-use-outro', '#sk-outro-start');
+
+    const auto = $('#sk-auto');
+    if (auto) auto.addEventListener('change', () => {
+      V.autoSkipIntro = !!auto.checked;
+      const p = loadPrefs();
+      p.autoSkipIntro = V.autoSkipIntro;
+      savePrefs(p);
+    });
+
+    const save = $('#sk-save');
+    if (save) save.addEventListener('click', async e => {
+      e.stopPropagation();
+      const startSec = parseClock($('#sk-intro-start') && $('#sk-intro-start').value);
+      const endSec = parseClock($('#sk-intro-end') && $('#sk-intro-end').value);
+      const outroStartSec = parseClock($('#sk-outro-start') && $('#sk-outro-start').value);
+      await saveOpenSkip({ startSec, endSec, outroStartSec });
+    });
+
+    const clear = $('#sk-clear');
+    if (clear) clear.addEventListener('click', async e => {
+      e.stopPropagation();
+      await saveOpenSkip({ startSec: 0, endSec: 0, outroStartSec: 0 });
+    });
+  }
+
+  /**
+   * 保存片头片尾。
+   * 只对「有索引的片源」有效——从文件夹直接放的没有 index_id，服务端认不出来。
+   * 保存后按服务端返回的实际值刷新：区间不合法时服务端是清空而不是夹紧，
+   * 照自己提交的那份刷新会和库里不一致。
+   */
+  async function saveOpenSkip({ startSec, endSec, outroStartSec }) {
+    if (!V.indexId) { toast('这个文件没有入库索引，无法保存片头片尾', 'warn'); return; }
+    try {
+      const r = await api.post('/api/video/detail/open_skip/set', {
+        index_id: V.indexId,
+        open_skip_start_sec: startSec,
+        open_skip_end_sec: endSec,
+        open_skip_outro_start_sec: outroStartSec,
+      });
+      const sk = (r && r.data && r.data.open_skip) || null;
+      if (sk) {
+        V.openSkip = {
+          startSec: Math.max(0, Number(sk.start_sec) || 0),
+          endSec: Math.max(0, Number(sk.end_sec) || 0),
+          outroStartSec: Math.max(0, Number(sk.outro_start_sec) || 0),
+        };
+      }
+      V._introSkipped = false;
+      paintSkipMenu();
+      paintSkipIntro(currentPos());
+      paintSkipOutro(currentPos());
+      const intro = V.openSkip.startSec > 0 && V.openSkip.endSec > V.openSkip.startSec + 1;
+      const outro = V.openSkip.outroStartSec > 0;
+      if (!intro && !outro && (startSec || endSec || outroStartSec)) {
+        toast('区间不合法已清空：片头终点要晚于起点，片尾起点要晚于片头终点', 'warn');
+      } else {
+        toast('片头片尾已保存', 'ok');
+      }
+    } catch (e) {
+      toast(`保存失败：${(e && e.message) || '请稍后重试'}`, 'warn');
     }
   }
 
@@ -1421,6 +1603,9 @@ function __register(N) {
     if (!filePath) { toast('这个条目没有可播放的文件'); return; }
     V.filePath = filePath;
     V.duration = Number(item.duration) || 0;
+    // 片头片尾是存在 video_index 上的片源元数据，要带 index_id 才能保存。
+    // 剧集点进来时 item 是分集行，同样有 id。
+    V.indexId = Number(item.id) || 0;
     V.baseSeek = Number(seek) || 0;
     V.quality = 'original';
     V._fellBack = false;
@@ -1453,6 +1638,9 @@ function __register(N) {
     paintAudioMenu();
     paintSpeedMenu();
     paintAspectMenu();
+    // 先用默认空值画一版，tracks 回来再按库里的实际值重画——
+    // 不先画的话打开菜单会看到上一部片子的设置
+    paintSkipMenu();
 
     const v = $('#vstage-video');
     applyAspect();
@@ -1496,13 +1684,21 @@ function __register(N) {
       const d = t.data || {};
       V.audioTracks = Array.isArray(d.audio) ? d.audio : [];
       V.subtitleTracks = Array.isArray(d.subtitles) ? d.subtitles : [];
-      V.openSkip = d.openSkip && typeof d.openSkip === 'object' ? d.openSkip : { startSec: 0, endSec: 0 };
+      V.openSkip = d.openSkip && typeof d.openSkip === 'object'
+        ? {
+            startSec: Math.max(0, Number(d.openSkip.startSec) || 0),
+            endSec: Math.max(0, Number(d.openSkip.endSec) || 0),
+            outroStartSec: Math.max(0, Number(d.openSkip.outroStartSec) || 0),
+          }
+        : { startSec: 0, endSec: 0, outroStartSec: 0 };
       V.directPlay = d.directPlay && typeof d.directPlay === 'object' ? d.directPlay : null;
       if (V.audioIndex > 0 && !V.audioTracks.some(a => a.index === V.audioIndex)) V.audioIndex = 0;
       buildSubtitleTracks();
       paintAudioMenu();
       paintSubtitleMenu();
+      paintSkipMenu();
       paintSkipIntro(currentPos());
+      paintSkipOutro(currentPos());
       // 源编码浏览器解不了时，原画档位放出来只有一个黑屏 + 错误框。
       // 服务端已经按编码判过（webPlayableUtil），这里直接切到转码档位。
       autoSwitchOffDirectPlay();
@@ -1538,6 +1734,9 @@ function __register(N) {
     V._fellBack = false;
     V._autoSwitched = false;
     $('#vstage-err').hidden = true;
+    // 换集不换片源元数据，但片尾按钮要收起来，否则上一集尾的按钮会留到下一集开头
+    const outBtn = $('#vstage-skipoutro');
+    if (outBtn) outBtn.hidden = true;
     const v = $('#vstage-video');
     setLoading(true, '起播中…');
     v.src = videoStreamUrl(0);

@@ -904,6 +904,21 @@ input[type="range"]::-moz-range-thumb { width: 11px; height: 11px; border: 0; bo
 .vstage__skip { position: absolute; z-index: 2; left: 50%; bottom: 118px; transform: translateX(-50%); height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .92); color: #0f172a; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
 .vstage__skip[hidden] { display: none; }
 .vstage__skip:hover { background: #fff; }
+/* 片尾按钮比片头矮一档、颜色沉一档：片头是「快点看正片」，片尾是「这一集结束了」，
+   两个按钮同时出现的概率极低，但真同时出现时要分得清主次 */
+.vstage__skip--outro { bottom: 92px; height: 30px; padding: 0 14px; background: rgba(15, 23, 42, .86); color: #e2e8f0; font-size: 12px; border: 1px solid rgba(255, 255, 255, .18); }
+.vstage__skip--outro:hover { background: rgba(15, 23, 42, .96); }
+
+/* 片头片尾设置面板（挂在播放器顶栏菜单里） */
+.skipset { display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 2px; min-width: 268px; }
+.skipset__row { display: flex; align-items: center; gap: 6px; }
+.skipset__lb { flex: 0 0 30px; font-size: 12px; color: var(--text-dim); }
+.skipset__to { flex: 0 0 auto; font-size: 11.5px; color: var(--text-dim); }
+.skipset__in { flex: 1 1 0; min-width: 0; text-align: center; font-variant-numeric: tabular-nums; }
+.skipset__in:disabled { opacity: .55; cursor: not-allowed; }
+.skipset__acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.skipset__acts .btn { flex: 1 1 auto; }
+.skipset__hint { font-size: 11.5px; line-height: 1.5; color: var(--text-dim); }
 .vstage__next { position: absolute; z-index: 3; right: 22px; bottom: 112px; display: flex; align-items: center; gap: 8px; max-width: min(420px, 80vw); padding: 10px 12px; border-radius: var(--radius); background: rgba(10, 14, 24, .9); border: 1px solid rgba(255, 255, 255, .16); color: #e2e8f0; font-size: 12px; }
 .vstage__next[hidden] { display: none; }
 .vstage__next span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

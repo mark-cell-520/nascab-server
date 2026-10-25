@@ -117,12 +117,16 @@ class VideoDetailController {
       const indexId = Number(body.index_id ?? body.indexId ?? 0) || 0;
       const openSkipStartSec = body.open_skip_start_sec ?? body.openSkipStartSec ?? 0;
       const openSkipEndSec = body.open_skip_end_sec ?? body.openSkipEndSec ?? 0;
+      // 片尾开始秒。没传就是 0（不设片尾）——不能默认沿用库里的旧值，
+      // 否则用户想清掉片尾时没有途径表达「清空」。
+      const openSkipOutroStartSec = body.open_skip_outro_start_sec ?? body.openSkipOutroStartSec ?? 0;
 
       const service = new VideoDetailService(req.dbVideo);
       const data = await service.setOpenSkip({
         indexId,
         openSkipStartSec,
         openSkipEndSec,
+        openSkipOutroStartSec,
       });
       return ResponseUtil.success(req, res, data, 'common.SUCCESS', 200);
     } catch (e) {

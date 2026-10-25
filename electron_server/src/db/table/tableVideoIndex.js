@@ -48,6 +48,9 @@ class tableVideoIndex {
         table.text('nfo_director_json').defaultTo('[]');
         table.integer('open_skip_start_sec').notNullable().defaultTo(0);
         table.integer('open_skip_end_sec').notNullable().defaultTo(0);
+        // 片尾开始秒。0 表示没设片尾。上游只有片头两列，片尾（连播时最有用的那段）
+        // 完全没有地方存，播放器也就无从判断「现在已经在片尾了」。
+        table.integer('open_skip_outro_start_sec').notNullable().defaultTo(0);
         table.integer('nfo_get_state').notNullable().defaultTo(0);
         table.integer('gen_subtitle_vtt').notNullable().defaultTo(0);
         table.integer('gen_tiny').notNullable().defaultTo(0);
@@ -67,6 +70,8 @@ class tableVideoIndex {
       };
       await addColumn('play_rel_path', "TEXT DEFAULT ''");
       await addColumn('gen_subtitle_vtt', 'INTEGER NOT NULL DEFAULT 0');
+      // 片尾开始秒：老库补列，默认 0（没设片尾）
+      await addColumn('open_skip_outro_start_sec', 'INTEGER NOT NULL DEFAULT 0');
     }
   }
 
