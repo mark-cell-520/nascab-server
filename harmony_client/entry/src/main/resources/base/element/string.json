@@ -35,6 +35,14 @@
     {
       "name": "permission_media_location_reason",
       "value": "相册备份需要保留照片中的拍摄地点等元数据"
+    },
+    {
+      "name": "permission_camera_reason",
+      "value": "P2P 实时音视频通信需要访问摄像头采集画面"
+    },
+    {
+      "name": "permission_microphone_reason",
+      "value": "P2P 实时音视频通信需要访问麦克风采集声音"
     }
   ]
 }

@@ -66,6 +66,25 @@
           "abilities": ["EntryAbility"],
           "when": "inuse"
         }
+      },
+      // CAMERA / MICROPHONE 由 @ohos/webrtc HAR 的 module.json 合并进安装包，
+      // 该 HAR 只声明了 reason 未声明 usedScene，会导致上架审核失败。
+      // 在此显式声明同名权限以补全 usedScene（WebRTC 实时音视频能力使用）。
+      {
+        "name": "ohos.permission.CAMERA",
+        "reason": "$string:permission_camera_reason",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
+      },
+      {
+        "name": "ohos.permission.MICROPHONE",
+        "reason": "$string:permission_microphone_reason",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
       }
     ],
     "abilities": [
