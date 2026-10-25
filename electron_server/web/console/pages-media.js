@@ -34,6 +34,7 @@ function __register(N) {
     audio: '<svg viewBox="0 0 20 20"><path d="M10 4.2L6.4 7.2H4v5.6h2.4L10 15.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 7.6a3.4 3.4 0 010 4.8M15.4 5.6a6.2 6.2 0 010 8.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
     mute: '<svg viewBox="0 0 20 20"><path d="M10 4.2L6.4 7.2H4v5.6h2.4L10 15.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13.4 8l4 4M17.4 8l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     speed: '<svg viewBox="0 0 20 20"><path d="M3.6 14.4a7 7 0 1112.8 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 10.6l3.4-2.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="11.4" r="1.2" fill="currentColor"/></svg>',
+    ratio: '<svg viewBox="0 0 20 20"><rect x="2.6" y="4.6" width="14.8" height="10.8" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.8 13.4V7.2l4.4 3.4 2.2-1.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     fs: '<svg viewBox="0 0 20 20"><path d="M4 8V4.6h4M16 12v3.4h-4M16 8V4.6h-4M4 12v3.4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     pip: '<svg viewBox="0 0 20 20"><rect x="2.6" y="4.4" width="14.8" height="11.2" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="11.4" y="9.6" width="4.6" height="4" rx=".8" fill="currentColor"/></svg>',
     text: '<svg viewBox="0 0 20 20"><path d="M4.5 5.5h11M10 5.5v10M7.4 15.5h5.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
@@ -870,6 +871,8 @@ function __register(N) {
     subtitleRef: '',          // '' 表示关闭字幕
     subOffset: 0,             // 字幕延时（秒），正数延后
     speed: '1',
+    /* 画面比例：'auto' 表示按片源自带比例，其余强制成指定宽高比 */
+    aspect: 'auto',
     /* 片头片尾（video_index.open_skip_*_sec） */
     openSkip: { startSec: 0, endSec: 0 },
     autoSkipIntro: false,
@@ -1102,6 +1105,10 @@ function __register(N) {
             <button class="qsel__btn" id="vstage-rbtn" title="倍速">${I.speed}<span id="vstage-rlabel">倍速</span></button>
             <div class="qsel__menu" id="vstage-rmenu" hidden></div>
           </div>
+          <div class="qsel" id="vstage-psel">
+            <button class="qsel__btn" id="vstage-pbtn" title="画面比例">${I.ratio}<span id="vstage-plabel">比例</span></button>
+            <div class="qsel__menu" id="vstage-pmenu" hidden></div>
+          </div>
           <button class="vstage__btn" id="vstage-pip" title="画中画">${I.pip}</button>
           <button class="vstage__btn" id="vstage-fs" title="全屏 (F)">${I.fs}</button>
           <button class="vstage__btn" id="vstage-close" title="退出播放 (Esc)">${I.close}</button>
@@ -1160,6 +1167,7 @@ function __register(N) {
     bindMenu('#vstage-ssel', '#vstage-smenu', '#vstage-sbtn');
     bindMenu('#vstage-asel', '#vstage-amenu', '#vstage-abtn');
     bindMenu('#vstage-rsel', '#vstage-rmenu', '#vstage-rbtn');
+    bindMenu('#vstage-psel', '#vstage-pmenu', '#vstage-pbtn');
 
     document.addEventListener('click', e => {
       $$('.qsel__menu').forEach(m => {
@@ -1423,6 +1431,8 @@ function __register(N) {
     V.subOffset = 0;
     V.audioIndex = 0;
     V.speed = '1';
+    // 画面比例是显示偏好、跟设备相关，和音量一样放 localStorage（不同步到服务端）
+    V.aspect = ASPECT_BY_KEY.has(String(loadPrefs().videoAspect)) ? String(loadPrefs().videoAspect) : 'auto';
     clearTimeout(V._nextTimer);
     const nextBox = $('#vstage-next');
     if (nextBox) nextBox.hidden = true;
@@ -1436,13 +1446,16 @@ function __register(N) {
     $('#vstage-slabel').textContent = '字幕';
     $('#vstage-alabel').textContent = '音轨';
     $('#vstage-rlabel').textContent = '倍速';
+    $('#vstage-plabel').textContent = (ASPECT_BY_KEY.get(V.aspect) || ASPECT_BY_KEY.get('auto')).label;
     removeSubtitleTracks();
     paintQualityMenu();
     paintSubtitleMenu();
     paintAudioMenu();
     paintSpeedMenu();
+    paintAspectMenu();
 
     const v = $('#vstage-video');
+    applyAspect();
     setLoading(true, '起播中…');
     v.src = videoStreamUrl(V.baseSeek);
     v.play().catch(() => {});
@@ -1922,6 +1935,73 @@ function __register(N) {
   /* ---------------- 倍速 / 音量 ---------------- */
   const SPEEDS = ['0.5', '0.75', '1', '1.25', '1.5', '1.75', '2', '3'];
 
+  /**
+   * 画面比例选项。
+   *
+   * 两类需求用一个模型表达，每个选项是 (ar, fit) 一对：
+   *   ar  = 强制显示宽高比，'' 表示不干预、按片源自带比例
+   *   fit = object-fit：contain 完整显示（可能留黑边）、cover 裁掉多余部分、
+   *         fill 拉满不管比例
+   *
+   * 「自动」只设 fit=contain，其余交给片源元数据——这是默认且永远正确的一档。
+   * 强制比例那几档用 fill：把画面拉到指定宽高比，用来矫正元数据写错的片源
+   * （见过标成 16:9 实际是老 4:3 转的，人都被拉宽了）。
+   * 「裁剪填充」用 cover：填满播放区、多出的部分裁掉，适合不想看黑边的时候。
+   */
+  const ASPECTS = [
+    { key: 'auto', label: '自动', ar: '', fit: 'contain', desc: '按片源比例，留黑边' },
+    { key: '16:9', label: '16:9', ar: '16 / 9', fit: 'fill', desc: '宽屏标准' },
+    { key: '16:10', label: '16:10', ar: '16 / 10', fit: 'fill', desc: '部分显示器比例' },
+    { key: '4:3', label: '4:3', ar: '4 / 3', fit: 'fill', desc: '老片 / 标清' },
+    { key: '1:1', label: '1:1', ar: '1 / 1', fit: 'fill', desc: '方形，按像素' },
+    { key: 'cover', label: '裁剪填充', ar: '', fit: 'cover', desc: '填满播放区，裁掉多余' },
+    { key: 'fill', label: '拉伸填充', ar: '', fit: 'fill', desc: '拉满播放区，不管比例' },
+  ];
+  const ASPECT_BY_KEY = new Map(ASPECTS.map(a => [a.key, a]));
+
+  /** 把比例写进 video 元素。ar 为空时移除 aspect-ratio，回到片源自带比例 */
+  function applyAspect() {
+    const v = $('#vstage-video');
+    if (!v) return;
+    const a = ASPECT_BY_KEY.get(V.aspect) || ASPECT_BY_KEY.get('auto');
+    v.style.aspectRatio = a.ar || '';
+    v.style.objectFit = a.fit || 'contain';
+    // 强制比例时要把 width/height 的上限放开，否则 aspect-ratio 会被 100% 宽高顶掉
+    v.style.width = a.ar ? 'auto' : '';
+    v.style.height = a.ar ? 'auto' : '';
+    v.style.maxWidth = '100%';
+    v.style.maxHeight = '100%';
+  }
+
+  function paintAspectMenu() {
+    const menu = $('#vstage-pmenu');
+    if (!menu) return;
+    menu.innerHTML = ASPECTS.map(a => `
+      <button class="qsel__item ${a.key === V.aspect ? 'is-active' : ''}" data-ar="${a.key}">
+        <span class="qsel__key">${a.label}${a.key === 'auto' ? ' <em>默认</em>' : ''}</span>
+        <span class="qsel__desc">${a.desc}</span>
+      </button>`).join('');
+    $$('[data-ar]', menu).forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      menu.hidden = true;
+      setAspect(b.dataset.ar, false);
+    }));
+  }
+
+  function setAspect(key, silent) {
+    const a = ASPECT_BY_KEY.get(key);
+    if (!a) return;
+    if (key === V.aspect) return;
+    V.aspect = key;
+    $('#vstage-plabel').textContent = a.label;
+    applyAspect();
+    paintAspectMenu();
+    const p = loadPrefs();
+    p.videoAspect = key;
+    savePrefs(p);
+    if (!silent) toast(`画面比例：${a.label}`, 'ok');
+  }
+
   function paintSpeedMenu() {
     const menu = $('#vstage-rmenu');
     if (!menu) return;
@@ -2026,6 +2106,7 @@ function __register(N) {
       case 'c': case 'C': $('#vstage-sbtn').click(); return;
       case 'a': case 'A': $('#vstage-abtn').click(); return;
       case 's': case 'S': $('#vstage-rbtn').click(); return;
+      case 'r': case 'R': cycleAspect(); return;
       case 'n': case 'N': playEpisode(V.epIndex + 1); return;
       case ',': nudgeSubtitleOffset(-0.5); return;
       case '.': nudgeSubtitleOffset(0.5); return;
@@ -2049,6 +2130,13 @@ function __register(N) {
     const next = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, (i < 0 ? 2 : i) + dir))];
     setSpeed(next);
     toast(`倍速 ${next}x`);
+  }
+
+  /** R 键：在几个常用比例间循环（自动 → 16:9 → 4:3 → 裁剪填充 → 拉伸填充 → 自动） */
+  function cycleAspect() {
+    const order = ['auto', '16:9', '4:3', 'cover', 'fill'];
+    const i = order.indexOf(V.aspect);
+    setAspect(order[(i + 1) % order.length], false);
   }
 
   function seekVideo(t) {
