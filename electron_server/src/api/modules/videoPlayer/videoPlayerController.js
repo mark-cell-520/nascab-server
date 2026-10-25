@@ -14,6 +14,7 @@ const config = require('../../../config/config');
 const FileUtil = require('../../../utils/fileUtil');
 const { hasPermission } = require('../../../utils/permissionUtil');
 const videoQualityUtil = require('../../../utils/videoQualityUtil');
+const webPlayableUtil = require('../../../utils/webPlayableUtil');
 const thunderSubtitleService = require('./thunderSubtitleService');
 
 ffmpeg.setFfmpegPath(ffmpegPath.path);
@@ -109,22 +110,37 @@ function _normalizeText(v) {
   return String(v).trim();
 }
 
+/** mp4 容器层面装不装得下这个音频编码。装得下 ≠ 浏览器解得了，别混用。 */
 function _isMp4CompatibleAudioCodec(codecName) {
-  const codec = _normalizeText(codecName).toLowerCase();
-  if (!codec) return true;
-  return new Set(['aac', 'alac', 'ac3', 'eac3', 'ec3', 'mp3', 'mp2']).has(codec);
+  return webPlayableUtil.isMp4CompatibleAudioCodec(codecName);
 }
 
-async function _shouldFallbackMovCopyAudio(db, filePath) {
-  const ext = path.extname(_normalizeText(filePath)).toLowerCase();
-  if (ext !== '.mov') return false;
+/**
+ * 这个源能不能原样推给浏览器（视频音频都不动）
+ *
+ * 上游只对 `.mov` 做音频回退，视频编码从头到尾没看过。改成按编码判断：
+ * 只要有任一路音频浏览器解不了，copy 路径就把那一路转成 aac；视频编码
+ * 解不了时必须重编码视频（HEVC / MPEG-4 Part2 都属此类），否则播放器只会
+ * 收到一个必然失败的流。探测失败时返回 null，按「可以 copy」处理——
+ * 让播放器自己报错，比在这里误杀原画直连好。
+ */
+async function _planWebPlayable(db, filePath) {
+  try {
+    const result = await videoPlayerService.getCachedOrProbeVideoInfo(db, filePath);
+    const streams =
+      result && result.videoInfo && Array.isArray(result.videoInfo.streams) ? result.videoInfo.streams : [];
+    if (!streams.length) return null;
+    return webPlayableUtil.analyzeDirectPlay(streams);
+  } catch (_) {
+    return null;
+  }
+}
 
-  const result = await videoPlayerService.getCachedOrProbeVideoInfo(db, filePath).catch(() => null);
-  const streams = result && result.videoInfo && Array.isArray(result.videoInfo.streams) ? result.videoInfo.streams : [];
-  const audioStream = streams.find(s => s && s.codec_type === 'audio');
-  if (!audioStream) return false;
-
-  return !_isMp4CompatibleAudioCodec(audioStream.codec_name);
+/** copy 路径下音频是否要转 aac（原 `.mov` 专用，现按编码判断，与容器无关） */
+async function _shouldFallbackCopyAudio(db, filePath) {
+  const plan = await _planWebPlayable(db, filePath);
+  if (!plan) return false;
+  return !plan.audioCopy;
 }
 
 /** Subtitle codecs that can be remuxed into MP4 with -c copy (bitmap / exotic subs still excluded). */
@@ -1086,13 +1102,17 @@ class VideoPlayerController {
             : 0;
       const targetBitrate = tier && tier.bitrate ? tier.bitrate : _normalizeText(req.query && req.query.bitrate);
       const needsScale = targetWidth > 0;
-      const effectiveMode = needsScale ? 'transcode' : mode;
       const scaleFilter = needsScale ? videoQualityUtil.scaleFilter(targetWidth) : null;
       const resolvedPath = path.resolve(filePath);
       if (!fs.existsSync(resolvedPath)) {
         res.status(404).send('Not Found');
         return;
       }
+      // 浏览器解不了的编码必须重编码，否则 copy 出去只是一个必然失败的流。
+      // 这一条让「原画」档位在 HEVC / DTS 这类源上也能放（画质不缩放，只换编码）。
+      const webPlan = await _planWebPlayable(req.dbVideo, resolvedPath);
+      const needsVideoEncode = !!webPlan && !webPlan.videoCopy;
+      const effectiveMode = needsScale || needsVideoEncode ? 'transcode' : mode;
       const inputPath = transCodeUtil.dealFfmpegPath(resolvedPath);
       const subInputPathBase =
         useExternalSubtitle && resolvedSubtitlePath
@@ -1124,7 +1144,7 @@ class VideoPlayerController {
         }
         cmd.outputOptions(['-movflags', 'frag_keyframe+empty_moov+delay_moov']).outputFormat('mp4');
         if (effectiveMode === 'copy') {
-          const fallbackMovAudio = await _shouldFallbackMovCopyAudio(req.dbVideo, resolvedPath);
+          const fallbackMovAudio = await _shouldFallbackCopyAudio(req.dbVideo, resolvedPath);
           const subPlan =
             actuallyUseExternalSubtitle
               ? { mapOptions: [], subtitleCodecOptions: [] }

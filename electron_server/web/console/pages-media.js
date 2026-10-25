@@ -878,6 +878,9 @@ function __register(N) {
     epIndex: -1,
     autoplayNext: true,
     _fellBack: false,
+    /* 源能不能直连播放（/tracks 的 directPlay）。false 时原画档位必然放不出来 */
+    directPlay: null,
+    _autoSwitched: false,
     _introSkipped: false,
     _nextTimer: 0,
   };
@@ -1260,6 +1263,34 @@ function __register(N) {
     }, 1500);
   }
 
+  /**
+   * 源编码浏览器解不了时，从原画切到转码档位。
+   *
+   * 上游播放器的做法是等 videojs 报错再转码，并且**先**弹「已为您自动转码播放」
+   * 再发请求——转码服务没起来、ffmpeg 缺失、m3u8 生成失败时，这句话就是假的，
+   * 用户看到提示接着看到错误，比没有提示更难受。这里反过来：先确认放不出来，
+   * 切过去并等流真正开始（playing 事件）再告知，切失败了由 onVideoError 说清原因。
+   */
+  function autoSwitchOffDirectPlay() {
+    if (V._autoSwitched) return;
+    if (!V.directPlay || V.directPlay.ok) return;
+    if (V.quality === 'original') {
+      V._autoSwitched = true;
+      const tier = V.qualities.find(q => q.recommended && q.available)
+        || V.qualities.find(q => q.key !== 'original' && q.available)
+        || null;
+      const key = tier ? tier.key : '720p';
+      V.quality = key;
+      $('#vstage-qlabel').textContent = (tier && tier.label) || key;
+      reloadVideo();
+      paintQualityMenu();
+      saveVideoProgress(currentPos());
+      toast(`${V.directPlay.note || '源编码浏览器不支持'}，已切换到 ${(tier && tier.label) || key} 转码播放`, 'warn');
+      return;
+    }
+    // 已经在转码档位还是放不出来：不是编码问题，让 onVideoError 报
+  }
+
   function onVideoError() {
     const box = $('#vstage-err');
     setLoading(false);
@@ -1271,8 +1302,17 @@ function __register(N) {
       toast('该清晰度起播失败，已回落到原画', 'warn');
       return;
     }
+    // 原画失败：先看是不是编码问题。是就自动转码一次，而不是只给一句
+    // 「可尝试切换清晰度」让用户自己猜——转码正是唯一能放出来的路。
+    if (V.quality === 'original' && !V._autoSwitched && V.directPlay && !V.directPlay.ok) {
+      V._autoSwitched = true;
+      autoSwitchOffDirectPlay();
+      return;
+    }
     box.hidden = false;
-    box.textContent = '播放失败：浏览器无法解码这个源。可尝试切换清晰度（会重编码），或下载后用本地播放器观看。';
+    box.textContent = V.directPlay && !V.directPlay.ok
+      ? `播放失败：${V.directPlay.note || '源编码浏览器不支持'}，已尝试自动转码但仍未起来。可检查转码服务（libs/ffmpeg）后重试，或下载后用本地播放器观看。`
+      : '播放失败：浏览器无法解码这个源。可尝试切换清晰度（会重编码），或下载后用本地播放器观看。';
   }
 
   function onVideoEnded() {
@@ -1338,6 +1378,8 @@ function __register(N) {
     V.baseSeek = Number(seek) || 0;
     V.quality = 'original';
     V._fellBack = false;
+    V.directPlay = null;
+    V._autoSwitched = false;
     V._introSkipped = false;
     V.subtitleRef = '';
     V.subOffset = 0;
@@ -1404,11 +1446,15 @@ function __register(N) {
       V.audioTracks = Array.isArray(d.audio) ? d.audio : [];
       V.subtitleTracks = Array.isArray(d.subtitles) ? d.subtitles : [];
       V.openSkip = d.openSkip && typeof d.openSkip === 'object' ? d.openSkip : { startSec: 0, endSec: 0 };
+      V.directPlay = d.directPlay && typeof d.directPlay === 'object' ? d.directPlay : null;
       if (V.audioIndex > 0 && !V.audioTracks.some(a => a.index === V.audioIndex)) V.audioIndex = 0;
       buildSubtitleTracks();
       paintAudioMenu();
       paintSubtitleMenu();
       paintSkipIntro(currentPos());
+      // 源编码浏览器解不了时，原画档位放出来只有一个黑屏 + 错误框。
+      // 服务端已经按编码判过（webPlayableUtil），这里直接切到转码档位。
+      autoSwitchOffDirectPlay();
     } catch (_) {}
 
     // 剧集连播：只有多集才有意义
@@ -1438,6 +1484,8 @@ function __register(N) {
     $('#vstage-next').hidden = i >= V.episodes.length - 1;
     V.baseSeek = 0;
     V._introSkipped = false;
+    V._fellBack = false;
+    V._autoSwitched = false;
     $('#vstage-err').hidden = true;
     const v = $('#vstage-video');
     setLoading(true, '起播中…');

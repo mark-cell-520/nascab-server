@@ -54,6 +54,14 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 **剧集连播**（分集列表、上一集/下一集、播完自动连播、跳过片头）。
 另有缓冲进度、加载态、音量/静音、全屏、画中画与一套完整快捷键。
 
+**源编码浏览器不支持时**：`/stream-mp4` 的 `mode=copy` 是纯 remux，上游只对 `.mov`
+判断过音频要不要转 aac、视频编码一眼都没看过，于是 HEVC / DTS / AC3 这类源被原封不动
+推给浏览器，播放器只能报「源不支持」。新增 `webPlayableUtil.js` 把「mp4 容器装得下」
+与「浏览器解得了」分成两件事（上游把 AC3 算作兼容，那只是容器层面），`/stream-mp4`
+据此在**原画档位**就把解不了的编码换掉（视频仍能 copy 时只转音频），
+`/tracks` 额外返回 `directPlay` 让播放器在起播前就切到转码档位、并点名是哪个编码，
+而不是等黑屏之后再补救。
+
 「相册」页：服务端 `/api/photo` 下本来就有一整套相册能力（时间线、相册、合集、智能相册、
 人脸、地点、相似图、回收站），但 Web 控制台此前一处都没接。这里接出五个视图——
 **时间线**（年份导航、按拍摄日期分组、滚动分页、类型筛选、搜索）、**相册**（浏览/新建/
@@ -68,6 +76,7 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 | 歌单顺序 | `play_list2index` 没有顺序字段；列表按 `m.id desc` 排；`playlist/get` 不返回曲目 | 新增 `position` 列（老库自动补列回填）+ reorder/move/clear 三个接口，列表按 `position` 排 |
 | 清晰度 | `resolution` 只认 `1920x1080`，传 `"1080p"` 被静默忽略；没有档位表；`bitrate` 不带 `-maxrate/-bufsize` | 档位收敛成 `src/utils/videoQualityUtil.js` 一份定义，`/transcode` 与 `/stream-mp4` 共用 |
 | 播放器能力 | Web 端没有任何播放器；服务端有字幕/音轨相关接口但前端无处可用 | 新增 `mediaTrackLabelUtil.js` + `GET /api/videoPlayer/tracks`，字幕/音轨/倍速/连播全部落到 Web 播放器 |
+| 源编码浏览器不支持 |`/stream-mp4` 的 `mode=copy` 是纯 remux，上游**只对 `.mov` 判断过音频要不要转 aac**、**视频编码一眼都没看过**，HEVC / DTS / AC3 这类源被原封不动推给浏览器；`_isMp4CompatibleAudioCodec` 把 AC3 算作「兼容」，那只是「mp4 容器装得下」，桌面 Chrome/Firefox 解不了 AC3 |新增 `webPlayableUtil.js` 把「容器兼容」与「浏览器可解」分成两个函数（含 H.264 10bit/4:2:2 profile）；`_shouldFallbackMovCopyAudio` 改为按编码判断的 `_shouldFallbackCopyAudio`，视频编码解不了时整个流退到重编码——**原画档位也不再推必然失败的流**（实测 HEVC 源输出 `video:h264 audio:aac`，h264+AC3 源只转音频，h264+aac 源不动）；`/tracks` 增加 `directPlay`，播放器起播前就切档位并点名具体编码 |
 | 相册 | `/api/photo` 一整套能力在 Web 端零接入；`getTimelinePhotoList` 注释写着分页而实现没有，时间轴无法滚动加载；`/album/delete` 只认 `id` 而同文件其它接口全认 `album_id`；`getTinyImgByPath` 的缓存键不含 `size`，第一个请求的尺寸被永久固化（灯箱只能拿到网格尺寸的小图） | 新增 `pages-photo.js` 与「相册」页；时间线实现分页（单页上限 500、响应带 `hasMore`）；`deleteAlbum` 两种参数都收；缩略图缓存键加尺寸并新增 `normalizeTinySize`；清掉相册模块 4 处 `console.log` |
 
 ### 机器控制接口 `/api/control`

@@ -127,6 +127,38 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 `/transcode` 与 `/stream-mp4` 都从这儿取参数，前端也只认档位 key。显式传 `width`/`bitrate` 的老调用方行为不变。
 清晰度、字幕、音轨、倍速四类偏好都写进 `video_play_preference`，下次打开同一部影片自动恢复。
 
+#### 源编码浏览器不支持时
+
+这是「原文件编码不支持,已为您自动转码播放」这类提示的根因。`/stream-mp4` 的 `mode=copy` 是纯 remux，
+视频音频流原样搬进 mp4 容器，上游**只对 `.mov` 判断过音频要不要转 aac**（`_shouldFallbackMovCopyAudio`
+第一行就是 `ext !== '.mov' return false`），**视频编码从头到尾没看过一眼**。于是 HEVC / MPEG-4 Part2 /
+DTS / TrueHD 这类源会被原封不动推给浏览器，播放器报 `MEDIA_ERR_SRC_NOT_SUPPORTED`，用户看到黑屏加一句
+「播放失败」，或者上游客户端那句先弹出来、转码却没起来的「已为您自动转码播放」。
+
+新增 `src/utils/webPlayableUtil.js` 把「哪些编码浏览器解得了」收成一份定义，关键是把两件常被混为一谈的事分开：
+
+| | 回答的问题 | 例 |
+|---|---|---|
+| `isMp4CompatibleAudioCodec` | mp4 **容器**装不装得下 | AC3、E-AC3 装得下 |
+| `isWebPlayableAudioCodec` | **浏览器**解不解得了 | 桌面 Chrome/Firefox 解不了 AC3 |
+
+拿前一问的结论去做后一件事的判断，就是「容器明明支持却放不出来」的原因。视频侧同理：H.264 的
+`High 10` / `High 4:2:2` 这些 10bit、4:2:2 profile 也在禁用列表里——源是 10bit 时浏览器同样放不出来。
+
+落地上有三处：
+
+1. `/stream-mp4`：只要探到任一路音频浏览器解不了，copy 路径就把那一路转 aac（视频仍 copy，不做无谓重编码）；
+   视频编码解不了时整个流退到重编码分支。**「原画」档位因此不再把必然失败的流推给浏览器**——
+   实测 HEVC 源在原画档位现在输出 `video:h264 audio:aac`，h264+AC3 源视频保持 copy、只转音频，
+   而 h264+aac 源不被无谓重编码。
+2. `GET /api/videoPlayer/tracks` 返回 `video`（编码/profile/宽高）与 `directPlay`
+   （`ok` / `reason` / `note` / `videoCodec` / `audioCodecs`），`note` 是给人看的中文句子
+   （「视频编码 HEVC / H.265 浏览器不支持」），不把 `hevc` 直接扔给用户。
+3. 控制台播放器起播后拿到 `directPlay`，**放不出来就直接切到推荐转码档位**，并在提示里点名是哪个编码；
+   转码档位失败则回落一次原画（服务端在原画档位也会按编码重封装，回落常常就活了），
+   原画仍不行才显示错误框，文案是「已尝试自动转码但仍未起来 + 具体编码 + 可检查 libs/ffmpeg」。
+   上游客户端是反过来：先弹「已为您自动转码播放」再发请求，转码没起来时那句话就是假的。
+
 服务端这边：`collectSystemInfo()` 的静态部分（`package.json`、CPU 型号、核心数）按进程缓存——
 其中 `os.cpus()` 在 Windows 上每次调用都会重新构造一份「每个逻辑核一个对象」的数组，
 概览页每 3 秒调一次，不缓存就是每分钟制造一整套纯垃圾。
@@ -185,9 +217,9 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 | 接口 | 鉴权 | 说明 |
 |---|---|---|
 | `GET /api/videoPlayer/qualities?filePath=...` | 登录用户 + 文件 view/download 权限 | 可选清晰度档位表 + 源分辨率 + 用户上次选择（清晰度/字幕/音轨/倍速） |
-| `GET /api/videoPlayer/tracks?filePath=...` | 同上 | 可选音轨与字幕轨清单（含内嵌/外挂、语言、编码、可否走 WebVTT）+ 片头片尾区间 |
+| `GET /api/videoPlayer/tracks?filePath=...` | 同上 | 可选音轨与字幕轨清单（含内嵌/外挂、语言、编码、可否走 WebVTT）+ 片头片尾区间 + 视频轨编码 + `directPlay`（源能否被浏览器直连播放，含中文原因说明） |
 | `GET /api/videoPlayer/transcode?...&quality=720p` | 同上 | HLS 转码；`quality` 为档位 key，`original` 会 400 指引走原画直链 |
-| `GET /api/videoPlayer/stream-mp4?...&quality=480p&audioMapIndex=1` | 同上 | fMP4 流；带缩放参数时自动重编码；`audioMapIndex` 选音轨 |
+| `GET /api/videoPlayer/stream-mp4?...&quality=480p&audioMapIndex=1` | 同上 | fMP4 流；带缩放参数、或源里有浏览器解不了的编码时自动重编码（原画档位遇到 HEVC/DTS 会换成浏览器能放的编码，而不是原样推出去）；`audioMapIndex` 选音轨 |
 | `GET /api/videoPlayer/subtitle-vtt?filePath=...&subtitleIndex=3` | 同上 | 内嵌字幕轨导成 WebVTT（带缓存）；`subtitlePath=` 则直接转外挂文件 |
 | `POST /api/videoPlayer/uploadSubtitle` | 同上 | 上传外挂字幕到 `subtitleUpload/<视频 hash>/<uid>/` |
 | `POST /api/videoPlayer/searchSubtitle` | 同上 | 迅雷字幕搜索（`searchType=keyword` 或按影片特征） |
@@ -715,15 +747,16 @@ server {
 | `src/api/controlServer.js` | 多 worker 抢控制端口时按 info 记录而非 error（不是故障，报了会让运维误判）。补充说明：cluster worker 的 `listen` 会经主进程共享句柄完成绑定，多个 express worker 实际是**共享**同一个控制端口，单个 worker 挂掉不影响控制接口 |
 | `src/utils/videoQualityUtil.js` | **新增**。清晰度档位的唯一来源：档位 key → 宽/高/码率/maxrate/bufsize，`normalizeQualityKey` 兼容 `1080p`/`FHD`/`1920x1080`/`source` 等写法，`listQualities` 按源分辨率收窄档位（不放大），`resolveQuality` 出 ffmpeg 参数 |
 | `src/utils/mediaTrackLabelUtil.js` | **新增**。音轨/字幕轨标签与可达性的唯一来源：ISO 639 语言码 → 中文名、字幕编码 → 中文名（含「PGS 图像字幕」）、声道数 → 5.1/立体声、`isTextSubtitleCodec` 判定能否转 WebVTT、倍速白名单归一 |
-| `src/api/modules/videoPlayer/videoPlayerController.js` | `/transcode` 新增 `quality` 参数并映射到 resolution/bitrate/maxrate/bufsize；新增 `GET /qualities`（返回档位表与整份偏好）与 `GET /tracks`（音轨/字幕轨清单 + 片头片尾）；`/info` 附带档位表；`/stream-mp4` 支持 `width`/`bitrate`/`quality`/`audioMapIndex`（带缩放参数时自动从 `mode=copy` 退到重编码，避免「选了 720p 出来还是原画」）；`/preference` 持久化清晰度/字幕/音轨/倍速；`/subtitle-vtt` 文件不存在时返回 404 而非默认 500 |
+| `src/utils/webPlayableUtil.js` | **新增**。浏览器能否直连播放某个源的唯一来源。把「mp4 容器装不装得下」与「浏览器解不解得了」分成两个函数（上游只判过前者且只对 `.mov`），视频侧覆盖 H.264 的 10bit / 4:2:2 / 4:4:4 profile，`analyzeDirectPlay` 从 ffprobe streams 给出 `ok`/`videoCopy`/`audioCopy`/`reason`/`note`；编码名统一走 `codecLabel` 转中文，不把 `hevc` 扔给用户 |
+| `src/api/modules/videoPlayer/videoPlayerController.js` | `/transcode` 新增 `quality` 参数并映射到 resolution/bitrate/maxrate/bufsize；新增 `GET /qualities`（返回档位表与整份偏好）与 `GET /tracks`（音轨/字幕轨清单 + 片头片尾）；`/info` 附带档位表；`/stream-mp4` 支持 `width`/`bitrate`/`quality`/`audioMapIndex`（带缩放参数时自动从 `mode=copy` 退到重编码，避免「选了 720p 出来还是原画」）；`/preference` 持久化清晰度/字幕/音轨/倍速；`/subtitle-vtt` 文件不存在时返回 404 而非默认 500。**`_shouldFallbackMovCopyAudio` 改为 `_shouldFallbackCopyAudio`**：不再看扩展名是不是 `.mov`，改按编码判断（任一路音频浏览器解不了就把那一路转 aac，视频仍 copy）；新增 `_planWebPlayable`，视频编码解不了时整个流退到重编码分支——原画档位不再把 HEVC 原样推给浏览器 |
 | `src/workers/transcodeWorker.js` | 透出 `options.maxrate`/`options.bufsize` 到 `-maxrate`/`-bufsize`（只有 `-b:v` 时 x264 在复杂场景会冲到远超目标值，流式播放表现为带宽抖动） |
 | `src/db/table/tableVideoPlayPreference.js` | 新增 `quality`、`subtitle_ref`、`audio_index`、`speed` 四列，老库逐列自动 `ADD COLUMN`（幂等） |
-| `src/api/modules/videoPlayer/videoPlayerService.js` | 偏好读写带上四列，落库前归一化：清晰度过 `normalizeQualityKey`、字幕引用只认 `emb:<流号>`/`ext:<文件名>`、音轨序号带上限、倍速过白名单——脏值一律落空而不是把任意字符串存进库；新增 `getTrackInfo` 汇总音轨/字幕轨清单 |
+| `src/api/modules/videoPlayer/videoPlayerService.js` | 偏好读写带上四列，落库前归一化：清晰度过 `normalizeQualityKey`、字幕引用只认 `emb:<流号>`/`ext:<文件名>`、音轨序号带上限、倍速过白名单——脏值一律落空而不是把任意字符串存进库；新增 `getTrackInfo` 汇总音轨/字幕轨清单，并返回视频轨编码与 `directPlay`（前端据此在起播前切档位） |
 | `src/db/table/tableMusicPlayList2Index.js` | **新增 `position` 列**（播放顺序），老库自动补列并按 `create_time` + `index_id` 回填；新增 `(list_id, position)` 索引 |
 | `src/api/modules/music/playlist/playListService.js` | 加歌按调用方传入的顺序分配 position；新增 `reorderIndexes`（整体重排，提交子集时未提到的按原相对次序移到队尾）、`moveIndex`（单曲移到指定位置，越界夹紧）、`clearIndexes`（清空曲目）；`getList` 现在返回曲目列表；歌单预览图改按播放顺序取 |
 | `src/api/modules/music/playlist/playListController.js`、`musicRouter.js` | 新增 `playlist/index/reorder`、`playlist/index/move`、`playlist/index/clear` 三个接口 |
 | `src/api/modules/music/list/musicListService.js` | 带 `list_id` 时按 `pl.position` 排序——**改造前固定 `m.id desc`，用户在歌单里排的顺序完全不会生效** |
-| `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度、分集列表）+ 全屏播放器（清晰度选择、字幕菜单与外观调节、音轨切换、倍速、跳过片头、自动连播、画中画/全屏、缓冲进度、完整快捷键、断点续播） |
+| `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度、分集列表）+ 全屏播放器（清晰度选择、字幕菜单与外观调节、音轨切换、倍速、跳过片头、自动连播、画中画/全屏、缓冲进度、完整快捷键、断点续播）。播放器按 `/tracks` 的 `directPlay` 在起播前切到转码档位（放不出来时点名具体编码），转码失败回落原画、原画仍不行才报错 |
 | `web/console/console.js`、`console.css`、`index.html` | 导航新增「媒体」分组（影视/音乐）；补足播放器栏、队列抽屉、歌词面板、海报墙、清晰度/字幕/音轨/倍速菜单、加载态、缓冲条、跳过片头、分集列表的样式（同样走设计令牌，暗色自动生效） |
 | `electron_server/language/*.json` | 新增 `videoPlayer.QUALITY_ORIGINAL_USE_RAW`（原画不走转码，应改走原画直链） |
 | `src/api/modules/photo/timeline/photoTimeLineService.js` | **`getTimelinePhotoList` 实现分页**——注释里一直写着 `page`/`pageSize`，实现却一个都没用，时间轴因此无法滚动加载；新增 `hasPaging`/`resolvePaging`（单页上限 500、兼容 `page_size`/`page_index` 写法），传了 `pageSize` 就分页并在响应里带 `hasMore`，不传时保持原行为返回全部；`loadTheDay` 兼容字符串 `'1'`/`'true'`。清掉 4 处 `console.log` 调试输出（含每次查询都打印的 `query.toString()`） |
@@ -784,6 +817,21 @@ server {
 - 快捷键全表无运行时错误；数字键 `5` 重连流的 `src` 带 `seek=3600`（7200 秒的 50%）
 - 剧集：详情弹层列出分集，点某一集直接起播并把标题换成该集名字
 - 用 CDP 驱动无头 Chrome 截图核对播放器各状态（播放器/字幕菜单/倍速菜单/清晰度菜单/音轨菜单），以及 780px 窄屏下顶栏自动收起文字标签只留图标、浅色主题下菜单跟随主题而视频区保持深色
+
+### 源编码浏览器不支持（本轮新增）
+
+以下在本机实测通过（Node 22.20.0，真实启动的服务端 + 真 ffmpeg/ffprobe 造片 + jsdom）：
+
+- 手搓 streams：`h264+aac` / `vp9+opus` / `av1+flac` 判为可直连；`hevc` / `mpeg4` / `mpeg2video` / `wmv3` / `theora` 判为视频必须重编码；`dts` / `truehd` / `ac3` / `eac3` / `pcm_s16le` / `wmav2` 判为音频必须转码；视频编码缺失、音频编码缺失、streams 为空时都不误判为「不能放」
+- 多音轨只坏一路（`aac + dts + ac3`）：`reason` 指向第一路坏轨，视频仍判为可 copy——只需转那一路音频，不必重编码视频
+- H.264 的 `High 10` / `High 4:2:2` / `High 4:4:4 Predictive` 判为不可直连（10bit 与 4:2:2 浏览器解不了），`Main` / `Baseline` / `High` 不受影响；profile 大小写不敏感
+- 「容器兼容」与「浏览器能解」确实是两张表：`ac3`/`eac3` 装得进 mp4 但浏览器解不了，`dts` 两边都不行——上游拿前一张表的结论做后一件事的判断，这就是「容器明明支持却放不出来」的原因
+- 真 ffmpeg 造片 + 真 ffprobe 探测（不是只测手搓数据）：HEVC 片判 `video:hevc`、h264+AC3 片判 `audio:ac3`、`-pix_fmt yuv420p10le -profile:v high10` 片判 `video:h264`，且确认 ffprobe 报上来的 profile 真的是 `High 10`
+- 走 HTTP：`/tracks` 带 `video`（codec/profile/宽高）与 `directPlay`（`ok`/`reason`/`note`/`videoCodec`/`audioCodecs`），`note` 是「视频编码 HEVC / H.265 浏览器不支持」而不是 `hevc`；重复请求命中 ffprobe 缓存，判定一致
+- **`/stream-mp4` 原画档位的实际输出编码**（这条是关键）：HEVC 源输出 `video:h264 audio:aac`；h264+AC3 源视频保持 `h264`、音频转 `aac`（不重编码视频）；h264+aac 源仍是 `h264+aac`（不被无谓重编码）
+- 控制台播放器：`directPlay.ok=false` 时清晰度标签换成 1080P、重连流的 `src` 带 `quality=1080p`、toast 点名「视频编码 HEVC / H.265 浏览器不支持，已切换到 1080P 转码播放」；转码失败先回落原画（有 toast 说明），原画仍不行错误框写「已尝试自动转码但仍未起来 + 具体编码 + 可检查 libs/ffmpeg」
+- 能直连的源（`h264+aac`）保持原画、不带 `quality` 参数——不会因为加了自动降级就把所有视频都去转码
+- 拉起播放器、自动切换、回落、报错四条路径均无运行时错误
 
 ### 相册（本轮新增）
 
@@ -877,21 +925,26 @@ server {
 
 ### 测试套件总览
 
-`tools_nascab/` 下共 10 个套件、**555 项断言**全部通过：
+`tools_nascab/` 下共 10 个套件、**696 项断言**全部通过：
 
 | 套件 | 断言数 | 覆盖 | 需要服务 |
 |---|---|---|---|
 | `test_deploy_config.js` | 57 | 配置层三级优先级、worker 数决策、外部二进制路径 | 否 |
 | `test_console.js` | 38 | 控制台三个接口、CORS 白名单、安全响应头 | 是 |
-| `test_console_dom.js` | 124 | jsdom 真实加载全部页面脚本：登录/向导、10 个系统页、文件管理、音乐/影视/相册三页与播放器全控件、主题、轮询不重建 DOM | 是 |
-| `test_file_manager.js` | 23 | 文件管理全链路（列目录/上传/下载/新建/重命名/删除/缩略图） | 是 |
+| `test_console_dom.js` | 138 | jsdom 真实加载全部页面脚本：登录/向导、10 个系统页、文件管理、音乐/影视/相册三页与播放器全控件（含源编码不支持时自动转码）、主题、轮询不重建 DOM | 是 |
+| `test_file_manager.js` | 23 | 文件管理全链路（列目录/上传/下载/新建/重命名/删除/缩略图） | 否（自造数据） |
 | `test_console_wizard.js` | 13 | 首次部署初始化向导（需另起空数据目录服务并清空 `user` 表） | 是 |
 | `test_control_api.js` | 61 | `/api/control` 21 个端点、三种令牌传递方式、权限隔离 | 是（控制端口） |
-| `test_media.js` | 72 | 清晰度档位纯函数、标签映射、偏好归一化、播放列表真实 SQLite 全链路、老库补列迁移 | 否 |
-| `test_media_api.js` | 46 | 音乐播放列表与影视播放器接口端到端 | 是 |
+| `test_media.js` | 181 | 清晰度档位纯函数、标签映射、偏好归一化、播放列表真实 SQLite 全链路、老库补列迁移、**浏览器可解码编码判定（手搓 streams + 真 ffmpeg 造片真 ffprobe 探测）** | 否 |
+| `test_media_api.js` | 64 | 音乐播放列表与影视播放器接口端到端，**含 `/tracks` 的 `directPlay` 与 `/stream-mp4` 原画档位的实际输出编码** | 是 |
 | `test_photo.js` | 79 | 时间线分页纯函数、真实 SQLite 全链路（分页/筛选/收藏/回收站/相册）、缩略图缓存键含尺寸 | 否 |
 | `test_photo_api.js` | 42 | 相册接口端到端（自起服务、往照片库塞真实数据）、鉴权 | 自起 |
 
 跑测试的两个环境要求：**Node 22**（`verify` 里的 `better-sqlite3` 是 NODE_MODULE_VERSION 127，Node 24 会 `ERR_DLOPEN_FAILED`），
 以及 `NODE_PATH` 指向 `nascab_src/verify/node_modules`。
 需要服务的套件传 `<baseUrl> <username> <password>`；`test_photo_api.js` 会自己起服务并把本轮改动的源码同步进 `verify`。
+
+另外，`test_media.js` / `test_media_api.js` 里「浏览器能否直连播放」那两段要**真的 ffmpeg + ffprobe** 才能跑
+（用 `testsrc` + `sine` 造 1–2 秒的 HEVC / AC3 / 10bit 片，再用 ffprobe 验 `stream-mp4` 实际吐出的编码）。
+找不到二进制时这两段自动跳过并打印说明，不影响其余断言——所以仓库里没有 ffmpeg 的机器上测试数会少十几项，
+这是预期行为而不是失败。

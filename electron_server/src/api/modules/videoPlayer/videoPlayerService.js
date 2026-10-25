@@ -7,6 +7,7 @@ const FileUtil = require('../../../utils/fileUtil');
 const VideoFfprobeUtil = require('../../../utils/videoFfprobeUtil');
 const mediaTrackLabelUtil = require('../../../utils/mediaTrackLabelUtil');
 const videoQualityUtil = require('../../../utils/videoQualityUtil');
+const webPlayableUtil = require('../../../utils/webPlayableUtil');
 
 /** 字幕引用前缀：emb:<ffprobe 流号> / ext:<文件名> */
 const SUBTITLE_REF_EMBEDDED = 'emb:';
@@ -668,6 +669,10 @@ class VideoPlayerService {
       });
 
     const skip = info.openSkip && typeof info.openSkip === 'object' ? info.openSkip : {};
+    // 浏览器能不能直连播放这个源。前端据此在起播前就切到转码档位，
+    // 不用等播放器报 MEDIA_ERR_SRC_NOT_SUPPORTED 再补救（那时用户已经看到黑屏了）。
+    const directPlay = webPlayableUtil.analyzeDirectPlay(streams);
+    const videoStream = streams.find(s => s && s.codec_type === 'video') || null;
     return {
       audio,
       subtitles: subtitles.concat(external),
@@ -676,6 +681,21 @@ class VideoPlayerService {
         endSec: Math.max(0, Number(skip.endSec) || 0),
       },
       source: { width: Number(info.width) || 0, height: Number(info.height) || 0 },
+      video: videoStream
+        ? {
+            codec: String(videoStream.codec_name || ''),
+            profile: String(videoStream.profile || ''),
+            width: Number(videoStream.width) || 0,
+            height: Number(videoStream.height) || 0,
+          }
+        : null,
+      directPlay: {
+        ok: directPlay.ok,
+        reason: directPlay.reason,
+        note: directPlay.note,
+        videoCodec: directPlay.videoCodec,
+        audioCodecs: directPlay.audioCodecs,
+      },
     };
   }
 
