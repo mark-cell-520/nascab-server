@@ -271,6 +271,17 @@ app.use('/api/auth', authApi);
 const consoleApi = require('./modules/console/consoleRouter');
 app.use('/api/console', consoleApi);
 
+// 机器控制接口（/api/control）：面向脚本 / AI Agent 的令牌化控制面。
+// 与业务 API 同端口挂载一份，便于反向代理统一暴露；
+// 另有一个默认只听 127.0.0.1:6792 的独立监听，见 controlServer.js
+const controlEnabled = config.control && config.control.enabled !== false;
+if (controlEnabled) {
+  const controlApi = require('./modules/control/controlRouter');
+  app.use('/api/control', controlApi);
+} else {
+  Logger.info('机器控制接口已关闭（control.enabled=false）');
+}
+
 // 安全中心相关api
 const securityApi = require('./modules/security/securityRouter');
 app.use('/api/security', securityApi);

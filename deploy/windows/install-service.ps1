@@ -111,6 +111,13 @@ $xml = @"
   <env name="NASCAB_WORKER_AUTO_RESTART" value="true"/>
   <!-- Web 控制台显示的产品名 -->
   <env name="NASCAB_CONSOLE_TITLE" value="NasCabOS"/>
+  <!-- 机器控制接口（/api/control）：面向脚本 / AI Agent 的 root 级控制面。
+       默认只听 127.0.0.1:6792，本机脚本可直接用；需要远程控制时改成 0.0.0.0 并配好防火墙。
+       令牌留空则首次启动自动生成，写进 <数据目录>/control.json，重启后复用 -->
+  <env name="NASCAB_CONTROL_ENABLED" value="true"/>
+  <env name="NASCAB_CONTROL_HOST" value="127.0.0.1"/>
+  <env name="NASCAB_CONTROL_PORT" value="6792"/>
+  <!-- <env name="NASCAB_CONTROL_TOKEN" value="ncctl_请换成自己的令牌"/> -->
   <!-- 首个超级管理员：两项都填才生效；留空则随机生成，账号密码见日志目录 combined.log 的启动横幅 -->
   <!--
   <env name="NASCAB_ADMIN_USER" value="admin"/>

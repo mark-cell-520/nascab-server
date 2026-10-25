@@ -71,5 +71,16 @@
     "dir": ""
   },
 
+  "control": {
+    "_enabled": "是否启用机器控制接口（/api/control）。面向脚本 / AI Agent：一个令牌换全部管理能力，无需登录拿 JWT。也可用环境变量 NASCAB_CONTROL_ENABLED",
+    "enabled": true,
+    "_host": "控制接口独立监听地址。默认只绑本机回环——控制令牌等价于管理员 root，暴露到局域网前应先想清楚，或交给反向代理做 TLS + IP 白名单。也可用环境变量 NASCAB_CONTROL_HOST",
+    "host": "127.0.0.1",
+    "_port": "控制接口独立端口。0 表示不单独监听，只通过主端口的 /api/control 访问。也可用环境变量 NASCAB_CONTROL_PORT",
+    "port": 6792,
+    "_token": "控制令牌。留空则首次启动自动生成并写入 <数据目录>/control.json（重启后复用）；显式指定后轮换令牌只需改这里。也可用环境变量 NASCAB_CONTROL_TOKEN",
+    "token": ""
+  },
+
   "_initAdmin": "首个超级管理员：不设置时系统会随机生成一个并在启动日志里打印；也可用环境变量 NASCAB_ADMIN_USER + NASCAB_ADMIN_PASSWORD 显式指定（用户名 3-20 位字母数字下划线，密码至少 6 位），两者必须同时设置才生效"
 }

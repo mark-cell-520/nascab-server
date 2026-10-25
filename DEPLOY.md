@@ -10,6 +10,7 @@
 
 - [快速开始](#快速开始)
 - [Web 控制台](#web-控制台)
+- [机器控制接口](#机器控制接口api-control)
 - [仓库结构与上游同步](#仓库结构与上游同步)
 - [配置系统](#配置系统)
 - [部署方式](#部署方式)
@@ -80,6 +81,116 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 - `/` 与 SPA 回退响应带严格 CSP（`default-src 'self'`、无 `unsafe-inline` 脚本）、`X-Frame-Options`、`nosniff`；HTML 一律 `no-cache`，升级后刷新即生效
 - 登录失败计数与 IP 拉黑由既有安全模块负责，控制台不另造一套
 - 只想提供 API 不开放页面：`NASCAB_CONSOLE_ENABLED=false`，此时 `/` 返回 404，探针与 `/api/*` 不受影响
+
+---
+
+## 机器控制接口（/api/control）
+
+Web 控制台是给人点的，这一节是给**脚本和 AI Agent** 用的。
+
+一个长期令牌换全部管理能力：查状态、看日志、管共享目录、浏览/上传/下载/新建/重命名/删除文件、管理下载任务与 Docker 容器。不需要先登录拿 JWT，也不需要cookie。
+
+### 两个入口
+
+| 入口 | 地址 | 用途 |
+|---|---|---|
+| 主端口 | `http://<IP>:6789/api/control` | 和业务 API 同端口，便于反向代理统一暴露 |
+| 独立端口 | `http://127.0.0.1:6792/api/control` | 默认只绑本机回环，给本机脚本用，可以单独做防火墙策略 |
+
+独立端口可以用 `control.port=0` 关掉（只保留主端口入口），用 `control.enabled=false` 把整个控制面关掉。
+
+### 令牌
+
+| 情况 | 行为 |
+|---|---|
+| 设了 `NASCAB_CONTROL_TOKEN`（或 `control.token`） | 用这个值，轮换令牌只改环境变量 |
+| 没设 | 首次启动自动生成 `ncctl_<48 位十六进制>`，写入 `<数据目录>/control.json`，**重启后复用** |
+
+启动日志会打印一段醒目横幅，含地址、令牌与用法。`control.json` 形如：
+
+```json
+{ "token": "ncctl_...", "source": "generated", "host": "127.0.0.1", "port": 6792, "createdAt": "..." }
+```
+
+> 自动生成的令牌用 `O_EXCL` 竞争创建文件，保证 cluster 下多个 express worker 拿到的是**同一个**令牌——
+> 否则同一份配置在主端口上会时好时坏。
+
+### 配置项
+
+| 配置项 | 环境变量 | 默认值 | 说明 |
+|---|---|---|---|
+| `control.enabled` | `NASCAB_CONTROL_ENABLED` | `true` | 关掉后控制接口与独立端口都不监听 |
+| `control.host` | `NASCAB_CONTROL_HOST` | `127.0.0.1` | 独立监听地址，默认只绑本机 |
+| `control.port` | `NASCAB_CONTROL_PORT` | `6792` | 独立端口，`0` 表示不单独监听 |
+| `control.token` | `NASCAB_CONTROL_TOKEN` | 空 | 留空则自动生成并落盘 |
+
+### 快速试用
+
+```bash
+# 探活（不需要令牌）
+curl http://127.0.0.1:6792/api/control/ping
+
+# 从 control.json 取令牌
+TOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync('data/control.json','utf8')).token)")
+
+# 总览：系统 / CPU / 内存 / 磁盘 / 共享目录
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:6792/api/control/status
+
+# 列目录
+curl -H "Authorization: Bearer $TOKEN" "http://127.0.0.1:6792/api/control/files?path=D%3A%5Cmedia"
+
+# 上传（请求体就是文件字节）
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/octet-stream" -H "X-Filename: movie.mkv" \
+     --data-binary @movie.mkv \
+     "http://127.0.0.1:6792/api/control/files/upload?path=D%3A%5Cmedia"
+```
+
+### 接口总览
+
+响应统一为 `{ "ok": true, "data": ... }` / `{ "ok": false, "error": { "code", "message" } }`，
+路径一律用服务端绝对路径。完整清单见 [接口参考](#)与 `electron_server/src/api/modules/control/`。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/ping` | 探活，无需令牌 |
+| GET | `/info` | 部署信息 + 端点清单（不含令牌） |
+| GET | `/status` | 系统信息 + 硬件指标 + 内存 + 磁盘 + 共享目录 |
+| GET | `/logs` | 日志尾部（`file`、`lines`） |
+| GET/POST | `/shares`、`/shares/remove` | 共享目录查询 / 添加 / 移除 |
+| GET | `/files`、`/files/stat` | 列目录、文件详情 |
+| GET | `/files/download` | 流式下载，支持 Range |
+| POST | `/files/upload` | 上传，请求体为文件原始字节（流式落盘） |
+| POST | `/files/mkdir`、`/files/rename`、`/files/delete` | 新建 / 重命名 / 删除（可批量） |
+| GET/POST | `/downloads`、`/downloads/add`、`/downloads/action` | 下载器状态、添加任务、批量启停删除 |
+| GET/POST | `/docker/status`、`/docker/containers`、`/docker/images`、`/docker/container` | 引擎状态、列表、启停 |
+
+### 命令行客户端与 Claude 技能
+
+仓库外附带一个零依赖的 Node 客户端 `nascabctl`，封装了上面全部接口：
+
+```bash
+nascabctl status                          # 总览
+nascabctl ls "D:\media"                   # 列目录
+nascabctl upload ./电影.mkv "D:\media"     # 上传
+nascabctl download "D:\media\a.mkv" ./a.mkv
+nascabctl logs -n 50                      # 看日志
+nascabctl docker                          # 容器列表
+nascabctl --json shares                   # 原始 JSON
+```
+
+连接信息按「命令行参数 > 环境变量 `NASCAB_URL`/`NASCAB_TOKEN` > `~/.nascabctl.json` > 自动发现 `control.json`」解析，
+本机部署下通常零配置。
+
+在 Claude Code 里它作为技能 `nascab` 安装，直接用自然语言即可驱动，例如「看一下 NAS 状态」「把这部电影传到 D:\media」。
+
+### 安全须知
+
+- 控制令牌**等价于管理员 root**，不要写进会提交的仓库、日志或聊天记录
+- 独立端口默认只听 `127.0.0.1`，外部访问不到；远程使用请改 `control.host` 或走 SSH 隧道 / 反向代理 + IP 白名单
+- 不需要机器控制面时直接 `NASCAB_CONTROL_ENABLED=false`
+- 与 Web 控制台的分工：`/api/console` 走 JWT + 用户权限分级，`/api/control` 只有「有令牌/没令牌」——
+  两者最终复用同一套服务端实现，不复制业务逻辑
 
 ---
 
@@ -200,6 +311,10 @@ JSON 里以 `_` 开头的键会被忽略，可以直接写注释（见 `config.e
 | `console.enabled` | `NASCAB_CONSOLE_ENABLED` | `true` | 是否启用 Web 控制台（挂在 `/`） |
 | `console.title` | `NASCAB_CONSOLE_TITLE` | `NasCabOS` | 登录页/顶栏/浏览器标题显示的产品名 |
 | `console.dir` | `NASCAB_CONSOLE_DIR` | `<root>/web/console` | 控制台静态资源目录 |
+| `control.enabled` | `NASCAB_CONTROL_ENABLED` | `true` | 是否启用机器控制接口 `/api/control` |
+| `control.host` | `NASCAB_CONTROL_HOST` | `127.0.0.1` | 控制接口独立监听地址，默认只绑本机 |
+| `control.port` | `NASCAB_CONTROL_PORT` | `6792` | 控制接口独立端口，`0` = 不单独监听 |
+| `control.token` | `NASCAB_CONTROL_TOKEN` | 空 | 控制令牌；留空自动生成并写入 `<数据目录>/control.json` |
 
 另有三个非 `console.*` 的运行开关：
 
@@ -433,6 +548,14 @@ server {
 | `web/console/pages-files.js`、`pages-nas.js` | **新增**。文件管理器（浏览/上传/下载/新建/重命名/删除/拖拽/缩略图）+ 挂载管理、分享管理、下载器、容器四页；页面模块化，`console.js` 只提供注册机制 |
 | `src/utils/userShareFolderUtil.js` | **新增 `ensureDefaultShareFolder()`**：全新部署时共享目录列表是空的，文件管理器会无处可看；现首次启动自动建 `<数据目录>/files` |
 | `src/initHandler/initMain.js` | 启动时创建上述默认共享目录并打印路径 |
+| `src/config/deployConfig.js`、`src/config/config.js` | 新增 `control` 配置段（开关/监听地址/独立端口/令牌） |
+| `src/utils/controlTokenUtil.js` | **新增**。控制令牌解析与落盘：显式令牌优先，否则首次启动自动生成并写入 `<数据目录>/control.json`（重启后复用）；用 `O_EXCL` 竞争创建，保证 cluster 下多个 worker 令牌一致 |
+| `src/api/modules/control/*` | **新增**。机器控制接口 `/api/control`：`controlAuth`（Bearer / `X-NasCab-Token` / 查询串令牌，常数时间比较）、`controlDelegate`（构造带数据库句柄的超级管理员 req 复用既有控制器）、`controlController`（21 个端点）、`controlRouter` |
+| `src/api/controlServer.js` | **新增**。控制接口独立监听（默认 `127.0.0.1:6792`），只挂控制路由与 `/healthz`，端口冲突不影响主服务 |
+| `src/api/app.js` | 主端口挂载 `/api/control`；`control.enabled=false` 时不挂载 |
+| `src/workers/expressWorker.js` | HTTP 就绪后启动控制接口独立监听，关停时一并关闭 |
+| `src/api/modules/console/consoleController.js` | 导出 `collectSystemInfo`/`requestHwMetrics` 供控制接口复用（避免两处各写一份系统信息） |
+| `deploy/config.example.json`、`deploy/docker/docker-compose.yml`、`deploy/windows/install-service.ps1` | 补充 `control.*` 配置项与 `NASCAB_CONTROL_*` 环境变量；compose 增加 6792 端口映射 |
 
 部署产物：`deploy/config.example.json`、`deploy/systemd/`、`deploy/docker/`、`deploy/windows/`、`deploy/scripts/`。
 
@@ -477,3 +600,23 @@ server {
 - 上传走 4MB 分片 + `upload/check` 断点续传；小文件单分片即完成，服务端返回 `UPLOAD_COMPLETED`
 - 挂载管理、分享管理、下载器、容器四个页面均能拉到真实数据并渲染（本机无 Docker，引擎状态正确显示「不可用」）
 - 五个测试套件共 141 项断言全部通过（配置 33 / 接口 38 / 页面渲染 34 / 文件管理 23 / 初始化向导 13）
+
+### 机器控制接口（本轮新增）
+
+以下均在本机实测通过（Node 22.20.0，无界面模式，真实启动的服务端，共 61 项接口断言 + 11 项配置断言）：
+
+- 两个入口都可用：独立端口 `127.0.0.1:6792` 与主端口 `/api/control` 返回一致结果
+- 鉴权：无令牌 401、错误令牌 401、`Authorization: Bearer` / `X-NasCab-Token` / `?token=` 三种传法均可用；未知子路径返回 404 JSON
+- 自动生成的令牌在多个 express worker 间一致（`O_EXCL` 竞争创建），启动横幅只由抢到创建权的进程完整打印
+- `NASCAB_CONTROL_TOKEN` 显式指定后立即生效，并同步写入 `<数据目录>/control.json`
+- `control.port=0` 时不再监听独立端口，主端口入口仍可用
+- `control.enabled=false` 时 `/api/control/*` 全部 404、独立端口不监听，`/healthz` 与 Web 控制台不受影响
+- 文件全链路：列目录（目录优先排序、父目录正确）、`stat`、`mkdir`、`rename`（拒绝带路径分隔符与 `..` 的新名字）、
+  `delete`（单条与批量）、`upload`（三种文件名指定方式 + 自动命名 + 目录不存在时报错）、
+  `download`（内容逐字节一致、带 `Content-Disposition`）
+- 上传的 path 语义：给了文件名则 path 必须是已存在目录；没给则按目标文件全路径处理
+- 共享目录：添加、重复添加去重、移除、不存在目录 400、相对路径 400
+- 日志：读取尾部、非法文件名（路径穿越尝试）返回 400
+- 下载器与容器接口在本机未安装对应组件时返回统一的 `{ok:false}` 结构，不抛异常、不挂起
+- 控制接口内部委托既有控制器（文件增删/容器/下载器），与 Web 控制台走同一套实现，未复制业务逻辑
+- 命令行客户端 `nascabctl` 实测：探活、总览、列目录、上传、下载（内容一致）、重命名、删除、共享目录增删、日志、下载器、容器、`raw` 直调、`--json`；连接信息可从 `control.json` 自动发现

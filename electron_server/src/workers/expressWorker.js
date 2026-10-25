@@ -58,6 +58,13 @@ class ExpressWorker {
         } else {
           Logger.info('ℹ️  HTTPS disabled by config (server.httpsEnabled=false), running HTTP only');
         }
+
+        // 机器控制接口独立监听（默认 127.0.0.1:6792）。失败不影响主服务
+        try {
+          require('../api/controlServer').startControlServer();
+        } catch (err) {
+          Logger.error('控制接口启动失败:', err && err.message ? err.message : err);
+        }
       });
 
       if (this.server && typeof this.server.removeListener === 'function') {
@@ -280,6 +287,11 @@ class ExpressWorker {
 
     // 等待所有服务器关闭
     await Promise.all(stopPromises);
+
+    // 关闭控制接口独立监听
+    try {
+      require('../api/controlServer').stopControlServer();
+    } catch (_) {}
 
     try {
       await getSingletonWorkerManager().gracefulShutdown();

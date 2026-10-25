@@ -91,6 +91,20 @@ const DEFAULTS = {
     // 控制台静态资源目录，为空则使用 <应用根目录>/web/console
     dir: '',
   },
+  control: {
+    // 机器控制接口（/api/control）开关。
+    // 面向脚本 / AI Agent / 自动化：一个令牌换全部管理能力，无需登录拿 JWT。
+    // 关闭后控制接口与控制端口都不再监听
+    enabled: true,
+    // 控制接口独立监听地址。默认只绑本机回环——控制令牌等价于管理员 root，
+    // 暴露到局域网前应先想清楚，或交给反向代理做 TLS + IP 白名单
+    host: '127.0.0.1',
+    // 控制接口独立端口。0 表示不单独监听，只通过主端口的 /api/control 访问
+    port: 6792,
+    // 控制令牌。为空则首次启动自动生成并写入 <数据目录>/control.json，
+    // 重启后复用同一个（避免配了客户端又失效）
+    token: '',
+  },
 };
 
 /** 布尔型环境变量真值 */
@@ -332,6 +346,16 @@ class DeployConfig {
       enabled: parseBool(this.get('console.enabled', DEFAULTS.console.enabled, 'NASCAB_CONSOLE_ENABLED'), DEFAULTS.console.enabled),
       title: String(this.get('console.title', DEFAULTS.console.title, 'NASCAB_CONSOLE_TITLE') || DEFAULTS.console.title),
       dir: String(this.get('console.dir', DEFAULTS.console.dir, 'NASCAB_CONSOLE_DIR') || ''),
+    };
+  }
+
+  /** 机器控制接口（/api/control）配置 */
+  get control() {
+    return {
+      enabled: parseBool(this.get('control.enabled', DEFAULTS.control.enabled, 'NASCAB_CONTROL_ENABLED'), DEFAULTS.control.enabled),
+      host: String(this.get('control.host', DEFAULTS.control.host, 'NASCAB_CONTROL_HOST') || DEFAULTS.control.host),
+      port: parseIntSafe(this.get('control.port', DEFAULTS.control.port, 'NASCAB_CONTROL_PORT'), DEFAULTS.control.port),
+      token: String(this.get('control.token', DEFAULTS.control.token, 'NASCAB_CONTROL_TOKEN') || ''),
     };
   }
 }

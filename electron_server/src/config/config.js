@@ -442,6 +442,9 @@ const config = {
   // Web 控制台配置
   console: deployConfig.console,
 
+  // 机器控制接口（/api/control）配置：面向脚本 / AI Agent 的令牌化控制面
+  control: deployConfig.control,
+
   // 外部二进制目录配置
   libs: deployConfig.libs,
 

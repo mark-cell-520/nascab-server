@@ -19,6 +19,8 @@ services:
     # 端口映射：左侧宿主机端口，右侧容器内端口（与容器内 PORT 保持一致）
     ports:
       - "${NASCAB_HTTP_PORT:-6789}:6789"
+      # 机器控制接口独立端口。控制令牌是 root 级凭证，不需要远程控制时建议注释掉
+      - "${NASCAB_CONTROL_PORT:-6792}:6792"
       # 反代场景不需要映射 HTTPS；如需直连再打开下一行
       # - "${NASCAB_HTTPS_PORT:-6799}:6799"
 
@@ -41,6 +43,12 @@ services:
       NASCAB_LOG_MAX_FILES: "10"
       # Web 控制台：产品名（登录页/顶栏显示）。设为 false 可只提供 API
       NASCAB_CONSOLE_TITLE: "${NASCAB_CONSOLE_TITLE:-NasCabOS}"
+      # 机器控制接口（/api/control）：容器内必须听 0.0.0.0 才能从宿主机访问；
+      # 令牌不设则首次启动自动生成并写进数据卷的 control.json（重启后复用）
+      NASCAB_CONTROL_ENABLED: "${NASCAB_CONTROL_ENABLED:-true}"
+      NASCAB_CONTROL_HOST: "0.0.0.0"
+      NASCAB_CONTROL_PORT: "${NASCAB_CONTROL_PORT:-6792}"
+      NASCAB_CONTROL_TOKEN: "${NASCAB_CONTROL_TOKEN:-}"
       # 首个超级管理员。两个都要设才生效；不设则系统随机生成，
       # 账号密码会在 `docker compose logs` 里打印（启动横幅）
       NASCAB_ADMIN_USER: "${NASCAB_ADMIN_USER:-}"

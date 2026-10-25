@@ -186,4 +186,9 @@ class ConsoleController {
   };
 }
 
-module.exports = new ConsoleController();
+const controller = new ConsoleController();
+// 供 /api/control 复用：控制接口与 Web 控制台应始终看到同一份系统信息与硬件指标
+controller.collectSystemInfo = collectSystemInfo;
+controller.requestHwMetrics = requestHwMetrics;
+
+module.exports = controller;
