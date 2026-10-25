@@ -142,6 +142,19 @@ function getFoliateRootPath() {
 }
 
 /**
+ * 获取 Web 控制台静态资源根目录
+ * 默认 <应用根目录>/web/console；可用 NASCAB_CONSOLE_DIR / console.dir 覆盖，
+ * 例如把自己定制的页面放到数据卷里
+ */
+function getConsolePath() {
+  const configured = deployConfig.console.dir;
+  if (configured) {
+    return path.resolve(configured);
+  }
+  return path.join(getRootPath(), 'web', 'console');
+}
+
+/**
  * 非 Electron 环境下的默认用户数据目录（Worker / Docker / 纯 Node）
  */
 function getDefaultNonElectronUserDataPath() {
@@ -397,6 +410,7 @@ const config = {
   getLibsPath: getLibsPath, //获取外部二进制（libs）根目录
   getOnnxModelsPath: getOnnxModelsPath, //获取 ONNX 模型根目录
   getFoliateRootPath: getFoliateRootPath, // foliate-js-main 根目录
+  getConsolePath: getConsolePath, //Web 控制台静态资源根目录
   getFileType: getFileType, //获取文件类型
   getDatabasePath: getDatabasePath, //数据库目录
   getCachePath: getCachePath, //缓存目录
@@ -424,6 +438,9 @@ const config = {
 
   // worker 监管配置
   worker: deployConfig.worker,
+
+  // Web 控制台配置
+  console: deployConfig.console,
 
   // 外部二进制目录配置
   libs: deployConfig.libs,
@@ -474,11 +491,15 @@ const config = {
 };
 
 // 开发环境特定配置（仅在未显式配置时生效，避免覆盖部署配置）
+// 注意：服务器/Docker 部署时 NODE_ENV 通常没有设置，若仍按「开发环境」处理，
+// 会关掉文件日志并把级别降到 debug——服务器长期排障就完全没有日志可看了。
+// 因此这套默认值只在「桌面端从源码跑起来」（进程处于 Electron 中）时套用。
+const runningInElectron = !!process.versions.electron;
 if (config.app.isDevelopment) {
-  if (!deployConfig.logging.level) {
+  if (!deployConfig.isExplicit('logging.level', 'LOG_LEVEL')) {
     config.logging.level = 'debug';
   }
-  if (!process.env.NASCAB_LOG_FILE) {
+  if (!deployConfig.isExplicit('logging.file', 'NASCAB_LOG_FILE') && runningInElectron) {
     config.logging.file.enabled = false;
   }
 }
@@ -502,6 +523,7 @@ try {
         httpsEnabled: config.server.httpsEnabled,
         dataDir: getUserDataPath(),
         libsDir: getLibsPath(),
+        consoleEnabled: config.console.enabled,
         logDir: config.logging.file.enabled ? config.logging.file.path : null,
       }) +
       ' ----------'

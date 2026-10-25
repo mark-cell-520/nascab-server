@@ -39,6 +39,12 @@ services:
       NASCAB_WORKER_AUTO_RESTART: "true"
       NASCAB_LOG_MAX_SIZE: "20971520"
       NASCAB_LOG_MAX_FILES: "10"
+      # Web 控制台：产品名（登录页/顶栏显示）。设为 false 可只提供 API
+      NASCAB_CONSOLE_TITLE: "${NASCAB_CONSOLE_TITLE:-NasCabOS}"
+      # 首个超级管理员。两个都要设才生效；不设则系统随机生成，
+      # 账号密码会在 `docker compose logs` 里打印（启动横幅）
+      NASCAB_ADMIN_USER: "${NASCAB_ADMIN_USER:-}"
+      NASCAB_ADMIN_PASSWORD: "${NASCAB_ADMIN_PASSWORD:-}"
       # 生产环境务必修改，并纳入密钥管理
       JWT_SECRET: "${JWT_SECRET:-change-me-in-production}"
 

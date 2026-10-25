@@ -19,7 +19,27 @@ router.get('/isNasCabServer', (req, res) => {
 });
 
 // 创建超级管理员
-// router.post('/createSuperAdmin', AuthValidation.validateCreateSuperAdmin(), AuthValidation.handleValidationErrors, authController.createSuperAdmin);
+// 仅在「系统中还没有任何超级管理员」时开放（首次部署引导），
+// 已存在超管后此接口返回 403，避免成为提权入口。
+const requireNoSuperAdmin = async (req, res, next) => {
+  try {
+    const authService = require('./authService');
+    const has = await authService.hasSuperAdmin({ knexMain: req.dbMain });
+    if (has) {
+      return res.status(403).json({ success: false, message: 'auth.SUPER_ADMIN_ALREADY_EXISTS', code: 'SUPER_ADMIN_ALREADY_EXISTS' });
+    }
+    return next();
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'auth.AUTHENTICATION_ERROR' });
+  }
+};
+router.post(
+  '/createSuperAdmin',
+  requireNoSuperAdmin,
+  AuthValidation.validateCreateSuperAdmin(),
+  AuthValidation.handleValidationErrors,
+  authController.createSuperAdmin
+);
 
 // 用户登录
 router.post('/login', AuthValidation.validateLogin(), AuthValidation.handleValidationErrors, authController.login);

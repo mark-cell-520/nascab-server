@@ -82,6 +82,15 @@ const DEFAULTS = {
     // 单个 worker 的最大自动重启次数（指数退避，达到上限后放弃并告警）
     maxRestarts: 10,
   },
+  console: {
+    // 是否启用 Web 控制台（/）。关闭后只保留 API 与 /healthz 等探针，
+    // 适合纯 API 部署或由外部系统接管的场景
+    enabled: true,
+    // 控制台显示的产品名（登录页与顶栏）
+    title: 'NasCabOS',
+    // 控制台静态资源目录，为空则使用 <应用根目录>/web/console
+    dir: '',
+  },
 };
 
 /** 布尔型环境变量真值 */
@@ -314,6 +323,15 @@ class DeployConfig {
     return {
       autoRestart: parseBool(this.get('worker.autoRestart', DEFAULTS.worker.autoRestart, 'NASCAB_WORKER_AUTO_RESTART'), DEFAULTS.worker.autoRestart),
       maxRestarts: parseIntSafe(this.get('worker.maxRestarts', DEFAULTS.worker.maxRestarts, 'NASCAB_WORKER_MAX_RESTARTS'), DEFAULTS.worker.maxRestarts),
+    };
+  }
+
+  /** Web 控制台配置 */
+  get console() {
+    return {
+      enabled: parseBool(this.get('console.enabled', DEFAULTS.console.enabled, 'NASCAB_CONSOLE_ENABLED'), DEFAULTS.console.enabled),
+      title: String(this.get('console.title', DEFAULTS.console.title, 'NASCAB_CONSOLE_TITLE') || DEFAULTS.console.title),
+      dir: String(this.get('console.dir', DEFAULTS.console.dir, 'NASCAB_CONSOLE_DIR') || ''),
     };
   }
 }

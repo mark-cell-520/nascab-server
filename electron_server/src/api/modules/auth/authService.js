@@ -365,7 +365,12 @@ class AuthService {
    */
   async getUserProfile({ knexMain }, userId) {
     try {
-      const user = await knexMain('user').where({ id: userId }).select('id', 'username', 'role', 'create_time', 'updated_at').first();
+      // 注意：user 表中没有 role / updated_at 列（角色字段名是 type），
+      // 选了不存在的列会让整条查询失败，/api/auth/profile 对所有客户端返回 400
+      const user = await knexMain('user')
+        .where({ id: userId })
+        .select('id', 'username', 'phone', 'language', 'avatar', 'user_remark', 'type', 'is_active', 'last_login_ip', 'last_login_time', 'create_time')
+        .first();
 
       if (!user) {
         throw new Error('auth.USER_NOT_FOUND');

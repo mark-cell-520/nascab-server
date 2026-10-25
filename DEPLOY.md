@@ -9,6 +9,7 @@
 ## 目录
 
 - [快速开始](#快速开始)
+- [Web 控制台](#web-控制台)
 - [仓库结构与上游同步](#仓库结构与上游同步)
 - [配置系统](#配置系统)
 - [部署方式](#部署方式)
@@ -21,6 +22,64 @@
 - [运维手册](#运维手册)
 - [已知平台差异](#已知平台差异)
 - [改造清单](#改造清单)
+
+---
+
+## Web 控制台
+
+源码部署时上游的 `web/main`（官方构建产物，被 `.gitignore` 排除）并不在仓库里，直接 `node src/main_nascab_os.js` 起来后 `/` 是 404。因此本仓库自带了一个 **Web 控制台**（`electron_server/web/console/`，纯静态、无构建步骤、无前端依赖），启动即在 `/` 可用。
+
+### 首次登录
+
+| 场景 | 会发生什么 |
+|---|---|
+| 全新数据目录 | 启动时自动创建一个超级管理员，**账号密码直接打印在启动日志里**（也会在 10 秒后再打印一次），登录后请立即修改 |
+| 设了 `NASCAB_ADMIN_USER` + `NASCAB_ADMIN_PASSWORD` | 用这对账号创建，日志里会标注「来自环境变量」 |
+| 启动时创建失败 / 数据库被清空 | 打开 `/` 会直接进入**初始化向导**，在页面上创建第一个超级管理员 |
+
+```bash
+# 推荐：Docker / 脚本化部署时显式指定首管理员
+NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/main_nascab_os.js
+
+# 首次启动的日志长这样
+# ================ 首次启动：超级管理员账号（来自 NASCAB_ADMIN_USER 环境变量）================
+#   用户名: admin
+#   密码  : 换成一个强密码
+#   请登录 Web 控制台后立即修改。控制台地址: http://<服务器IP>:6789/
+```
+
+### 页面
+
+登录后是单页控制台（前端路由，刷新/直接访问子路径都不会 404）：
+
+| 页面 | 内容 | 数据来源 |
+|---|---|---|
+| 概览 | CPU / 内存 / 网络 / 温度四张指标卡（含迷你走势）、存储池、设备信息、服务状态、系统通知 | `/api/console/overview`、`/api/home/config` |
+| 存储管理 | 各挂载点容量卡片（文件系统、已用、总量、使用率） | 同上 |
+| 用户管理 | 账号列表（角色、状态、创建/最近登录时间） | `/api/user/list` |
+| 网络服务 | 监听地址、P2P 远程访问、DDNS、实时上下行速率 | `/api/service/*`、硬件监控 |
+| 安全中心 | 登录防护状态、IP 黑名单、登录设备 | `/api/security/*`、`/api/auth/devices` |
+| 应用中心 | 已启用的应用（标识 → 中文名映射） | `/api/apps/getApps` |
+| 进程管理 | 服务端各进程的 PID、CPU、内存 | `/api/service/process` |
+| 系统日志 | 在线看日志尾部，可切换运行/错误/访问日志，可自动刷新 | `/api/console/logs` |
+| 关于本机 | 版本、服务器标识、Node/Electron、硬件环境、开源许可 | `/api/console/overview` |
+
+顶栏支持全局搜索菜单（按 `/` 聚焦）、系统通知、用户菜单；窄屏自动折叠为抽屉式侧边栏。
+
+### 控制台专用接口
+
+| 接口 | 鉴权 | 说明 |
+|---|---|---|
+| `GET /api/console/bootstrap` | 无 | 产品名与版本号，供登录页显示 |
+| `GET /api/console/overview` | 登录用户 | 设备信息 + 硬件指标（非管理员只返回设备信息） |
+| `GET /api/console/logs?file=combined&lines=300` | 管理员 | 日志尾部；文件名白名单（combined/error/access），最多读 1MB / 1000 行 |
+
+### 访问与安全
+
+- 令牌走 `Authorization: Bearer <token>`（`localStorage` 持久化），过期时用 `refreshToken` 自动续期，续期失败才回登录页
+- `/` 与 SPA 回退响应带严格 CSP（`default-src 'self'`、无 `unsafe-inline` 脚本）、`X-Frame-Options`、`nosniff`；HTML 一律 `no-cache`，升级后刷新即生效
+- 登录失败计数与 IP 拉黑由既有安全模块负责，控制台不另造一套
+- 只想提供 API 不开放页面：`NASCAB_CONSOLE_ENABLED=false`，此时 `/` 返回 404，探针与 `/api/*` 不受影响
 
 ---
 
@@ -138,8 +197,17 @@ JSON 里以 `_` 开头的键会被忽略，可以直接写注释（见 `config.e
 | `security.jwtSecret` | `JWT_SECRET` | 空 | JWT 密钥，生产建议显式设置 |
 | `worker.autoRestart` | `NASCAB_WORKER_AUTO_RESTART` | `true` | worker 崩溃自动重启 |
 | `worker.maxRestarts` | `NASCAB_WORKER_MAX_RESTARTS` | `10` | 单 worker 重启上限 |
+| `console.enabled` | `NASCAB_CONSOLE_ENABLED` | `true` | 是否启用 Web 控制台（挂在 `/`） |
+| `console.title` | `NASCAB_CONSOLE_TITLE` | `NasCabOS` | 登录页/顶栏/浏览器标题显示的产品名 |
+| `console.dir` | `NASCAB_CONSOLE_DIR` | `<root>/web/console` | 控制台静态资源目录 |
 
-另有 `NASCAB_IS_DOCKER=1`：让 ffmpeg/ffprobe 使用系统命令、数据目录落到 `/nascabos_data`（Docker 镜像已内置）。
+另有三个非 `console.*` 的运行开关：
+
+| 环境变量 | 作用 |
+|---|---|
+| `NASCAB_IS_DOCKER=1` | 让 ffmpeg/ffprobe 使用系统命令、数据目录落到 `/nascabos_data`（Docker 镜像已内置） |
+| `NASCAB_ADMIN_USER` + `NASCAB_ADMIN_PASSWORD` | 首次启动时用这对账号创建超级管理员，省得去日志里翻随机账号。两者必须同时设置；用户名 3-20 位字母数字下划线、密码至少 6 位。已存在超管时无效 |
+| `NASCAB_CONFIG` | 显式指定配置文件路径 |
 
 ### 服务器部署推荐配置
 
@@ -355,6 +423,13 @@ server {
 | `src/utils/appUtil.js` | 显式指定的端口优先于数据库持久化值 |
 | `src/initHandler/initMain.js` | 端口漂移受 `portFallback` 控制，禁止漂移时明确报错 |
 | `src/utils/remoteAssetsManager.js`、`src/libsPath/*` | libs / onnx 根目录可配置 |
+| `src/config/deployConfig.js`、`src/config/config.js` | 新增 `console` 配置段（开关/产品名/目录）；**修复 `NODE_ENV` 未设置时被当成开发环境而关掉文件日志、级别降为 debug**——服务器长期排障会因此完全没有日志 |
+| `src/initHandler/initialSuperAdmin.js` | 首管理员支持 `NASCAB_ADMIN_USER`/`NASCAB_ADMIN_PASSWORD`；创建成功立即打印醒目横幅（含控制台地址），不再等 10 秒 |
+| `src/api/modules/auth/authRouter.js` | 启用 `POST /createSuperAdmin`，加「系统中没有超管才可用」守卫（否则 403），支撑首次部署向导 |
+| `src/api/modules/auth/authService.js` | **修复 `getUserProfile` 选了不存在的 `role`/`updated_at` 列**，`/api/auth/profile` 原先对所有客户端返回 400 |
+| `src/api/modules/console/*` | **新增**。`/bootstrap`、`/overview`、`/logs` 三个控制台专用接口 |
+| `src/api/app.js` | `/` 改挂自带 Web 控制台（原指向不入库的 `web/main`）；基础安全响应头 + 控制台 CSP；SPA 回退（不吞 `/api` 404） |
+| `web/console/` | **新增**。无构建步骤的 Web 控制台：登录/初始化向导、概览、存储、用户、网络、安全、应用、进程、日志、关于共 10 个页面 |
 
 部署产物：`deploy/config.example.json`、`deploy/systemd/`、`deploy/docker/`、`deploy/windows/`、`deploy/scripts/`。
 
@@ -375,3 +450,18 @@ server {
 - `deploy/scripts/start.sh` 的 start/stop/status/重复启动保护
 - `deploy/scripts/start.ps1` 的 Start/Status/Stop 全生命周期，以及强杀后带残留锁重启自动接管
 - 两个 `.ps1` 脚本均通过 PowerShell 5.1 语法解析（文件带 UTF-8 BOM）
+
+### Web 控制台（本轮新增）
+
+以下在本机实测通过（Node 22.20.0，无界面模式，真实启动的服务端 + jsdom 渲染验证，共 38 项接口断言 + 29 项渲染断言 + 13 项初始化向导断言）：
+
+- `GET /` 返回控制台，`console.css`/`console.js` 正常加载；HTML 带 `no-cache` 与 CSP、`nosniff`、`SAMEORIGIN`，`X-Powered-By` 已移除
+- SPA 回退：`/storage`、`/users`、`/about` 均返回 `index.html`；`/api/__not_exist__` 仍为 404；带扩展名的 `/nope.js` 仍为 404
+- 登录后概览、存储、用户、网络、安全、应用、进程、日志、关于 9 个页面全部渲染出真实数据（CPU/内存/温度、磁盘挂载点、账号列表、进程列表、300 行日志等）
+- 首次部署向导：未初始化时自动显示；前端校验用户名格式、密码长度、两次一致性；提交后创建超管并自动进入控制台；已有超管后再次创建返回 403
+- `NASCAB_CONSOLE_TITLE` 改变登录页/顶栏/浏览器标题；`NASCAB_ADMIN_USER`/`NASCAB_ADMIN_PASSWORD` 按指定账号建号并能直接登录
+- 非法环境变量（如密码不足 6 位）只告警并回退随机账号，不阻断启动
+- `NASCAB_CONSOLE_ENABLED=false` 时 `/` 与 SPA 回退返回 404，`/healthz` 与 `/api/*` 不受影响
+- 文件日志修复后 `combined.log`/`error.log` 正常生成，`/api/console/logs` 能读到日志尾部
+- `/api/auth/profile` 修复后返回完整用户信息（此前因选了不存在的列而 400）
+- 无 token 访问控制台接口 401、伪造 token 401；第三方 Origin 不被 CORS 放行、本机 Origin 放行

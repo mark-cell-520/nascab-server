@@ -109,13 +109,24 @@ module.exports = {
       }, 6000);
     }
 
-    await this.ensureInitialSuperAdmin();
+    const initialAdmin = await this.ensureInitialSuperAdmin();
+    if (initialAdmin && initialAdmin.created) {
+      // 首次启动即打印首管理员账号，避免部署者要等 10 秒再去日志里翻
+      const source = initialAdmin.fromEnv ? '来自 NASCAB_ADMIN_USER 环境变量' : '系统随机生成';
+      Logger.info(
+        `\n================ 首次启动：超级管理员账号（${source}）================\n` +
+          `  用户名: ${initialAdmin.username}\n` +
+          `  密码  : ${initialAdmin.password}\n` +
+          `  请登录 Web 控制台后立即修改。控制台地址: http://<服务器IP>:${config.app.port}/\n` +
+          `==================================================================`
+      );
+    }
     setTimeout(async () => {
       try {
         const info = await this.getInitialSuperAdminInfo();
         if ((info && info.isInitialAdmin && info.username && info.password)) {
           Logger.info(`Default admin in use; change soon. \nusername:${info.username} \npassword:${info.password}`);
-        } 
+        }
         await this.writeLinuxHeadlessAdminAccountFileIfNeeded();
       } catch {}
     }, 10000);

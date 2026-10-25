@@ -106,6 +106,19 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * 基础安全响应头（对所有响应生效）
+ * 服务端要长期暴露在局域网甚至公网，这几项是成本最低的加固
+ */
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
 // 大文件 Range 流式（rawFile / download）若走压缩层，部分客户端会退化为整文件 200 或异常缓冲；显式排除
 app.use(
   compression({
@@ -209,12 +222,54 @@ app.use(
   },
   express.static(config.getCustomWallpaperPath(), { dotfiles: 'deny' })
 );
-app.use('/', express.static(path.join(config.appRootPath, 'web', 'main'), { dotfiles: 'deny' }));
+// Web 控制台（/）
+// 上游把 web/main 列为不入库的构建产物，源码部署时该目录是空的，
+// 因此这里改为提供自带的 Web 控制台（web/console，纯静态、无构建步骤）。
+// 控制台页面自身不带内联事件与 eval，可以上一套较严格的 CSP；
+// 其余路径仍只带基础安全头，避免影响既有页面（如 Flutter Web 版）。
+app.use('/', (req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "frame-ancestors 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ')
+  );
+  next();
+});
+
+const consoleEnabled = config.console && config.console.enabled !== false;
+const consoleDir = typeof config.getConsolePath === 'function' ? config.getConsolePath() : path.join(config.appRootPath, 'web', 'console');
+if (consoleEnabled) {
+  // HTML 不缓存：控制台升级后刷新即可生效，不需要运维清 CDN
+  app.use(
+    '/',
+    express.static(consoleDir, {
+      dotfiles: 'deny',
+      setHeaders: res => {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      },
+    })
+  );
+} else {
+  Logger.info('Web 控制台已关闭（console.enabled=false），仅提供 API 与探针');
+}
 app.use('/quickshare', express.static(path.join(config.appRootPath, 'web', 'quickshare'), { dotfiles: 'deny' }));
 
 // 用户相关api
 const authApi = require('./modules/auth/authRouter');
 app.use('/api/auth', authApi);
+
+// Web 控制台专用api
+const consoleApi = require('./modules/console/consoleRouter');
+app.use('/api/console', consoleApi);
 
 // 安全中心相关api
 const securityApi = require('./modules/security/securityRouter');
@@ -334,6 +389,38 @@ require('./modules/file/ws/stats/fileStats')(app);
 require('./modules/editor/ws/editorWs')(app);
 // 终端 ws 链接处理
 require('./modules/terminal/terminalWs')(app);
+
+// 单页应用回退：控制台使用前端路由，刷新/直接访问子路径时需要返回 index.html
+// 只处理 GET、且不属于 /api 与 WebSocket 升级的请求，避免把 API 的 404 也吞掉
+if (consoleEnabled) {
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const p = String(req.path || '/');
+    if (p.startsWith('/api/') || p.startsWith('/quickshare') || p.startsWith('/wallpaper') || p.startsWith('/customWallpaper')) {
+      return next();
+    }
+    // 带扩展名的请求视为静态资源，找不到就正常 404
+    if (path.extname(p)) return next();
+    res.setHeader(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "frame-ancestors 'self'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join('; ')
+    );
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    res.sendFile(path.join(consoleDir, 'index.html'), err => {
+      if (err) next();
+    });
+  });
+}
 
 // 404处理
 app.use((req, res) => {

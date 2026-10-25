@@ -109,6 +109,13 @@ $xml = @"
   <env name="NASCAB_PORT_FALLBACK" value="false"/>
   <env name="NASCAB_ACCESS_LOG" value="true"/>
   <env name="NASCAB_WORKER_AUTO_RESTART" value="true"/>
+  <!-- Web 控制台显示的产品名 -->
+  <env name="NASCAB_CONSOLE_TITLE" value="NasCabOS"/>
+  <!-- 首个超级管理员：两项都填才生效；留空则随机生成，账号密码见日志目录 combined.log 的启动横幅 -->
+  <!--
+  <env name="NASCAB_ADMIN_USER" value="admin"/>
+  <env name="NASCAB_ADMIN_PASSWORD" value="请换成强密码"/>
+  -->
 
   <startmode>Automatic</startmode>
   <delayedAutoStart>true</delayedAutoStart>

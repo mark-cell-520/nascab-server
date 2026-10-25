@@ -38,10 +38,13 @@ git log --oneline upstream-v1.2.5..main   # 分了几次提交、每次做了什
 | 端口占用 | 静默换一个端口；数据库里的旧端口会压过 `PORT` 环境变量 | `server.portFallback=false` 时快速失败并明确报错；显式指定的端口优先于数据库值 |
 | CORS | 反射任意 `Origin` 且允许携带凭证 | 白名单，默认仅同源 + 本机 + `file://`，第三方源需显式声明 |
 | 健康检查 | 无 | `/healthz`（存活）、`/readyz`（就绪，含数据库连通检查，失败 503） |
-| 日志 | `maxFiles:1` 等于不轮转，长期运行会把磁盘写满 | 轮转参数可配；日志目录可配且不可写时回退；访问日志单独落 `access.log` |
+| 日志 | `maxFiles:1` 等于不轮转，长期运行会把磁盘写满；且 `NODE_ENV` 未设置时被判定为开发环境，**文件日志被静默关闭、级别降为 debug** | 轮转参数可配；日志目录可配且不可写时回退；访问日志单独落 `access.log`；开发环境默认值只在真正运行于 Electron 中时套用 |
 | 外部二进制 | 路径写死，只能放在应用目录内 | `NASCAB_LIBS_DIR` / `NASCAB_ONNX_DIR` 可指向只读镜像之外的数据卷 |
 | 优雅停止 | Windows 上没有可行路径 | 监听 `SIGBREAK`，经 WinSW 服务可优雅停止 |
 | 异常兜底 | 无全局 `uncaughtException` 处理 | 全局兜底 + 统一关停流程（停 worker → 释放锁） |
+| Web 界面 | 主控制台 `web/main` 是官方构建产物、**不入库**，源码部署后 `/` 直接 404 | 自带无构建步骤的 Web 控制台（`web/console`）：登录/首次部署向导 + 概览/存储/用户/网络/安全/应用/进程/日志/关于 10 个页面，带 CSP 等安全响应头与 SPA 回退 |
+| 首个管理员 | 只能随机生成，账号密码要在启动日志里翻 | 支持 `NASCAB_ADMIN_USER`/`NASCAB_ADMIN_PASSWORD` 显式指定；创建成功立即打印醒目横幅；极端情况下可在网页上走初始化向导 |
+| 用户信息接口 | `getUserProfile` 查询不存在的 `role`/`updated_at` 列，`/api/auth/profile` 对所有客户端返回 400 | 按真实表结构取列 |
 
 逐文件的改造清单、部署方式与实测验证结果见 [DEPLOY.md](DEPLOY.md)。
 
