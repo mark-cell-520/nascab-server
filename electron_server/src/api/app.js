@@ -18,9 +18,65 @@ const expressWs = require('express-ws')(app); // Enable WebSocket support
 app.expressWs = expressWs;
 
 app.disable('x-powered-by');
-// 仅信任来自本机回环地址（P2P 代理从 127.0.0.1 转发）的 X-Forwarded-For / X-Real-IP
-// 外部直接请求伪造的 X-Forwarded-For 会被忽略，req.ip = 真实连接 IP
-app.set('trust proxy', ['loopback']);
+// 反向代理信任设置：
+// 默认仅信任本机回环（P2P 代理从 127.0.0.1 转发）的 X-Forwarded-For / X-Real-IP；
+// server.behindProxy=true 时（Nginx/Caddy/Traefik 等前置）信任代理链，req.ip 才能取到真实客户端 IP
+app.set('trust proxy', config.server.behindProxy ? true : ['loopback']);
+
+/**
+ * 生成本机/桌面客户端默认放行的 CORS 源判定
+ * 放行：无 Origin 头（curl、移动端、桌面客户端）、同源、本机回环任意端口、file:// 桌面端
+ * 拦截：其余任意第三方站点（改造前为 origin:true 反射任意源，配合 credentials:true 等于任意网站可携带凭证调用）
+ */
+function isLocalOrSameOrigin(origin, callback) {
+  if (!origin) return callback(null, true);
+  if (origin === 'null') return callback(null, true); // file:// 场景浏览器会发 Origin: null
+  let parsed;
+  try {
+    parsed = new URL(origin);
+  } catch (_) {
+    return callback(null, false);
+  }
+  if (parsed.protocol === 'file:') return callback(null, true);
+  const host = parsed.hostname.toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0' || host === '[::1]') {
+    return callback(null, true);
+  }
+  return callback(null, false);
+}
+
+const _corsAllowedHeaders = [
+  'Content-Type',
+  'Authorization',
+  'Range',
+  'Accept',
+  'Accept-Language',
+  'X-Requested-With',
+  'Cache-Control',
+];
+const _corsExposedHeaders = ['Accept-Ranges', 'Content-Range', 'Content-Length'];
+
+function buildCorsOptions() {
+  const origins = config.security.corsOrigins || [];
+  const base = {
+    credentials: true,
+    // 跨域 fetch/探测必须带 Range；未放行时浏览器会发无 Range 的 GET，服务端 200 整文件会把内存打满
+    allowedHeaders: _corsAllowedHeaders,
+    exposedHeaders: _corsExposedHeaders,
+  };
+  if (origins.includes('*')) {
+    // 显式配置 ['*']：兼容改造前的宽松行为（不推荐，仅用于排障）
+    return { ...base, origin: true };
+  }
+  if (origins.length > 0) {
+    const allow = new Set(origins);
+    return { ...base, origin: (o, cb) => cb(null, !o || allow.has(o)) };
+  }
+  // 默认：仅同源 + 本机 + 桌面端
+  return { ...base, origin: isLocalOrSameOrigin };
+}
+
+app.use(cors(buildCorsOptions()));
 
 function _isScannerPath(rawPath) {
   const p = String(rawPath || '');
@@ -50,23 +106,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    // 跨域 fetch/探测必须带 Range；未放行时浏览器会发无 Range 的 GET，服务端 200 整文件会把内存打满
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'Range',
-      'Accept',
-      'Accept-Language',
-      'X-Requested-With',
-      'Cache-Control',
-    ],
-    exposedHeaders: ['Accept-Ranges', 'Content-Range', 'Content-Length'],
-  }),
-); //允许跨域并携带凭据
 // 大文件 Range 流式（rawFile / download）若走压缩层，部分客户端会退化为整文件 200 或异常缓冲；显式排除
 app.use(
   compression({
@@ -90,7 +129,7 @@ app.use(cookieParser()); // 使用cookie-parser中间件
 app.use(initI18nMiddleware()); // 使用i18n中间件
 app.use(require('./middleware/decryptMiddleware')); // 参数解密中间件
 
-// 健康检查路由
+// 健康检查路由（存活探针）：进程活着就返回 200，供 Docker/ systemd / k8s livenessProbe 使用
 app.use('/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -99,17 +138,46 @@ app.use('/health', (req, res) => {
   });
 });
 
-// HTTP请求日志中间件
-app.use((req, res, next) => {
-  // 推荐用法：Express 封装后的 req.ip（自动处理 IPv6 格式，更简洁）
-  const startTime = Date.now();
-  // console.log(`API [HTTP] ${req.method} ${req.path} ${req.ip}`);
-  res.on('finish', () => {
-    const responseTime = Date.now() - startTime;
-    // Logger.http(req, res, responseTime);
+// 兼容常见探针路径别名
+app.use('/healthz', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'OK',
+    serverId: process.env.SERVER_ID,
   });
-  next();
 });
+
+// 就绪探针：数据库可用才算就绪，否则返回 503，供 readinessProbe / 负载均衡摘流使用
+app.use('/readyz', async (req, res) => {
+  const checks = {
+    uptime: Math.round(process.uptime()),
+    memoryMb: Math.round(process.memoryUsage().rss / 1048576),
+    db: 'unknown',
+  };
+  let ready = true;
+  try {
+    const knex = dbUtil.getConnectMainDb().knex;
+    await knex.raw('select 1 as ok');
+    checks.db = 'ok';
+  } catch (err) {
+    checks.db = 'fail';
+    checks.dbError = err && err.message ? err.message : String(err);
+    ready = false;
+  }
+  res.status(ready ? 200 : 503).json({ success: ready, checks });
+});
+
+// HTTP请求日志中间件（默认关闭，通过 logging.accessLog / NASCAB_ACCESS_LOG 开启）
+if (config.logging.accessLog) {
+  app.use((req, res, next) => {
+    const startTime = Date.now();
+    res.on('finish', () => {
+      const responseTime = Date.now() - startTime;
+      Logger.http(req, res, responseTime);
+    });
+    next();
+  });
+}
 
 // 挂载数据库实例到req对象上 方便路由使用
 app.use((req, res, next) => {
