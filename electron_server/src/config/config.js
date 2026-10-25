@@ -1,6 +1,9 @@
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+// 部署配置层：配置文件 + 环境变量，供服务器/容器/服务化部署注入配置
+const deployConfig = require('./deployConfig');
+const runtimeFlags = require('../utils/runtimeFlags');
 
 let packageJson = {};
 try {
@@ -99,7 +102,36 @@ function getRootPath() {
     // 开发环境
     rootPath = path.join(__dirname, '../../');
   }
+  // 根目录确定后，补加载根目录下的 config.json（此时才能知道根目录在哪）
+  try {
+    deployConfig.loadRootConfig(rootPath);
+  } catch (_) {}
   return rootPath;
+}
+
+/**
+ * 获取外部二进制（libs）根目录
+ * 默认 <应用根目录>/libs；服务器部署可用 NASCAB_LIBS_DIR / libs.dir 指向独立位置，
+ * 例如把 libs 放到只读镜像之外的数据卷中，或按平台分发到 /opt/nascab/libs
+ */
+function getLibsPath() {
+  const configured = deployConfig.libs.dir;
+  if (configured) {
+    return path.resolve(configured);
+  }
+  return path.join(getRootPath(), 'libs');
+}
+
+/**
+ * 获取 ONNX 模型根目录
+ * 默认 <应用根目录>/onnx_models；可用 NASCAB_ONNX_DIR / onnx.dir 覆盖
+ */
+function getOnnxModelsPath() {
+  const configured = deployConfig.onnx.dir;
+  if (configured) {
+    return path.resolve(configured);
+  }
+  return path.join(getRootPath(), 'onnx_models');
 }
 
 /**
@@ -117,7 +149,7 @@ function getDefaultNonElectronUserDataPath() {
     return process.env['userDataFolder'];
   }
   // Docker 镜像内不能使用项目工作目录下的 data，改用根目录下的 /nascabos_data（便于挂载卷）
-  if (packageJson.isDocker && os.platform() === 'linux') {
+  if (runtimeFlags.isDocker() && os.platform() === 'linux') {
     const folder = path.join('/', 'nascabos_data');
     try {
       fs.mkdirSync(folder, { recursive: true });
@@ -134,16 +166,31 @@ function getDefaultNonElectronUserDataPath() {
 
 /**
  * 获取用户数据目录 如果 app 不存在则返回程序当前目录
+ * 优先级：环境变量 userDataFolder > 部署配置 data.dir > Electron userData > 内置默认
  */
 function getUserDataPath() {
   if (process.env['userDataFolder']) {
     return process.env['userDataFolder'];
   }
+  // 部署配置显式指定的数据目录（服务器/容器部署用）
+  const configuredDataDir = deployConfig.data.dir;
+  if (configuredDataDir) {
+    return path.resolve(configuredDataDir);
+  }
   if (isElectronAvailable && app && typeof app.getPath === 'function') {
     // Electron 环境
-    return app.getPath('userData');
+    const userData = app.getPath('userData');
+    // userData 确定后，补加载 userData/config.json（幂等，只执行一次）
+    try {
+      deployConfig.loadUserDataConfig(userData);
+    } catch (_) {}
+    return userData;
   } else {
-    return getDefaultNonElectronUserDataPath();
+    const fallback = getDefaultNonElectronUserDataPath();
+    try {
+      deployConfig.loadUserDataConfig(fallback);
+    } catch (_) {}
+    return fallback;
   }
 }
 
@@ -347,6 +394,8 @@ const config = {
   uploadTempPartPrefix: '.uploadTempPart_', //上传临时分块文件前缀
   getUploadTempDir: getUploadTempDir, //上传临时目录
   getRootPath: getRootPath, //获取应用根目录
+  getLibsPath: getLibsPath, //获取外部二进制（libs）根目录
+  getOnnxModelsPath: getOnnxModelsPath, //获取 ONNX 模型根目录
   getFoliateRootPath: getFoliateRootPath, // foliate-js-main 根目录
   getFileType: getFileType, //获取文件类型
   getDatabasePath: getDatabasePath, //数据库目录
@@ -358,15 +407,28 @@ const config = {
   appRootPath: getRootPath(),
   // 应用配置
   app: {
-    port: process.env.PORT || 6789,
-    httpsPort: process.env.HTTPS_PORT || 6799,
+    // 端口取值优先级：环境变量 PORT/HTTPS_PORT > 配置文件 server.port > 内置默认
+    port: deployConfig.server.port,
+    httpsPort: deployConfig.server.httpsPort,
     env: env,
     isProduction: env === 'production',
     isDevelopment: env === 'development',
     isTest: env === 'test',
   },
 
-  // JWT配置（密钥仅从 process.env.JWT_SECRET 读取，不在此暴露以防注入）
+  // 服务器部署配置（监听地址、HTTPS 开关、反代模式）
+  server: deployConfig.server,
+
+  // 安全配置
+  security: deployConfig.security,
+
+  // worker 监管配置
+  worker: deployConfig.worker,
+
+  // 外部二进制目录配置
+  libs: deployConfig.libs,
+
+  // JWT配置（密钥仅从 deployConfig（含 process.env.JWT_SECRET）读取，不在此暴露以防注入）
   jwt: {
     accessTokenExpiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || '12h',
     refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
@@ -377,13 +439,15 @@ const config = {
     maxFileSize: process.env.MAX_FILE_SIZE || '100gb',
   },
 
-  // 日志配置
+  // 日志配置（级别/目录/轮转均可通过部署配置注入）
   logging: {
-    level: process.env.LOG_LEVEL || 'info',
+    level: deployConfig.logging.level || 'info',
     file: {
-      enabled: true, //是否启用文件输出
-      path: path.join(getRootPath(), 'logs'),
+      enabled: deployConfig.logging.file, //是否启用文件输出
+      path: deployConfig.logging.dir ? path.resolve(deployConfig.logging.dir) : path.join(getRootPath(), 'logs'),
     },
+    accessLog: deployConfig.logging.accessLog, //是否记录 HTTP 访问日志
+    rotate: deployConfig.logging.rotate, //日志轮转参数
   },
 
   fileServer: {
@@ -409,15 +473,39 @@ const config = {
   musicTypeList: musicTypeList,
 };
 
-// 开发环境特定配置
+// 开发环境特定配置（仅在未显式配置时生效，避免覆盖部署配置）
 if (config.app.isDevelopment) {
-  config.logging.level = 'debug';
-  config.logging.file.enabled = false;
+  if (!deployConfig.logging.level) {
+    config.logging.level = 'debug';
+  }
+  if (!process.env.NASCAB_LOG_FILE) {
+    config.logging.file.enabled = false;
+  }
 }
 
 // 生产环境特定配置
 if (config.app.isProduction) {
-  config.logging.file.enabled = true;
+  config.logging.file.enabled = deployConfig.logging.file;
 }
+
+// 输出实际生效的部署配置来源，便于排查「为什么配置没生效」
+try {
+  if (deployConfig.loadedFiles.length > 0) {
+    console.log('----------deploy config files: ' + deployConfig.loadedFiles.join(', ') + ' ----------');
+  }
+  console.log(
+    '----------deploy config: ' +
+      JSON.stringify({
+        host: config.server.host,
+        port: config.app.port,
+        httpsPort: config.server.httpsEnabled ? config.app.httpsPort : null,
+        httpsEnabled: config.server.httpsEnabled,
+        dataDir: getUserDataPath(),
+        libsDir: getLibsPath(),
+        logDir: config.logging.file.enabled ? config.logging.file.path : null,
+      }) +
+      ' ----------'
+  );
+} catch (_) {}
 
 module.exports = config;

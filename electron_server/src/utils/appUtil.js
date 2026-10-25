@@ -15,6 +15,7 @@ try {
 }
 const os = require('os');
 const config = require('../config/config');
+const deployConfig = require('../config/deployConfig');
 const path = require('path');
 const tableConfig = require('../db/table/tableConfig');
 const portfinder = require('portfinder');
@@ -29,13 +30,23 @@ class AppUtil {
   async getConfigApiPort(getHttps) {
     //获取用户设置的api服务端口号
     let configPort = getHttps ? config.app.httpsPort : config.app.port;
-    let portConfig = await tableConfig.getConfigByKey(getHttps ? tableConfig.KEY_API_PORT_HTTPS : tableConfig.KEY_API_PORT_HTTP);
-    if (portConfig) {
-      let dbPort = parseInt(portConfig);
-      if (dbPort <= 0 || dbPort > 65535) {
-        // 设置的端口无效 还用默认的
-      } else {
-        configPort = dbPort;
+
+    // 运维通过环境变量 PORT/HTTPS_PORT 或配置文件 server.port 显式指定端口时，
+    // 优先于数据库里持久化的旧值。否则会出现「改了 PORT 却不生效」的部署坑——
+    // 数据库里还留着上次分配/用户在界面里设过的端口，把显式配置覆盖掉了。
+    const explicit = deployConfig.isExplicit(
+      getHttps ? 'server.httpsPort' : 'server.port',
+      getHttps ? 'HTTPS_PORT' : 'PORT'
+    );
+    if (!explicit) {
+      const portConfig = await tableConfig.getConfigByKey(getHttps ? tableConfig.KEY_API_PORT_HTTPS : tableConfig.KEY_API_PORT_HTTP);
+      if (portConfig) {
+        const dbPort = parseInt(portConfig);
+        if (dbPort <= 0 || dbPort > 65535) {
+          // 设置的端口无效 还用默认的
+        } else {
+          configPort = dbPort;
+        }
       }
     }
     return configPort;

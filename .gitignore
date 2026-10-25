@@ -11,3 +11,49 @@ logs/**/*
 .env
 flutter_client/android/nascabos-pwd-nascab.jks
 electron_server/onnx_models/faces/insightFace/model.onnx
+
+# ================= 服务端部署改造（分支 server-deploy）新增 =================
+# 说明：node_modules / libs 外部二进制 / onnx_models / certs / test 等
+#       「electron_server 内部」的忽略规则沿用上游的 electron_server/.gitignore
+
+# ---- 运行时数据目录（SQLite / 缓存 / 证书 / 单例锁 / PID）----
+/data/
+/electron_server/data/
+*.pid
+nascabos.lock
+
+# ---- 日志目录与裸机脚本输出 ----
+/logs/
+/electron_server/logs/
+stdout.log
+stderr.log
+
+# ---- 本地配置含密钥，不入库；示例见 deploy/config.example.json ----
+/config.json
+/electron_server/config.json
+
+# ---- Flutter / Dart 构建产物 ----
+flutter_client/.dart_tool/
+flutter_client/build/
+flutter_client/.flutter-plugins
+flutter_client/.flutter-plugins-dependencies
+**/.packages
+
+# ---- Android 构建产物 ----
+tv_android/.gradle/
+tv_android/local.properties
+tv_android/app/build/
+
+# ---- HarmonyOS 构建产物 ----
+harmony_client/oh_modules/
+harmony_client/.preview/
+harmony_client/build/
+**/.hvigor/
+
+# ---- IDE / 操作系统 ----
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+desktop.ini
+__pycache__/
