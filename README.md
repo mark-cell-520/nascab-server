@@ -29,7 +29,7 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 
 单页应用，前端路由（刷新 / 直接访问子路径不会 404）。页面：概览、存储管理、用户管理、
 网络服务、安全中心、应用中心、进程管理、系统日志、关于本机；另有 Web 文件管理器与
-挂载 / 分享 / 下载 / 容器四个 NAS 管理页面，以及音乐与影视两个媒体页面。
+挂载 / 分享 / 下载 / 容器四个 NAS 管理页面，以及音乐、影视、相册三个媒体页面。
 
 界面做了设计令牌化，浅色 / 暗色双主题：暗色只覆盖 `[data-theme="dark"]` 一层令牌，
 组件规则两边共用。未显式选择时跟随系统 `prefers-color-scheme` 并实时响应，
@@ -54,13 +54,21 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 **剧集连播**（分集列表、上一集/下一集、播完自动连播、跳过片头）。
 另有缓冲进度、加载态、音量/静音、全屏、画中画与一套完整快捷键。
 
-这两个页面修掉了上游两处残缺：
+「相册」页：服务端 `/api/photo` 下本来就有一整套相册能力（时间线、相册、合集、智能相册、
+人脸、地点、相似图、回收站），但 Web 控制台此前一处都没接。这里接出五个视图——
+**时间线**（年份导航、按拍摄日期分组、滚动分页、类型筛选、搜索）、**相册**（浏览/新建/
+重命名/删除/增删照片/设封面）、**收藏**、**地点**、**回收站**——外加一个灯箱
+（大图、前后翻页、EXIF 信息、收藏、加入相册、下载、删除）与多选批量操作。
+缩略图走 `/api/file/tiny` 出 webp，网格 360px、灯箱 1600px，两份缓存互不干扰。
+
+这三个页面修掉了上游几处残缺：
 
 | 方面 | 上游 | 本仓库 |
 |---|---|---|
 | 歌单顺序 | `play_list2index` 没有顺序字段；列表按 `m.id desc` 排；`playlist/get` 不返回曲目 | 新增 `position` 列（老库自动补列回填）+ reorder/move/clear 三个接口，列表按 `position` 排 |
 | 清晰度 | `resolution` 只认 `1920x1080`，传 `"1080p"` 被静默忽略；没有档位表；`bitrate` 不带 `-maxrate/-bufsize` | 档位收敛成 `src/utils/videoQualityUtil.js` 一份定义，`/transcode` 与 `/stream-mp4` 共用 |
 | 播放器能力 | Web 端没有任何播放器；服务端有字幕/音轨相关接口但前端无处可用 | 新增 `mediaTrackLabelUtil.js` + `GET /api/videoPlayer/tracks`，字幕/音轨/倍速/连播全部落到 Web 播放器 |
+| 相册 | `/api/photo` 一整套能力在 Web 端零接入；`getTimelinePhotoList` 注释写着分页而实现没有，时间轴无法滚动加载；`/album/delete` 只认 `id` 而同文件其它接口全认 `album_id`；`getTinyImgByPath` 的缓存键不含 `size`，第一个请求的尺寸被永久固化（灯箱只能拿到网格尺寸的小图） | 新增 `pages-photo.js` 与「相册」页；时间线实现分页（单页上限 500、响应带 `hasMore`）；`deleteAlbum` 两种参数都收；缩略图缓存键加尺寸并新增 `normalizeTinySize`；清掉相册模块 4 处 `console.log` |
 
 ### 机器控制接口 `/api/control`
 

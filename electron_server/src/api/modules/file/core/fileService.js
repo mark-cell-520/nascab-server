@@ -406,11 +406,14 @@ class FileService {
     }
 
     if (!stat.isFile()) {
-      console.log(resolvedPath);
       throw new Error('file.NOT_FILE');
     }
 
-    const hashStr = path.basename(resolvedPath) + stat.size + stat.mtimeMs;
+    // 尺寸必须参与缓存键。原来只按 文件名+大小+mtime 哈希，缓存目录又是扁平的，
+    // 结果第一个请求的尺寸被永久固化：网格先请求 320px，之后灯箱再请求 1600px
+    // 命中的还是那张 320px 的小图，放大就糊；反过来先来了大图，网格又白下流量。
+    const tinySize = this.normalizeTinySize(size);
+    const hashStr = `${path.basename(resolvedPath)}|${stat.size}|${stat.mtimeMs}|${tinySize}`;
     const hash = crypto.createHash('sha256').update(hashStr).digest('hex');
 
     const cachePath = config.getTinyCachePath();
@@ -450,9 +453,19 @@ class FileService {
       this._deferTinyToWorker(resolvedPath);
     }
 
-    await sharpUtils.genTinyFile(resolvedPath, cachePath, hash, type, size);
+    await sharpUtils.genTinyFile(resolvedPath, cachePath, hash, type, tinySize);
 
     return targetTinyPath;
+  }
+
+  /**
+   * 归一化缩略图尺寸。
+   * 未指定时取 genTinyFile 里的默认值 640，保证「不传 size」与「传 640」命中同一份缓存。
+   */
+  normalizeTinySize(size) {
+    const n = parseInt(size, 10);
+    if (!Number.isFinite(n) || n <= 0) return 640;
+    return Math.min(n, 8192);
   }
 
   async addFileLog(uid, type, sourcePath, targetPath, state, message = '') {

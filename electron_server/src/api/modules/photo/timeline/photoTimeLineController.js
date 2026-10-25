@@ -73,11 +73,13 @@ class PhotoTimeLineController {
       // 参数: page, pageSize, fileType,original_time,
       // sort: 'asc' | 'desc' 数据根据original_time的排序方式
       // dataTimeType(1为获取时间戳originalTime之前的(包含时间戳),2为获取时间戳originalTime之后的)
-      const { pageSize, sort, fileType, originalTime, startTime, endTime, search, geohash, sourceList, list_type, album_id, collection_id, smart_album_id, loadTheDay, face_id, place_name, year } =
+      // page/pageSize 不传时返回全部（老调用方行为）；传了才分页，响应里带 hasMore
+      const { page, pageSize, sort, fileType, originalTime, startTime, endTime, search, geohash, sourceList, list_type, album_id, collection_id, smart_album_id, loadTheDay, face_id, place_name, year } =
         req.body;
 
       const result = await photoTimeLineService.getTimelinePhotoList(
         {
+          page,
           pageSize,
           sort,
           fileType,
@@ -99,7 +101,8 @@ class PhotoTimeLineController {
         req.user
       );
 
-      const photoList = Array.isArray(result) ? result : [];
+      const photoList = Array.isArray(result && result.list) ? result.list : Array.isArray(result) ? result : [];
+      const hasMore = !!(result && result.hasMore);
 
       let locale = '';
       try {
@@ -176,7 +179,7 @@ class PhotoTimeLineController {
         };
       });
 
-      return ResponseUtil.success(req, res, { photoList, dateInfoList }, 'common.SUCCESS', 200);
+      return ResponseUtil.success(req, res, { photoList, dateInfoList, hasMore }, 'common.SUCCESS', 200);
     } catch (error) {
       Logger.error('getTimelinePhotoList error:', error);
       const statusCode = error.statusCode || 500;

@@ -63,6 +63,7 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 | 应用中心 | 已启用的应用（标识 → 中文名映射） | `/api/apps/getApps` |
 | 进程管理 | 服务端各进程的 PID、CPU、内存 | `/api/service/process` |
 | 系统日志 | 在线看日志尾部，可切换运行/错误/访问日志，可自动刷新 | `/api/console/logs` |
+| 相册 | 照片时间线、相册、收藏、地点、回收站 + 灯箱 | `/api/photo/*`、`/api/file/tiny` |
 | 关于本机 | 版本、服务器标识、Node/Electron、硬件环境、开源许可 | `/api/console/overview` |
 
 顶栏支持全局搜索菜单（按 `/` 聚焦）、系统通知、用户菜单；窄屏自动折叠为抽屉式侧边栏。
@@ -130,6 +131,47 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 其中 `os.cpus()` 在 Windows 上每次调用都会重新构造一份「每个逻辑核一个对象」的数组，
 概览页每 3 秒调一次，不缓存就是每分钟制造一整套纯垃圾。
 
+### 媒体：相册
+
+控制台第三个媒体页面（`web/console/pages-photo.js`）。服务端 `/api/photo` 下本来就有一整套相册能力
+（时间线、相册、合集、智能相册、人脸、地点、相似图、回收站、GPS 补全、AI 开关），
+但 Web 控制台此前一处都没接——照片只能在手机客户端看，网页上完全进不去。
+
+接出来的是核心浏览体验，五个视图：
+
+| 视图 | 内容 |
+|---|---|
+| 时间线 | 按拍摄日期分组的照片网格，左侧年份导航（`timeline/years`，带每年的张数与封面），滚动分页加载，可筛选照片/视频/LivePhoto，可按文件名与拍摄设备搜索 |
+| 相册 | 相册 / 合集 / 智能相册三组卡片；进相册可浏览、新建、重命名、删除、把照片加进去/移出来、设封面 |
+| 收藏 | `list_type=favorite`，按收藏时间排序 |
+| 地点 | 按拍摄地点归类；未启用 AI 地点识别时明确说明原因，而不是给一个空列表 |
+| 回收站 | 列表、单张/全部恢复、彻底删除、清空 |
+
+点照片进**灯箱**：大图、上一张/下一张（`←`/`→`）、`Esc` 关闭、`I` 详细信息（EXIF：
+设备、镜头、光圈、快门、ISO、焦距、GPS 反查的地点）、收藏、加入相册、下载原图、删除（进回收站）。
+多选模式可批量收藏、批量加入相册、批量删除。
+
+缩略图走 `GET /api/file/tiny?path=...&size=...`（sharp 出的 webp，缓存按「文件名+大小+mtime+尺寸」哈希），
+灯箱用 `size=1600`、网格用 `size=360`——同一张图两种尺寸是两份缓存，互不干扰。
+缩略图还没生成时服务端返回 `202 + Retry-After`，前端会自动重试。
+
+时间线接口补上了**分页**：`getTimelinePhotoList` 的注释里一直写着 `page`/`pageSize`，
+实现里却一个都没用，也不传时间范围就直接返回空——时间轴因此根本无法滚动加载，
+只能一次拉完某个区间的全部照片。现在传了 `pageSize` 就分页（响应带 `hasMore`），
+单页上限 500；不传时保持原行为返回全部，老调用方不受影响。
+顺带清掉了 `photoTimeLineService` 里 4 处 `console.log` 调试输出
+（含每次查询都打印的 `query.toString()`）——服务端长期运行不该往标准输出刷 SQL。
+
+`/album/delete` 原先只认 `payload.id`，而同一文件的 `getAlbum`/`updateAlbum`/
+`album/index/add`/`album/cover/set` 全都认 `album_id`——同一个调用方两种写法必错一个，
+现在两种都收。
+
+`getTinyImgByPath` 的缓存键**原先不含请求的 `size`**，而缓存目录又是扁平的：
+第一个请求的尺寸会被永久固化。网格先请求 360px，之后灯箱再请求 1600px，
+命中的还是那张 360px 的小图，放大就糊；反过来先来了大图，网格又白下流量。
+现在尺寸参与哈希，`normalizeTinySize` 把未指定/非法值统一回落成 640（`genTinyFile` 的默认值），
+保证「不传 size」与「传 640」仍然命中同一份缓存。
+
 ### 控制台专用接口
 
 | 接口 | 鉴权 | 说明 |
@@ -158,6 +200,20 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 | `POST /api/music/playlist/get` | 登录用户 | 歌单元信息 + 曲目列表（按 `position`） |
 | `GET /api/music/cover?file_path=...&size=300` | 登录用户 | 内嵌封面（`has_inner_cover=1` 才有） |
 | `GET /api/music/transcode?path=...` | 登录用户 + 文件权限 | 192k MP3 兜底（浏览器解不了的格式），支持 Range |
+| `POST /api/photo/timeline/photos` | 登录用户 | 时间线照片列表；`page`/`pageSize` 分页（不传则返回全部），响应带 `hasMore`；支持 `year`/`fileType`/`search`/`list_type=favorite`/`album_id`/`place_name` 筛选 |
+| `POST /api/photo/timeline/years` | 登录用户 | 年份列表 + 每年张数 + 封面 |
+| `POST /api/photo/timeline/dates` | 登录用户 | 按 `original_date` 分组的日期与计数 |
+| `POST /api/photo/timeline/count` | 登录用户 | 可见照片总数 |
+| `POST /api/photo/album/overview` | 登录用户 | 一次给出相册 / 合集 / 智能相册三组卡片 |
+| `POST /api/photo/album/get` | 登录用户 | 相册详情与分享列表 |
+| `POST /api/photo/album/create` `update` `delete` | 登录用户 | 相册增改删；`delete` 同时接受 `id` 与 `album_id` |
+| `POST /api/photo/album/index/add` `remove` | 登录用户 | 相册内增删照片 |
+| `POST /api/photo/album/cover/set` | 登录用户 | 设封面 |
+| `POST /api/photo/place/list` | 登录用户 | 地点列表；未启用 AI 地点识别时返回 `placeEnable: 0` 与空列表 |
+| `POST /api/photo/favorite/toggle` `favorite/batch` | 登录用户 | 单个切换 / 批量收藏 |
+| `POST /api/photo/trash/list` `add` `restore` `delete` `empty` | 登录用户 | 回收站全链路 |
+| `POST /api/photo/properties/get` | 登录用户 + 文件 view 权限 | 照片 EXIF、尺寸、GPS 反查地点 |
+| `GET /api/file/tiny?path=...&size=360` | 登录用户 + 文件权限 | 缩略图（webp）；`202 + Retry-After` 表示待生成，`404` 文件不存在，`415` 类型不支持 |
 
 > 媒体地址都要带 `accessToken` 查询参数（`<audio>`/`<video>` 的 `src` 发不出 `Authorization` 头），
 > 服务端 `extractTokenFromRequest` 认这个参数。文件管理器的缩略图与下载一直是这么做的。
@@ -613,7 +669,7 @@ server {
 
 ## 改造清单
 
-源码改造（相对上游基线 `upstream-v1.2.5`，共 11 次提交，第 1 次为上游基线）：
+源码改造（相对上游基线 `upstream-v1.2.5`，共 12 次提交，第 1 次为上游基线）：
 
 | 文件 | 改造 |
 |---|---|
@@ -670,6 +726,14 @@ server {
 | `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度、分集列表）+ 全屏播放器（清晰度选择、字幕菜单与外观调节、音轨切换、倍速、跳过片头、自动连播、画中画/全屏、缓冲进度、完整快捷键、断点续播） |
 | `web/console/console.js`、`console.css`、`index.html` | 导航新增「媒体」分组（影视/音乐）；补足播放器栏、队列抽屉、歌词面板、海报墙、清晰度/字幕/音轨/倍速菜单、加载态、缓冲条、跳过片头、分集列表的样式（同样走设计令牌，暗色自动生效） |
 | `electron_server/language/*.json` | 新增 `videoPlayer.QUALITY_ORIGINAL_USE_RAW`（原画不走转码，应改走原画直链） |
+| `src/api/modules/photo/timeline/photoTimeLineService.js` | **`getTimelinePhotoList` 实现分页**——注释里一直写着 `page`/`pageSize`，实现却一个都没用，时间轴因此无法滚动加载；新增 `hasPaging`/`resolvePaging`（单页上限 500、兼容 `page_size`/`page_index` 写法），传了 `pageSize` 就分页并在响应里带 `hasMore`，不传时保持原行为返回全部；`loadTheDay` 兼容字符串 `'1'`/`'true'`。清掉 4 处 `console.log` 调试输出（含每次查询都打印的 `query.toString()`） |
+| `src/api/modules/photo/timeline/photoTimeLineController.js` | 透传 `page`；适配服务端新的 `{list, hasMore}` 返回，响应体加 `hasMore` |
+| `src/api/modules/photo/album/photoAlbumService.js` | `deleteAlbum` 同时接受 `id` 与 `album_id`——原先只认 `id`，与同文件的 `getAlbum`/`updateAlbum`/`index/add`/`cover/set` 全都不一致，同一个调用方两种写法必错一个 |
+| `src/api/modules/photo/map/photoMapController.js` | `getTileServerList` 的 `console.log(e)` 改为 `Logger.error`（原本堆栈直接刷标准输出，日志里找不到） |
+| `src/api/modules/file/core/fileService.js` | **修复缩略图缓存键不含 `size`**：原先只按「文件名+大小+mtime」哈希而缓存目录是扁平的，第一个请求的尺寸被永久固化——网格先请求 360px，灯箱再请求 1600px 命中的还是小图；现在尺寸参与哈希，并新增 `normalizeTinySize`（未指定/非法值回落 640，与 `genTinyFile` 默认值一致，保证「不传」与「传 640」仍是同一份缓存） |
+| `web/console/pages-photo.js` | **新增**。相册页：时间线（年份导航、按拍摄日期分组、滚动分页、类型筛选、搜索）、相册（卡片/详情/新建/重命名/删除/增删照片/设封面）、收藏、地点、回收站五个视图；灯箱（大图、前后翻页、EXIF 信息、收藏、加入相册、下载、删除）与多选批量操作；缩略图 202 待生成时自动重试 |
+| `web/console/console.js`、`index.html` | 导航「媒体」分组新增「相册」；`ICONS` 新增相册图标；引入 `pages-photo.js` |
+| `web/console/console.css` | 相册页与灯箱样式（视图页签、年份导航、日期分组网格、多选操作条、相册卡片、灯箱与 EXIF 面板），窄屏下页签收起文字、网格降为 104px 轨道 |
 
 部署产物：`deploy/config.example.json`、`deploy/systemd/`、`deploy/docker/`、`deploy/windows/`、`deploy/scripts/`。
 
@@ -720,6 +784,27 @@ server {
 - 快捷键全表无运行时错误；数字键 `5` 重连流的 `src` 带 `seek=3600`（7200 秒的 50%）
 - 剧集：详情弹层列出分集，点某一集直接起播并把标题换成该集名字
 - 用 CDP 驱动无头 Chrome 截图核对播放器各状态（播放器/字幕菜单/倍速菜单/清晰度菜单/音轨菜单），以及 780px 窄屏下顶栏自动收起文字标签只留图标、浅色主题下菜单跟随主题而视频区保持深色
+
+### 相册（本轮新增）
+
+以下在本机实测通过（Node 22.20.0，真实启动的服务端 + 真实 SQLite + jsdom + 无头 Chrome）：
+
+- 时间线分页：不传 `pageSize` 时在时间范围内返回全部（老行为不变）；既不传范围也不传分页时仍返回空（与改造前一致）；传了 `pageSize` 就不再强制要时间范围
+- 分页不重不漏：三页并集等于全部、顺序与不分页一致、越界页返回空、`hasMore` 在取完那一刻转 false；单页上限 500（`pageSize=100000` 被夹到 500）
+- 筛选与分页叠加：`year`、`fileType`、`search`（文件名 / 拍摄设备）各自生效且仍按拍摄时间倒序
+- 日期分组与统计：`timeline/dates` 分组计数、`timeline/years` 年份倒序且每年带封面、`timeline/count` 总数
+- 收藏：`toggleFavorite` 开/关、`favorite/batch` 批量、`list_type=favorite` 只出收藏的且 `is_favorite=1`；普通列表里收藏标记按人区分
+- 回收站：移入后时间线不再出现、`trash/list` 出这些、恢复后回到时间线、彻底删除后库里也没有了
+- 相册：建相册、加片（重复加不插第二次）、设封面（一个相册只有一张）、移出（照片本身还在）、删相册（照片不动）；`album/list` 带封面预览与 `is_owner`
+- **`/album/delete` 同时接受 `id` 与 `album_id`**——原先只认 `id`，与同文件其它接口不一致，两种写法必错一个
+- **缩略图缓存键含尺寸**：同一张图请求 360 与 1600 得到两个不同缓存文件，产物长边分别为 360 与 1600；重复请求同一尺寸命中同一份；不传尺寸与传 640 是同一份
+- 接口层：未登录打相册接口返回 401；`favorite/toggle` 缺 `file_hash`、`favorite/batch` 传非数组、`trash/add` 传非数组均被拒；地点未启用时返回 `placeEnable: 0` 与空列表而不是报错
+- 页面渲染：五个视图页签、年份导航、按日期分三组、7 张瓦片、日期头带地点与设备、收藏星标、缩略图地址带 `accessToken`
+- 灯箱：点瓦片打开、计数 `1 / 7`、大图走 `size=1600`、上一张/下一张、`I` 开信息面板（列出 EXIF）、收藏按钮变已选、`→` 翻页、`Esc` 关闭
+- 多选：进多选模式点两张 → 操作条显示「已选 2 张」、选中项有勾选标记、取消后操作条收起
+- 相册视图卡片可点进相册并带出相册内照片；收藏视图只出收藏的；地点未启用给出说明；回收站为空给出提示；切视图不留下上一个视图的筛选条
+- 用 CDP 驱动无头 Chrome 截图核对时间线、灯箱、相册视图、收藏视图与 780px 窄屏（侧边栏收成汉堡、页签只留图标、年份导航移到上方、瓦片缩到 104px）
+- 截图中发现并修掉两处纯 CSS 问题：灯箱舞台的隐式网格行按内容撑到 1053px，导致图片 `max-height: 100%` 失去参照、底部操作条被挤出视口；`.phgroup__grid`/`.phalbums` 用 `minmax(146px, 1fr)`，只剩一项时会被拉成占满整行的巨块
 
 ### Web 控制台（本轮新增）
 
@@ -789,3 +874,24 @@ server {
 - CSS 中无硬编码浅色背景残留（原先网格视图占位块写死了 `#f6f8fb`，暗色下会漏出一块亮色）
 - 键盘焦点环（`:focus-visible`）、减少动画偏好（`prefers-reduced-motion`）、高对比偏好均已定义
 - 六个测试套件共 **243 项断言**全部通过（配置 57 / 控制台接口 38 / 页面渲染 51 / 文件管理 23 / 初始化向导 13 / 机器控制接口 61）
+
+### 测试套件总览
+
+`tools_nascab/` 下共 10 个套件、**555 项断言**全部通过：
+
+| 套件 | 断言数 | 覆盖 | 需要服务 |
+|---|---|---|---|
+| `test_deploy_config.js` | 57 | 配置层三级优先级、worker 数决策、外部二进制路径 | 否 |
+| `test_console.js` | 38 | 控制台三个接口、CORS 白名单、安全响应头 | 是 |
+| `test_console_dom.js` | 124 | jsdom 真实加载全部页面脚本：登录/向导、10 个系统页、文件管理、音乐/影视/相册三页与播放器全控件、主题、轮询不重建 DOM | 是 |
+| `test_file_manager.js` | 23 | 文件管理全链路（列目录/上传/下载/新建/重命名/删除/缩略图） | 是 |
+| `test_console_wizard.js` | 13 | 首次部署初始化向导（需另起空数据目录服务并清空 `user` 表） | 是 |
+| `test_control_api.js` | 61 | `/api/control` 21 个端点、三种令牌传递方式、权限隔离 | 是（控制端口） |
+| `test_media.js` | 72 | 清晰度档位纯函数、标签映射、偏好归一化、播放列表真实 SQLite 全链路、老库补列迁移 | 否 |
+| `test_media_api.js` | 46 | 音乐播放列表与影视播放器接口端到端 | 是 |
+| `test_photo.js` | 79 | 时间线分页纯函数、真实 SQLite 全链路（分页/筛选/收藏/回收站/相册）、缩略图缓存键含尺寸 | 否 |
+| `test_photo_api.js` | 42 | 相册接口端到端（自起服务、往照片库塞真实数据）、鉴权 | 自起 |
+
+跑测试的两个环境要求：**Node 22**（`verify` 里的 `better-sqlite3` 是 NODE_MODULE_VERSION 127，Node 24 会 `ERR_DLOPEN_FAILED`），
+以及 `NODE_PATH` 指向 `nascab_src/verify/node_modules`。
+需要服务的套件传 `<baseUrl> <username> <password>`；`test_photo_api.js` 会自己起服务并把本轮改动的源码同步进 `verify`。

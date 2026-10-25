@@ -253,7 +253,6 @@ class PhotoTimeLineService {
                 .replace(/["']/g, '')
                 .trim()}*`;
             if (finalQuery !== '*') {
-              console.log('finalQuery', finalQuery);
               builder.orWhereRaw('photo_index.file_hash IN (SELECT file_hash FROM photo_info_fts WHERE ocr MATCH ?)', [finalQuery]);
             }
           }
@@ -282,7 +281,9 @@ class PhotoTimeLineService {
       }
     }
 
-    if (params.loadTheDay === true || params.loadTheDay === 1) {
+    // loadTheDay 可能被传成字符串 '1' / 'true'，统一按布尔判
+    const loadTheDay = params.loadTheDay === true || params.loadTheDay === 1 || params.loadTheDay === '1' || params.loadTheDay === 'true';
+    if (loadTheDay) {
       const now = new Date();
       const mm = String(now.getMonth() + 1).padStart(2, '0');
       const dd = String(now.getDate()).padStart(2, '0');
@@ -400,14 +401,39 @@ class PhotoTimeLineService {
   }
 
   /**
+   * 是否要求分页。
+   * 老调用方不传 pageSize 时一律视为「要全部」，行为与改造前一致。
+   */
+  hasPaging(params) {
+    const raw = params ? params.pageSize ?? params.page_size : undefined;
+    const size = Number(raw);
+    return Number.isFinite(size) && size > 0;
+  }
+
+  /**
+   * 解析分页参数。单页上限 500，防止调用方传个 100000 把内存拉爆。
+   * @returns {{limit: number, offset: number}} limit 为 0 表示不分页
+   */
+  resolvePaging(params) {
+    if (!this.hasPaging(params)) return { limit: 0, offset: 0 };
+    const size = Math.min(Math.floor(Number(params.pageSize ?? params.page_size)), 500);
+    const rawPage = Number(params.page ?? params.page_index);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+    return { limit: size, offset: (page - 1) * size };
+  }
+
+  /**
    * 获取时间轴照片列表
    * @param {Object} params 参数
+   *   page / pageSize 分页（不传则返回全部，兼容老调用方）；
+   *   startTime / endTime 时间范围，传了 pageSize 时可以不传
    * @param {Object} user 用户
+   * @returns {Promise<{list: Array, hasMore: boolean}>}
    */
   async getTimelinePhotoList(params, user) {
     const validPaths = await this.getValidPathsByParams(params, user);
     if (validPaths.length === 0) {
-      return { list: [], total: 0 };
+      return { list: [], hasMore: false };
     }
 
     const knex = this.getKnex();
@@ -419,9 +445,9 @@ class PhotoTimeLineService {
     if (startTime && endTime) {
       const [start, end] = startTime.getTime() <= endTime.getTime() ? [startTime, endTime] : [endTime, startTime];
       query.whereBetween('photo_index.original_time', [start.getTime(), end.getTime()]);
-    } else {
-      console.log('缺少请求参数 startTime or endTime is null');
-      return [];
+    } else if (!this.hasPaging(params)) {
+      // 既不给时间范围也不要求分页：与改造前一致，直接返回空
+      return { list: [], hasMore: false };
     }
 
     // 排序：普通列表按拍摄时间排，收藏列表按收藏时间排（与影音库一致）
@@ -434,6 +460,10 @@ class PhotoTimeLineService {
       query.orderBy('photo_index.original_time', sortOrder); // 辅助排序
     }
 
+    const { limit, offset } = this.resolvePaging(params);
+    // 多取一条用来判断还有没有下一页，省掉一次 count 查询
+    if (limit > 0) query.limit(limit + 1).offset(offset);
+
     const selectFields = indexFields.map(f => `photo_index.${f}`);
 
     if (params.list_type === 'favorite') {
@@ -444,8 +474,10 @@ class PhotoTimeLineService {
       });
       query.select([...selectFields, knex.raw('CASE WHEN photo_favorite.id IS NOT NULL THEN 1 ELSE 0 END as is_favorite')]);
     }
-    const list = await query;
-    console.log(query.toString());
+    const rows = await query;
+
+    const hasMore = limit > 0 && rows.length > limit;
+    const list = hasMore ? rows.slice(0, limit) : rows;
 
     // 原始文件扩展名 + 原始文件扩展名（大写）用于前端展示
     function rawShowExt(item) {
@@ -466,8 +498,7 @@ class PhotoTimeLineService {
       fullpath: path.join(item.path, item.filename), // 添加 fullpath
       raw_show_ext: rawShowExt(item),
     }));
-    console.log("photoList",photoList.length)
-    return photoList;
+    return { list: photoList, hasMore };
   }
 
   getBoundsPrecisionByZoom(zoom) {

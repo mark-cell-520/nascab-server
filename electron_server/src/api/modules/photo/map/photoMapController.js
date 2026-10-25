@@ -1,4 +1,5 @@
 const ResponseUtil = require('../../../apiUtils/responseUtil');
+const Logger = require('../../../../utils/logger');
 const photoMapService = require('./photoMapService');
 
 function parseTileServerFromBody(body) {
@@ -41,7 +42,7 @@ class PhotoMapController {
       const list = await photoMapService.getTileServerList();
       return ResponseUtil.success(req, res, { tileServerList: list }, 'common.SUCCESS', 200);
     } catch (e) {
-      console.log(e);
+      Logger.error('getTileServerList error:', e);
       return ResponseUtil.error(req, res, 'common.ERROR', 500);
     }
   }

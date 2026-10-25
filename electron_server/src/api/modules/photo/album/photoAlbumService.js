@@ -368,7 +368,9 @@ class PhotoAlbumService {
 
   async deleteAlbum({ knexPhoto }, payload, user) {
     const uid = this._uid(user);
-    const albumId = Number(payload.id);
+    // 本文件的其它接口（get/update/index add/cover set）都认 album_id，只有删除原先只认 id，
+    // 同一个调用方两种写法必错一个。这里两种都收。
+    const albumId = Number(payload.id ?? payload.album_id ?? payload.albumId);
     if (!Number.isFinite(albumId) || albumId <= 0) throw new Error('common.PARAM_ERROR');
 
     const existing = await this._getAlbumById(knexPhoto, albumId);
