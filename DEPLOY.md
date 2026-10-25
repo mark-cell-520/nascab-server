@@ -430,6 +430,9 @@ server {
 | `src/api/modules/console/*` | **新增**。`/bootstrap`、`/overview`、`/logs` 三个控制台专用接口 |
 | `src/api/app.js` | `/` 改挂自带 Web 控制台（原指向不入库的 `web/main`）；基础安全响应头 + 控制台 CSP；SPA 回退（不吞 `/api` 404） |
 | `web/console/` | **新增**。无构建步骤的 Web 控制台：登录/初始化向导、概览、存储、用户、网络、安全、应用、进程、日志、关于共 10 个页面 |
+| `web/console/pages-files.js`、`pages-nas.js` | **新增**。文件管理器（浏览/上传/下载/新建/重命名/删除/拖拽/缩略图）+ 挂载管理、分享管理、下载器、容器四页；页面模块化，`console.js` 只提供注册机制 |
+| `src/utils/userShareFolderUtil.js` | **新增 `ensureDefaultShareFolder()`**：全新部署时共享目录列表是空的，文件管理器会无处可看；现首次启动自动建 `<数据目录>/files` |
+| `src/initHandler/initMain.js` | 启动时创建上述默认共享目录并打印路径 |
 
 部署产物：`deploy/config.example.json`、`deploy/systemd/`、`deploy/docker/`、`deploy/windows/`、`deploy/scripts/`。
 
@@ -465,3 +468,12 @@ server {
 - 文件日志修复后 `combined.log`/`error.log` 正常生成，`/api/console/logs` 能读到日志尾部
 - `/api/auth/profile` 修复后返回完整用户信息（此前因选了不存在的列而 400）
 - 无 token 访问控制台接口 401、伪造 token 401；第三方 Origin 不被 CORS 放行、本机 Origin 放行
+
+### 文件管理与 NAS 页面（本轮新增）
+
+- 首次启动自动创建默认共享目录 `<数据目录>/files`（Docker 下在持久化卷内），日志打印路径
+- 文件管理器全链路实测（jsdom + 真实服务端，23 项断言）：列目录、进入子目录、面包屑跳转、回上级、
+  新建文件夹（磁盘与列表同步）、**分片上传真实落盘且内容一致**、重命名、删除、页面内添加共享目录
+- 上传走 4MB 分片 + `upload/check` 断点续传；小文件单分片即完成，服务端返回 `UPLOAD_COMPLETED`
+- 挂载管理、分享管理、下载器、容器四个页面均能拉到真实数据并渲染（本机无 Docker，引擎状态正确显示「不可用」）
+- 五个测试套件共 141 项断言全部通过（配置 33 / 接口 38 / 页面渲染 34 / 文件管理 23 / 初始化向导 13）

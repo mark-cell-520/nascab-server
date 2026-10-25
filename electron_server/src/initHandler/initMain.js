@@ -121,6 +121,17 @@ module.exports = {
           `==================================================================`
       );
     }
+
+    // 首次启动自动建一个默认共享目录，否则文件管理器「无处可看」
+    try {
+      const userShareFolderUtil = require('../utils/userShareFolderUtil');
+      const def = await userShareFolderUtil.ensureDefaultShareFolder();
+      if (def && def.created) {
+        Logger.info(`📁 已创建默认共享目录: ${def.path}（名称：文件存储）`);
+      }
+    } catch (err) {
+      Logger.warn(`创建默认共享目录失败: ${err && err.message ? err.message : err}`);
+    }
     setTimeout(async () => {
       try {
         const info = await this.getInitialSuperAdminInfo();

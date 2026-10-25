@@ -179,11 +179,41 @@ async function isUserShareDownloadAllowed(targetPath) {
   return !!matched && !!matched.allowDownload;
 }
 
+/**
+ * 确保至少存在一个共享目录
+ * 全新部署时共享目录列表是空的，文件管理器会「无处可看」——NAS 开箱就应有一个可写目录。
+ * 默认建在数据目录下（Docker 里位于持久化卷内，重建镜像不丢数据）。
+ * @returns {Promise<{created: boolean, path?: string}>}
+ */
+async function ensureDefaultShareFolder() {
+  const list = await getUserShareFolders({ includeMissing: true });
+  if (list.length > 0) return { created: false };
+
+  let baseDir = '';
+  try {
+    const config = require('../config/config');
+    baseDir = typeof config.getUserDataPath === 'function' ? config.getUserDataPath() : '';
+  } catch (_) {}
+  if (!baseDir) baseDir = path.join(process.cwd(), 'data');
+
+  const target = path.join(baseDir, 'files');
+  try {
+    fs.mkdirSync(target, { recursive: true });
+  } catch (err) {
+    return { created: false, error: err && err.message ? String(err.message) : String(err) };
+  }
+
+  await saveUserShareFolders([{ path: target, name: '文件存储', allowDownload: true }]);
+  invalidateCache();
+  return { created: true, path: target };
+}
+
 module.exports = {
   CONFIG_KEY_USER_SHARE_FOLDERS,
   getUserShareFolders,
   getUserShareFoldersWithStats,
   saveUserShareFolders,
+  ensureDefaultShareFolder,
   invalidateCache,
   isUserSharePath,
   isUserShareDownloadAllowed,

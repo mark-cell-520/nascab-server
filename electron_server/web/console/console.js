@@ -222,6 +222,11 @@
     docker: '<svg viewBox="0 0 20 20"><path d="M3 9.5h14M6.5 6.5h2v2h-2zM9.5 6.5h2v2h-2zM12.5 6.5h2v2h-2zM6.5 3.5h2v2h-2zM9.5 3.5h2v2h-2z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.6 12.4c1.6 2.2 4.3 3.3 7.6 3.3 3.6 0 6.2-1.4 7.6-3.6H2.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
     process: '<svg viewBox="0 0 20 20"><rect x="3" y="3.5" width="14" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 7h7M6.5 10h7M6.5 13h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
     logs: '<svg viewBox="0 0 20 20"><path d="M4.5 3.5h11v13h-11z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h6M7 10h6M7 13h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    files: '<svg viewBox="0 0 20 20"><path d="M3.5 6.5a2 2 0 012-2h2.6l1.6 1.8h4.8a2 2 0 012 2v5.7a2 2 0 01-2 2h-9a2 2 0 01-2-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+    mounts: '<svg viewBox="0 0 20 20"><path d="M3 6.5h14M3 10h14M3 13.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6.5" cy="6.5" r="1.3" fill="currentColor"/><circle cx="13.5" cy="10" r="1.3" fill="currentColor"/><circle cx="9" cy="13.5" r="1.3" fill="currentColor"/></svg>',
+    share: '<svg viewBox="0 0 20 20"><circle cx="6" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="14.5" cy="5.5" r="2.4" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="14.5" cy="14.5" r="2.4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.2 9l4.1-2.6M8.2 11l4.1 2.6" stroke="currentColor" stroke-width="1.5"/></svg>',
+    download: '<svg viewBox="0 0 20 20"><path d="M10 3.5v8M6.5 8L10 11.5 13.5 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 14.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    docker: '<svg viewBox="0 0 20 20"><path d="M3 9.5h14M6.5 6.5h2v2h-2zM9.5 6.5h2v2h-2zM12.5 6.5h2v2h-2zM6.5 3.5h2v2h-2zM9.5 3.5h2v2h-2z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.6 12.4c1.6 2.2 4.3 3.3 7.6 3.3 3.6 0 6.2-1.4 7.6-3.6H2.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
     about: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v4.2M10 6.6v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
   };
 
@@ -236,8 +241,17 @@
       ],
     },
     {
+      group: '存储与文件', items: [
+        { id: 'files', label: '文件管理', icon: ICONS.files },
+        { id: 'mounts', label: '挂载管理', icon: ICONS.mounts },
+        { id: 'shares', label: '分享管理', icon: ICONS.share },
+      ],
+    },
+    {
       group: '应用与服务', items: [
         { id: 'apps', label: '应用中心', icon: ICONS.apps },
+        { id: 'downloads', label: '下载器', icon: ICONS.download },
+        { id: 'docker', label: '容器', icon: ICONS.docker },
         { id: 'processes', label: '进程管理', icon: ICONS.process },
       ],
     },
@@ -359,7 +373,16 @@
     return '普通用户';
   }
 
-  /* ---------------- 路由 ---------------- */
+  /* ---------------- 路由 ----------------
+     页面渲染器集中在 RENDERERS；pages-*.js 通过 NasCab.registerPage 追加，
+     因此这里查找时要兼容后注册的页面。 */
+  const RENDERERS = {};
+
+  function registerPage(pageId, renderer, meta) {
+    RENDERERS[pageId] = renderer;
+    if (meta) PAGES[pageId] = Object.assign({ title: pageId, desc: '' }, meta);
+  }
+
   function route(pageId) {
     if (!PAGES[pageId]) pageId = 'overview';
     state.page = pageId;
@@ -378,7 +401,13 @@
 
     stopPolling();
     const render = RENDERERS[pageId];
-    if (render) render($('#page-body'), $('#pagehead-actions'));
+    if (render) {
+      render($('#page-body'), $('#pagehead-actions'));
+    } else {
+      // 页面模块（pages-*.js）没加载成功时给出明确提示，而不是静默跳回概览
+      $('#page-body').innerHTML = `<div class="card"><div class="card__body"><div class="empty">
+        页面模块未加载：${escapeHtml(pageId)}<br>请确认 web/console 下的 pages-files.js / pages-nas.js 已随页面一同部署。</div></div></div>`;
+    }
   }
 
   function stopPolling() {
@@ -395,7 +424,7 @@
   /* ============================================================
      页面渲染器
      ============================================================ */
-  const RENDERERS = {
+  Object.assign(RENDERERS, {
     /* ---------------- 概览 ---------------- */
     async overview(body, actions) {
       actions.innerHTML = `<button class="btn btn--ghost btn--sm" id="btn-refresh-overview">刷新</button>`;
@@ -786,7 +815,7 @@
           </div>
         </div>`;
     },
-  };
+  });
 
   /* ---------------- 概览页各区块绘制 ---------------- */
   function pushHistory(key, value, max) {
@@ -1289,9 +1318,40 @@
     await checkInitState();
   }
 
+  // 暴露给 pages-*.js 的公共能力
+  window.NasCab = {
+    api,
+    state,
+    route,
+    registerPage,
+    showAuth,
+    toast,
+    escapeHtml,
+    fmtBytes,
+    fmtSpeed,
+    fmtTime,
+    fmtUptime,
+    pct,
+    barClass,
+    b64Encode,
+    $,
+    $$,
+  };
+
+  // 各页面模块在本文件之后加载。
+  // 注意：模块自身也会在 window.NasCab 就绪后立即注册（见 pages-*.js 末尾），
+  // 这里再跑一遍只是兜底——registerPage 是幂等覆盖，重复注册无副作用。
+  // 不能只依赖这里：若脚本是在 DOMContentLoaded 之后才执行的，modules 数组还是空的。
+  function bootPages() {
+    (window.NasCabPages || []).forEach(fn => {
+      try { fn(window.NasCab); } catch (e) { console.error('页面模块加载失败', e); }
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', () => { boot(); bootPages(); });
   } else {
     boot();
+    bootPages();
   }
 })();
