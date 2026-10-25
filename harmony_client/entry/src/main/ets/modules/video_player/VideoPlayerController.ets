@@ -1,7 +1,7 @@
 /**
  * 视频播放器控制器（对齐 Flutter PlayerController 及其 parts 扩展）：
  * 播放初始化流程 / 原画↔转码切换 / 续播与偏好 / 自动保存 / 自动跳过片头片尾 /
- * 音轨字幕切换（VTT 客户端叠层 + 位图烧录转码）/ 循环模式 / 错误恢复。
+ * 音轨字幕切换（内嵌/外挂字幕 mpv 原生渲染，失败回退 VTT 叠层；内嵌位图转码烧录）/ 循环模式 / 错误恢复。
  * 时间单位统一为毫秒。
  */
 
@@ -21,9 +21,11 @@ import {
 import { VideoPlayerApiService } from './service/VideoPlayerApiService';
 import { VideoPlayerEngine } from './engine/VideoPlayerEngine';
 import { parseWebVtt, findActiveCue } from './subtitle/WebVttParser';
+import { decodeSubtitleText } from './subtitle/SubtitleEncoding';
 import { asNum, asStr } from '../video/models/VideoModels';
 import { WindowStore } from '../../common/WindowStore';
 import { window } from '@kit.ArkUI';
+import fs from '@ohos.file.fs';
 import { Player } from '@mpv-ohos/mpv-arkts';
 
 const TAG = 'PlayerCtrl';
@@ -166,6 +168,8 @@ export class VideoPlayerController {
   private nativeSubtitleFallbackLabel: string = '';
   private speedBeforeBoost: number = 1.0;
   private deviceId: string = '';
+  /** 应用缓存目录（页面注入，用于外挂字幕解码后的 UTF-8 本地文件） */
+  private cacheDir: string = '';
 
   constructor() {
     this.engine.setCallbacks({
@@ -257,6 +261,11 @@ export class VideoPlayerController {
       return '';
     }
     return item.internalPath.trim().length > 0 ? item.internalPath : item.path;
+  }
+
+  /** 页面注入应用缓存目录（getContext(this).cacheDir），用于外挂字幕 UTF-8 本地缓存 */
+  setCacheDir(dir: string): void {
+    this.cacheDir = dir;
   }
 
   // ================================ 初始化播放器 ================================
@@ -539,21 +548,13 @@ export class VideoPlayerController {
     }
 
     let subtitleIndex = -1;
-    let subtitlePath = '';
     let burn = false;
     if (this.currentSubtitleTrack.length > 0 && !this.currentIsNoSubtitle) {
       const track = this.findTrackByLabel(this.subtitleTracks, this.currentSubtitleTrack);
-      if (track !== undefined) {
-        if (track.isExternal) {
-          // 文本外挂由客户端 VTT 叠层渲染；位图外挂烧录
-          if (isBitmapSubtitleExt(fileExt(track.path))) {
-            subtitlePath = track.path;
-            burn = true;
-          }
-        } else if (isBitmapSubtitleCodec(track.codecName)) {
-          subtitleIndex = track.mapIndex;
-          burn = true;
-        }
+      // 外挂字幕（含位图）由客户端 raw 直链交给 mpv 原生渲染，转码流不再烧录
+      if (track !== undefined && !track.isExternal && isBitmapSubtitleCodec(track.codecName)) {
+        subtitleIndex = track.mapIndex;
+        burn = true;
       }
     }
 
@@ -578,9 +579,6 @@ export class VideoPlayerController {
     }
     if (subtitleIndex >= 0) {
       url += `&subtitleIndex=${subtitleIndex}`;
-    }
-    if (subtitlePath.length > 0) {
-      url += `&subtitlePath=${encodeURIComponent(subtitlePath)}`;
     }
     if (burn) {
       url += '&subtitleBurn=true';
@@ -753,33 +751,16 @@ export class VideoPlayerController {
     return t !== undefined && t.isExternal;
   }
 
-  isTextExternalSubtitleLabel(label: string): boolean {
-    if (label.length === 0 || this.currentIsNoSubtitle) {
-      return false;
-    }
-    const t = this.findTrackByLabel(this.subtitleTracks, label);
-    if (t === undefined || !t.isExternal) {
-      return false;
-    }
-    return !isBitmapSubtitleExt(fileExt(t.path));
-  }
-
-  /** 是否为位图字幕（原画交给 mpv 原生渲染；转码需烧录进画面） */
-  private subtitleIsBitmap(label: string): boolean {
+  /** 是否为内嵌位图字幕（转码时由服务端烧录进画面，切换必须重建会话） */
+  private subtitleIsEmbeddedBitmap(label: string): boolean {
     if (label.length === 0 || label === this.noSubtitleLabel()) {
       return false;
     }
     const t = this.findTrackByLabel(this.subtitleTracks, label);
-    if (t === undefined) {
-      return false;
-    }
-    if (t.isExternal) {
-      return isBitmapSubtitleExt(fileExt(t.path));
-    }
-    return isBitmapSubtitleCodec(t.codecName);
+    return t !== undefined && !t.isExternal && isBitmapSubtitleCodec(t.codecName);
   }
 
-  /** 原画内嵌字幕（文本/位图）交给 mpv 原生渲染；外挂字幕与转码仍走客户端 VTT 叠层 */
+  /** 原画内嵌字幕（文本/位图）交给 mpv 原生渲染 */
   private shouldUseNativeEmbeddedSubtitle(label: string): boolean {
     if (this.currentQuality !== 'original' || label.length === 0 ||
       label === this.noSubtitleLabel()) {
@@ -793,16 +774,36 @@ export class VideoPlayerController {
     return t !== undefined && !t.isExternal;
   }
 
+  /** 外挂字幕（文本/位图）直接拉 raw 源文件交给 mpv 原生渲染，原画/转码都适用 */
+  private shouldUseNativeExternalSubtitle(label: string): boolean {
+    if (label.length === 0 || label === this.noSubtitleLabel()) {
+      return false;
+    }
+    // 原生挂载失败过一次时，本次会话回退到客户端叠层（仅文本字幕可回退）
+    if (this.nativeSubtitleFallbackLabel === label) {
+      return false;
+    }
+    const t = this.findTrackByLabel(this.subtitleTracks, label);
+    return t !== undefined && t.isExternal;
+  }
+
+  /** 是否为外挂位图字幕（无法转 VTT，原生挂载失败后没有叠层可回退） */
+  private isExternalBitmapSubtitle(label: string): boolean {
+    const t = this.findTrackByLabel(this.subtitleTracks, label);
+    return t !== undefined && t.isExternal && isBitmapSubtitleExt(fileExt(t.path));
+  }
+
   /** 是否使用客户端 VTT 叠层 */
   useClientSubtitleOverlay(): boolean {
     if (this.currentIsNoSubtitle) {
       return false;
     }
-    // 原画内嵌字幕由 mpv 原生渲染（保留 ASS/SSA 原始样式），不再叠加客户端字幕
-    if (this.shouldUseNativeEmbeddedSubtitle(this.currentSubtitleTrack)) {
+    // 外挂字幕与内嵌字幕都优先交给 mpv 原生渲染，不再叠加客户端字幕
+    if (this.shouldUseNativeExternalSubtitle(this.currentSubtitleTrack) ||
+      this.shouldUseNativeEmbeddedSubtitle(this.currentSubtitleTrack)) {
       return false;
     }
-    // 转码流与原画外挂字幕仍走客户端 VTT 叠层
+    // 仅原生渲染失败回退时使用 VTT 叠层
     return true;
   }
 
@@ -810,40 +811,60 @@ export class VideoPlayerController {
     if (this.currentSubtitleTrack === trackLabel && !force) {
       return;
     }
-    const prevBitmap = this.subtitleIsBitmap(this.currentSubtitleTrack);
-    const nextBitmap = this.subtitleIsBitmap(trackLabel);
+    const prevBitmap = this.subtitleIsEmbeddedBitmap(this.currentSubtitleTrack);
+    const nextBitmap = this.subtitleIsEmbeddedBitmap(trackLabel);
     hilog.info(0x0000, TAG,
       'setSubtitleTrack label=%{public}s prevBitmap=%{public}s nextBitmap=%{public}s quality=%{public}s',
       trackLabel, String(prevBitmap), String(nextBitmap), this.currentQuality);
     this.currentSubtitleTrack = trackLabel;
-    // 切轨时重新尝试原生选轨，上一次的失败回退只对那一次会话有效
+    // 切轨时重新尝试原生挂载，上一次的失败回退只对那一次会话有效
     this.nativeSubtitleFallbackLabel = '';
     this.cancelWebSubtitleRetry();
     this.webSubtitleRetryCount = 0;
     this.savePreference();
 
-    if (this.currentQuality === 'original') {
-      // 原画：内嵌字幕（文本/位图）交给 mpv 原生渲染；外挂字幕走客户端 VTT 叠层，均无需转码
-      if (nextBitmap) {
-        this.webClearSubtitle();
-        const ok = await this.attachNativeBitmapSubtitle(trackLabel);
-        if (!ok) {
-          // mpv 确实挂不上时才回退转码烧录
-          hilog.warn(0x0000, TAG, 'native bitmap subtitle failed, fallback to transcode');
-          this.currentQuality = DEFAULT_TRANSCODE_QUALITY;
-          await this.initializePlayer(true, this.absolutePlaybackPositionMs());
+    // 转码流中已烧录的内嵌位图无法实时移除，切到任何其他字幕都要重建会话
+    if (this.currentQuality !== 'original' && prevBitmap) {
+      await this.initializePlayer(true, this.absolutePlaybackPositionMs());
+      return;
+    }
+
+    // 外挂字幕：独立文件，文本先由客户端解码为 UTF-8 再交给 mpv，原画与转码都无需服务端转换
+    if (this.shouldUseNativeExternalSubtitle(trackLabel)) {
+      this.webClearSubtitle();
+      const ok = await this.attachNativeExternalSubtitle(trackLabel);
+      if (!ok) {
+        hilog.warn(0x0000, TAG, 'native external subtitle failed label=%{public}s', trackLabel);
+        this.nativeSubtitleFallbackLabel = trackLabel;
+        // 挂载失败时关闭 mpv 可能残留的上一条字幕，避免与叠层重复
+        this.engine.disableSubtitle();
+        // 文本外挂可回退客户端叠层；位图外挂无法转 VTT，只能放弃
+        if (!this.isExternalBitmapSubtitle(trackLabel)) {
+          void this.loadWebSubtitleIfNeeded(true);
         }
-        return;
       }
+      return;
+    }
+
+    if (this.currentQuality === 'original') {
+      // 原画：内嵌字幕（文本/位图）交给 mpv 原生渲染，无需转码
       if (this.shouldUseNativeEmbeddedSubtitle(trackLabel)) {
         this.webClearSubtitle();
         const ok = await this.attachNativeEmbeddedSubtitle(trackLabel);
         if (!ok) {
-          hilog.warn(0x0000, TAG, 'native inner subtitle failed, fallback to overlay label=%{public}s',
-            trackLabel);
-          this.nativeSubtitleFallbackLabel = trackLabel;
-          // 不阻塞字幕菜单：回退叠层，加载完成后自动显示
-          void this.loadWebSubtitleIfNeeded(true);
+          if (nextBitmap) {
+            // 内嵌位图 mpv 确实挂不上时才回退转码烧录
+            hilog.warn(0x0000, TAG, 'native bitmap subtitle failed, fallback to transcode');
+            this.currentQuality = DEFAULT_TRANSCODE_QUALITY;
+            await this.initializePlayer(true, this.absolutePlaybackPositionMs());
+          } else {
+            hilog.warn(0x0000, TAG, 'native inner subtitle failed, fallback to overlay label=%{public}s',
+              trackLabel);
+            this.nativeSubtitleFallbackLabel = trackLabel;
+            this.engine.disableSubtitle();
+            // 不阻塞字幕菜单：回退叠层，加载完成后自动显示
+            void this.loadWebSubtitleIfNeeded(true);
+          }
         }
         return;
       }
@@ -857,14 +878,13 @@ export class VideoPlayerController {
       return;
     }
 
-    // 转码：位图字幕烧录进转码流，切换位图（或从位图切走）必须重建会话
-    if (nextBitmap || prevBitmap) {
+    // 转码：切到内嵌位图需要重建会话（由服务端烧录进转码流）
+    if (nextBitmap) {
       await this.initializePlayer(true, this.absolutePlaybackPositionMs());
-      if (!nextBitmap) {
-        void this.loadWebSubtitleIfNeeded(true);
-      }
       return;
     }
+    // 转码 + 内嵌文本/无字幕：关闭可能残留的外挂原生字幕，改由 VTT 叠层绘制
+    this.engine.disableSubtitle();
     if (this.currentIsNoSubtitle) {
       this.webClearSubtitle();
       return;
@@ -894,23 +914,70 @@ export class VideoPlayerController {
   }
 
   /**
-   * 用 mpv 原生渲染位图字幕（外挂走服务器 raw 直链，内嵌按 mapIndex 选轨）。
+   * 用 mpv 原生渲染外挂字幕（文本/位图通用）。
+   * 文本字幕的编码由客户端识别（GBK/Big5/UTF-16 等）并转成 UTF-8 写入本地缓存文件，
+   * 再以 file:// 交给 mpv：libmpv/libass 只按 UTF-8 解析，直接给原文件会乱码。
    * 返回 false 表示 mpv 无法挂载该字幕。
    */
-  private async attachNativeBitmapSubtitle(label: string): Promise<boolean> {
+  private async attachNativeExternalSubtitle(label: string): Promise<boolean> {
     const track = this.findTrackByLabel(this.subtitleTracks, label);
-    if (track === undefined) {
+    if (track === undefined || !track.isExternal) {
       return false;
     }
-    if (track.isExternal) {
-      const url = await ApiUrls.getRawFileUrl(track.path, true);
-      if (url.length === 0) {
+    let subtitleUrl = '';
+    if (isBitmapSubtitleExt(fileExt(track.path))) {
+      // 位图字幕（sup/sub+idx）无编码问题，直接交给 mpv 解析
+      subtitleUrl = await ApiUrls.getRawFileUrl(track.path, true);
+    } else {
+      const bytes = await this.apiService.getExternalSubtitleBytes(track.path);
+      if (bytes === undefined) {
+        hilog.warn(0x0000, TAG, 'download external subtitle failed label=%{public}s', track.label);
         return false;
       }
-      hilog.info(0x0000, TAG, 'attach external bitmap subtitle %{public}s', track.label);
-      return this.engine.loadExternalSubtitle(url, track.label, track.language);
+      const text = decodeSubtitleText(bytes);
+      if (text === undefined || text.length === 0) {
+        hilog.warn(0x0000, TAG, 'decode external subtitle failed label=%{public}s bytes=%{public}d',
+          track.label, bytes.length);
+        return false;
+      }
+      const localPath = this.writeUtf8SubtitleCache(track.path, text);
+      if (localPath.length === 0) {
+        return false;
+      }
+      subtitleUrl = `file://${localPath}`;
     }
-    return this.attachNativeEmbeddedSubtitle(label);
+    if (subtitleUrl.length === 0) {
+      return false;
+    }
+    hilog.info(0x0000, TAG, 'attach external subtitle label=%{public}s url=%{public}s',
+      track.label, subtitleUrl);
+    return this.engine.loadExternalSubtitle(subtitleUrl, track.label, track.language);
+  }
+
+  /** 把解码后的 UTF-8 字幕写入本地缓存，返回文件路径；失败返回 '' */
+  private writeUtf8SubtitleCache(sourcePath: string, text: string): string {
+    if (this.cacheDir.length === 0) {
+      hilog.warn(0x0000, TAG, 'cacheDir not injected, skip subtitle cache');
+      return '';
+    }
+    const dir = `${this.cacheDir}/player_subtitles`;
+    try {
+      if (!fs.accessSync(dir)) {
+        fs.mkdirSync(dir, true);
+      }
+      const outPath = `${dir}/${subtitleCacheName(sourcePath, fileExt(sourcePath).toLowerCase())}`;
+      const file = fs.openSync(outPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
+      try {
+        // 字符串默认 UTF-8 写入，正是 mpv/libass 需要的编码
+        fs.writeSync(file.fd, text);
+      } finally {
+        fs.closeSync(file);
+      }
+      return outPath;
+    } catch (e) {
+      hilog.warn(0x0000, TAG, 'write subtitle cache failed: %{public}s', JSON.stringify(e));
+      return '';
+    }
   }
 
   /** 字幕恢复标记（mpv 每次加载新文件会重置 sid，需在播放开始后重新挂载） */
@@ -926,12 +993,29 @@ export class VideoPlayerController {
       return;
     }
     this.subtitleAppliedGen = this.initGeneration;
+
+    // 外挂字幕：独立文件，原画/转码都直接交给 mpv 原生渲染
+    if (this.shouldUseNativeExternalSubtitle(this.currentSubtitleTrack)) {
+      this.webClearSubtitle();
+      const ok = await this.attachNativeExternalSubtitle(this.currentSubtitleTrack);
+      if (!ok) {
+        hilog.warn(0x0000, TAG, 'restore native external subtitle failed label=%{public}s',
+          this.currentSubtitleTrack);
+        this.nativeSubtitleFallbackLabel = this.currentSubtitleTrack;
+        this.engine.disableSubtitle();
+        if (!this.isExternalBitmapSubtitle(this.currentSubtitleTrack)) {
+          void this.loadWebSubtitleIfNeeded(true);
+        }
+      }
+      return;
+    }
+
     if (this.currentQuality !== 'original') {
-      // 位图字幕已烧录进转码画面，关闭 mpv 原生字幕避免重复显示
+      // 内嵌位图字幕已烧录进转码画面，关闭 mpv 原生字幕避免重复显示
       this.engine.disableSubtitle();
       return;
     }
-    if (!this.currentIsNoSubtitle && this.shouldUseNativeEmbeddedSubtitle(this.currentSubtitleTrack)) {
+    if (this.shouldUseNativeEmbeddedSubtitle(this.currentSubtitleTrack)) {
       // 原画内嵌字幕：文本与位图统一交给 mpv 原生渲染
       this.webClearSubtitle();
       const ok = await this.attachNativeEmbeddedSubtitle(this.currentSubtitleTrack);
@@ -940,16 +1024,8 @@ export class VideoPlayerController {
         hilog.warn(0x0000, TAG, 'restore native inner subtitle failed, fallback to overlay label=%{public}s',
           this.currentSubtitleTrack);
         this.nativeSubtitleFallbackLabel = this.currentSubtitleTrack;
+        this.engine.disableSubtitle();
         void this.loadWebSubtitleIfNeeded(true);
-      }
-      return;
-    }
-    if (!this.currentIsNoSubtitle && this.subtitleIsBitmap(this.currentSubtitleTrack)) {
-      this.webClearSubtitle();
-      const ok = await this.attachNativeBitmapSubtitle(this.currentSubtitleTrack);
-      if (!ok) {
-        hilog.warn(0x0000, TAG, 'restore native bitmap subtitle failed label=%{public}s',
-          this.currentSubtitleTrack);
       }
       return;
     }
@@ -958,8 +1034,10 @@ export class VideoPlayerController {
 
   /** 打开/切换后应用客户端字幕叠层 */
   private async applyClientSubtitleOverlayIfNeeded(): Promise<void> {
-    if (this.currentQuality !== 'original') {
-      // 转码流里的位图字幕已由服务端烧录，关闭 mpv 原生字幕避免重复显示
+    if (this.currentQuality !== 'original' &&
+      !this.shouldUseNativeExternalSubtitle(this.currentSubtitleTrack)) {
+      // 转码：内嵌位图已烧录、内嵌文本不在转码流中，关闭 mpv 原生字幕；
+      // 外挂字幕是独立文件，转码下同样由 mpv 原生渲染，不能关闭
       this.engine.disableSubtitle();
     }
     if (!this.useClientSubtitleOverlay()) {
@@ -1797,6 +1875,16 @@ export class VideoPlayerController {
 function fileExt(p: string): string {
   const dot = p.lastIndexOf('.');
   return dot >= 0 ? p.substring(dot) : '';
+}
+
+/** 外挂字幕 UTF-8 缓存文件名：源路径 FNV-1a 哈希 + 原扩展名（mpv 按扩展名识别字幕格式） */
+function subtitleCacheName(sourcePath: string, ext: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < sourcePath.length; i++) {
+    h ^= sourcePath.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `${(h >>> 0).toString(16)}${ext.length > 0 ? ext : '.srt'}`;
 }
 
 /** 日志脱敏：隐藏访问令牌 */

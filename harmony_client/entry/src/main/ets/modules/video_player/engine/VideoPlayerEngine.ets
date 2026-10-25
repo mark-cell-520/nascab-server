@@ -3,8 +3,8 @@
  * - 由 mpv 负责解封装、解码（ohcodec 硬解）与渲染（gpu-next + OHOS GL），
  *   相比系统 AVPlayer 支持更多容器/编码格式（MKV、RMVB、AVI、VVC 等）。
  * - 对外接口与控制器保持一致：position/duration/seek 均为毫秒，mpv 内部秒值在此转换。
- * - 音轨/字幕：原画内嵌字幕（文本/位图）由 mpv 原生渲染；
- *   外挂字幕与转码流字幕由控制器 VTT 叠层绘制；音轨切换走后端 aid。
+ * - 音轨/字幕：内嵌字幕（原画）与外挂字幕（原画/转码）由 mpv 原生渲染；
+ *   转码流内嵌字幕与原生挂载失败时才由控制器 VTT 叠层绘制；音轨切换走后端 aid。
  */
 
 import { AudioTrack, Media, MpvLogLevel, Player, PlayerConfig, PlayerLog, SubtitleTrack } from '@mpv-ohos/mpv-arkts';
@@ -361,8 +361,9 @@ export class VideoPlayerEngine {
   }
 
   /**
-   * 挂载外挂字幕 URL（服务器 raw 文件直链），由 mpv 原生渲染，
-   * 支持 .sup/.sub/.idx 等客户端无法转成 VTT 的位图字幕。
+   * 挂载外挂字幕，由 mpv 原生渲染。url 可以是服务器 raw 文件直链，
+   * 也可以是客户端解码后写入本地缓存的 UTF-8 字幕（file://）。
+   * 文本字幕（ASS/SSA/SRT/VTT）与位图字幕（.sup/.sub/.idx）都走这条路径。
    */
   loadExternalSubtitle(url: string, label: string, lang: string): boolean {
     if (this.released || url.trim().length === 0) {
@@ -373,7 +374,7 @@ export class VideoPlayerEngine {
     return true;
   }
 
-  /** 关闭 mpv 原生字幕渲染（外挂字幕/转码字幕交给客户端 VTT 叠层时调用） */
+  /** 关闭 mpv 原生字幕渲染（原生挂载失败回退客户端 VTT 叠层时调用） */
   disableSubtitle(): void {
     if (!this.released) {
       this.player.disableSubtitleTrack();

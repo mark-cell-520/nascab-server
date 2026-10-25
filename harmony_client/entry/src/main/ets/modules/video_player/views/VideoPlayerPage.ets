@@ -103,6 +103,8 @@ export struct VideoPlayerPage {
 
   aboutToAppear(): void {
     SystemBars.activate(this, { colors: SystemBars.immersiveColors(), fullscreen: true });
+    // 外挂字幕解码后的 UTF-8 文件落在应用缓存目录，交给 mpv 以 file:// 加载
+    this.ctrl.setCacheDir(getContext(this).cacheDir);
     this.fetchSafeArea();
     // 播放期间保持屏幕常亮（对齐 Flutter WakelockPlus.enable）
     this.keepScreenOn(true);

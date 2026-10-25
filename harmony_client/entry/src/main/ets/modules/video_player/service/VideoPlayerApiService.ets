@@ -8,6 +8,7 @@ import { http } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { APIClient } from '../../../core/network/APIClient';
 import { APIResponse } from '../../../core/network/APIResponse';
+import { ApiUrls } from '../../../core/network/ApiUrls';
 import { ApiEnvelope } from '../../../common/JsonTypes';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import fs from '@ohos.file.fs';
@@ -148,6 +149,41 @@ export class VideoPlayerApiService {
       return undefined;
     } catch (e) {
       hilog.error(0x0000, TAG, 'subtitle-vtt failed: %{public}s', JSON.stringify(e));
+      return undefined;
+    } finally {
+      client.destroy();
+    }
+  }
+
+  /**
+   * 下载外挂字幕原始字节（rawFile 直链）。
+   * 客户端自行识别编码并转 UTF-8，再交给 mpv 原生渲染。
+   */
+  async getExternalSubtitleBytes(filePath: string): Promise<Uint8Array | undefined> {
+    const url = await ApiUrls.getRawFileUrl(filePath, true);
+    if (url.length === 0) {
+      return undefined;
+    }
+    const client = http.createHttp();
+    try {
+      const resp = await client.request(url, {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        connectTimeout: 15000,
+        readTimeout: 30000,
+        maxLimit: 32 * 1024 * 1024
+      });
+      if (resp.responseCode < 200 || resp.responseCode >= 300) {
+        hilog.error(0x0000, TAG, 'subtitle raw http %{public}d', resp.responseCode);
+        return undefined;
+      }
+      const result = resp.result as ArrayBuffer;
+      if (!result || result.byteLength === 0) {
+        return undefined;
+      }
+      return new Uint8Array(result);
+    } catch (e) {
+      hilog.error(0x0000, TAG, 'subtitle raw failed: %{public}s', JSON.stringify(e));
       return undefined;
     } finally {
       client.destroy();
