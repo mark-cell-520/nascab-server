@@ -725,7 +725,9 @@ export class VideoPlayerController {
     }
     this.originalAudioAppliedGen = this.initGeneration;
     const track = this.findTrackByLabel(this.audioTracks, this.currentAudioTrack);
-    if (track !== undefined && track.mapIndex > 0) {
+    // 即使目标是第一条也要显式下发：mpv 打开文件时会按容器里的 default 标记自动选轨，
+    // 多音轨视频可能默认选中第二条，而 UI 默认勾选第一条，不下发就会出现勾选与实际播放不一致。
+    if (track !== undefined && this.audioTracks.length > 1) {
       await this.engine.loadTracks();
       let ok = await this.engine.selectAudioTrackByOrder(track.mapIndex);
       // mpv 的 tracks 属性可能晚于 playing 事件到达，短暂等待后重试
