@@ -71,8 +71,9 @@ function startControlServer() {
     const server = app.listen(port, control.host, () => {
       const tokenInfo = controlTokenUtil.getControlInfo();
       const url = `http://${control.host}:${port}/api/control`;
-      // cluster 下多个 express worker 都会执行到这里；令牌只由抢到创建权的那个进程完整打印，
-      // 其余进程打一行指引，避免启动日志被重复横幅淹没
+      // cluster 下每个 express worker 都会执行到这里，且 listen 会经主进程的共享句柄
+      // 真正完成绑定——所以多个 worker 共享同一个控制端口，不会互相抢占。
+      // 令牌只由抢到创建权的那个进程完整打印，其余打一行指引，避免启动日志被重复横幅淹没
       if (tokenInfo.tokenClaimed || tokenInfo.tokenSource === 'config') {
         Logger.info(
           `\n================ 机器控制接口已就绪 ================\n` +
@@ -89,7 +90,12 @@ function startControlServer() {
     });
     server.on('error', err => {
       if (err && err.code === 'EADDRINUSE') {
-        Logger.error(`控制接口端口 ${control.host}:${port} 被占用，控制接口未启动（不影响主服务）`);
+        // 注意：cluster worker 里的 net.Server.listen 会自动走主进程的共享句柄，
+        // 所以多个 express worker 是**共享**同一个控制端口的，彼此不会冲突，
+        // 单个 worker 挂掉也不影响控制接口（主进程持有套接字）。
+        // 会走到这里只可能是 NasCab 之外的进程占了端口。
+        // 不按 error 记：它不是服务故障，报了会让运维以为主服务有问题
+        Logger.info(`控制接口端口 ${control.host}:${port} 已被其它进程占用，本进程未监听（不影响主服务）`);
         return;
       }
       Logger.error('控制接口启动失败:', err && err.message ? err.message : err);

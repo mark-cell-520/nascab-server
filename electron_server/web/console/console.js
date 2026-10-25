@@ -13,6 +13,10 @@
   const LS_REFRESH = 'nascab.console.refresh';
   const LS_USER = 'nascab.console.user';
   const LS_DEVICE = 'nascab.console.device';
+  const LS_THEME = 'nascab.console.theme';
+
+  const SUN_SVG = '<path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M5.3 5.3l1.4 1.4M13.3 13.3l1.4 1.4M14.7 5.3l-1.4 1.4M6.7 13.3l-1.4 1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>';
+  const MOON_SVG = '<path d="M15.4 11.9A5.9 5.9 0 018.1 4.6a5.9 5.9 0 107.3 7.3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>';
 
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
@@ -82,6 +86,65 @@
       node.style.opacity = '0';
       setTimeout(() => node.remove(), 260);
     }, 2400);
+  }
+
+  /* ---------------- 主题（浅色 / 暗色） ----------------
+     优先级：用户手动选过（localStorage）> 系统 prefers-color-scheme。
+     data-theme 由这里统一写到 <html>，CSS 只认这一个属性，
+     所以暗色令牌只需要声明一份，不会和系统偏好重复。 */
+  const themeMedia = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  function currentTheme() {
+    let saved = null;
+    try { saved = localStorage.getItem(LS_THEME); } catch (_) {}
+    if (saved === 'light' || saved === 'dark') return saved;
+    return themeMedia && themeMedia.matches ? 'dark' : 'light';
+  }
+
+  function applyTheme(theme) {
+    const next = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    paintThemeControls(next);
+    return next;
+  }
+
+  function setTheme(theme, persist) {
+    const next = applyTheme(theme);
+    if (persist !== false) {
+      try { localStorage.setItem(LS_THEME, next); } catch (_) {}
+    }
+    return next;
+  }
+
+  function toggleTheme() {
+    return setTheme(currentTheme() === 'dark' ? 'light' : 'dark', true);
+  }
+
+  /** 把当前主题同步到两处入口：顶栏用户菜单与登录页页脚 */
+  function paintThemeControls(theme) {
+    const dark = theme === 'dark';
+    const label = $('#theme-label');
+    if (label) label.textContent = '暗色模式';
+    const state = $('#theme-state');
+    if (state) state.textContent = dark ? '已开启' : '已关闭';
+    const icon = $('#theme-icon');
+    if (icon) icon.innerHTML = dark ? MOON_SVG : SUN_SVG;
+    const authLabel = $('#auth-theme-label');
+    if (authLabel) authLabel.textContent = dark ? '暗色' : '浅色';
+  }
+
+  // 在模块求值时就定好主题：console.js 是 body 末尾的同步脚本，
+  // 赶在首次绘制前把属性写上，避免登录页闪一下白底
+  applyTheme(currentTheme());
+
+  // 用户没有显式选过时，跟随系统偏好实时切换
+  if (themeMedia && typeof themeMedia.addEventListener === 'function') {
+    themeMedia.addEventListener('change', e => {
+      let saved = null;
+      try { saved = localStorage.getItem(LS_THEME); } catch (_) {}
+      if (saved === 'light' || saved === 'dark') return;
+      applyTheme(e.matches ? 'dark' : 'light');
+    });
   }
 
   /* ---------------- API 客户端 ---------------- */
@@ -430,6 +493,10 @@
       actions.innerHTML = `<button class="btn btn--ghost btn--sm" id="btn-refresh-overview">刷新</button>`;
       $('#btn-refresh-overview').addEventListener('click', () => route('overview'));
 
+      // 磁盘表格的「数据没变就跳过」指纹是模块级变量，离开页面时 DOM 已被销毁，
+      // 回来时必须清掉，否则会看到一张空表格
+      _disksSig = '';
+
       body.innerHTML = `
         <div class="grid grid--metrics" id="metrics"></div>
         <div class="grid grid--2" style="margin-top:14px">
@@ -750,21 +817,34 @@
       });
       $('#btn-refresh-logs').addEventListener('click', () => loadLogs());
 
+      let lastLogText = null;
       const loadLogs = async () => {
         const view = $('#logview');
         if (!view) return;
         try {
           const data = await api.get(`/api/console/logs?file=${encodeURIComponent(state.logFile)}&lines=300`);
           const lines = (data.data && data.data.lines) || [];
-          $('#log-meta').textContent = data.data && data.data.exists
-            ? `${data.data.file} · ${fmtBytes(data.data.size)}${data.data.truncated ? ' · 仅显示尾部' : ''}`
-            : '日志文件不存在（可能未开启文件日志）';
+          setText(
+            $('#log-meta'),
+            data.data && data.data.exists
+              ? `${data.data.file} · ${fmtBytes(data.data.size)}${data.data.truncated ? ' · 仅显示尾部' : ''}`
+              : '日志文件不存在（可能未开启文件日志）'
+          );
+          const text = lines.join('\n');
+          // 5 秒轮询里绝大多数时候日志没有新增，整块重建 300 行纯属白干
+          if (text === lastLogText) return;
+          lastLogText = text;
+          // 用户正在往上翻看历史时不要把他拽回底部
+          const atBottom = view.scrollHeight - view.scrollTop - view.clientHeight < 28;
           view.innerHTML = lines.length
             ? lines.map(line => `<span class="logview__line ${logLineClass(line)}">${escapeHtml(line)}</span>`).join('')
             : '<span class="logview__line">（暂无日志）</span>';
-          view.scrollTop = view.scrollHeight;
+          if (atBottom) view.scrollTop = view.scrollHeight;
         } catch (err) {
-          view.innerHTML = `<span class="logview__line logview__line--error">${escapeHtml(err.message)}</span>`;
+          if (lastLogText !== `__err__${err.message}`) {
+            lastLogText = `__err__${err.message}`;
+            view.innerHTML = `<span class="logview__line logview__line--error">${escapeHtml(err.message)}</span>`;
+          }
         }
       };
 
@@ -824,10 +904,69 @@
     while (arr.length > max) arr.shift();
   }
 
-  function sparkline(values) {
-    if (!values.length) return '';
-    const max = Math.max(...values, 1);
-    return `<div class="metric__spark">${values.map(v => `<i style="height:${Math.max(6, (v / max) * 100)}%"></i>`).join('')}</div>`;
+  /**
+   * 迷你趋势图就地更新。
+   * 以前每 3 秒用 innerHTML 把整块指标区重建一遍，等于每分钟扔掉 20 棵 DOM 树、
+   * 触发 20 次重排，还把「数字跳一下」的闪烁暴露给用户；现在只改柱高。
+   */
+  function drawSpark(host, values) {
+    if (!host) return;
+    const want = values.length;
+    while (host.children.length < want) host.appendChild(document.createElement('i'));
+    while (host.children.length > want && host.lastElementChild) host.removeChild(host.lastElementChild);
+    const max = Math.max.apply(null, values.concat([1]));
+    for (let i = 0; i < want; i += 1) {
+      host.children[i].style.height = `${Math.max(6, (values[i] / max) * 100)}%`;
+    }
+  }
+
+  /** 就地写文本：值没变就不碰 DOM，省掉无谓的重排 */
+  function setText(host, value) {
+    if (!host) return;
+    const text = value == null ? '' : String(value);
+    if (host.textContent !== text) host.textContent = text;
+  }
+
+  /** 就地写宽度百分比 */
+  function setWidth(host, percent) {
+    if (!host) return;
+    host.style.width = `${percent}%`;
+  }
+
+  /**
+   * 指标卡骨架：只建一次。
+   * 之后每次轮询只改文本、条宽与柱高，不重建 DOM。
+   */
+  function ensureMetricsSkeleton(box) {
+    if (box.dataset.built === '1') return;
+    box.dataset.built = '1';
+    box.innerHTML = `
+      <div class="card metric">
+        <div class="metric__top"><span class="metric__icon">${ICONS.overview}</span><span class="metric__label">处理器</span></div>
+        <div class="metric__value"><b class="num" data-v="cpu">—</b><span>%</span></div>
+        <div class="metric__sub" data-s="cpu"></div>
+        <div class="metric__bar"><div class="bar__fill" data-b="cpu" style="width:0%"></div></div>
+        <div class="metric__spark" data-k="cpu"></div>
+      </div>
+      <div class="card metric">
+        <div class="metric__top"><span class="metric__icon is-mem">${ICONS.storage}</span><span class="metric__label">内存</span></div>
+        <div class="metric__value"><b class="num" data-v="mem">—</b><span>%</span></div>
+        <div class="metric__sub" data-s="mem"></div>
+        <div class="metric__bar"><div class="bar__fill" data-b="mem" style="width:0%"></div></div>
+        <div class="metric__spark" data-k="mem"></div>
+      </div>
+      <div class="card metric">
+        <div class="metric__top"><span class="metric__icon is-net">${ICONS.network}</span><span class="metric__label">网络</span></div>
+        <div class="metric__value"><b class="num" data-v="net-down">—</b></div>
+        <div class="metric__sub" data-s="net"></div>
+        <div class="metric__bar"><div class="bar__fill" data-b="net" style="width:0%"></div></div>
+        <div class="metric__spark" data-k="net"></div>
+      </div>
+      <div class="card metric">
+        <div class="metric__top"><span class="metric__icon is-temp">${ICONS.security}</span><span class="metric__label">温度</span></div>
+        <div class="metric__value"><b class="num" data-v="temp">—</b><span data-u="temp" hidden>°C</span></div>
+        <div class="metric__sub" data-s="temp"></div>
+      </div>`;
   }
 
   function paintMetrics() {
@@ -836,11 +975,14 @@
     if (!box) return;
 
     if (!m) {
+      if (box.dataset.built === '1') return;
       box.innerHTML = `
         <div class="card metric"><div class="metric__top"><span class="metric__icon">${ICONS.overview}</span><span class="metric__label">硬件监控</span></div>
         <div class="metric__value"><b>—</b></div><div class="metric__sub">需要管理员权限或监控未就绪</div></div>`;
       return;
     }
+
+    ensureMetricsSkeleton(box);
 
     const cpu = pct(m.cpu && m.cpu.usage);
     const mem = pct(m.memory && m.memory.usage);
@@ -852,34 +994,34 @@
     pushHistory('mem', mem, 24);
     pushHistory('net', down + up, 24);
 
-    box.innerHTML = `
-      <div class="card metric">
-        <div class="metric__top"><span class="metric__icon">${ICONS.overview}</span><span class="metric__label">处理器</span></div>
-        <div class="metric__value"><b class="num">${cpu.toFixed(1)}</b><span>%</span></div>
-        <div class="metric__sub">${escapeHtml((state.system && state.system.cpuModel) || '') || 'CPU 使用率'}</div>
-        <div class="metric__bar"><div class="bar__fill ${barClass(cpu)}" style="width:${cpu}%"></div></div>
-        ${sparkline(state.history.cpu)}
-      </div>
-      <div class="card metric">
-        <div class="metric__top"><span class="metric__icon is-mem">${ICONS.storage}</span><span class="metric__label">内存</span></div>
-        <div class="metric__value"><b class="num">${mem.toFixed(1)}</b><span>%</span></div>
-        <div class="metric__sub">已用 ${escapeHtml(fmtBytes(m.memory && m.memory.used))} / ${escapeHtml(fmtBytes(m.memory && m.memory.total))}</div>
-        <div class="metric__bar"><div class="bar__fill ${barClass(mem)}" style="width:${mem}%"></div></div>
-        ${sparkline(state.history.mem)}
-      </div>
-      <div class="card metric">
-        <div class="metric__top"><span class="metric__icon is-net">${ICONS.network}</span><span class="metric__label">网络</span></div>
-        <div class="metric__value"><b class="num">${escapeHtml(fmtSpeed(down))}</b></div>
-        <div class="metric__sub">↑ ${escapeHtml(fmtSpeed(up))}　↓ ${escapeHtml(fmtSpeed(down))}</div>
-        <div class="metric__bar"><div class="bar__fill" style="width:${pct((down / (1024 * 1024 * 50)) * 100)}%"></div></div>
-        ${sparkline(state.history.net)}
-      </div>
-      <div class="card metric">
-        <div class="metric__top"><span class="metric__icon is-temp">${ICONS.security}</span><span class="metric__label">温度</span></div>
-        <div class="metric__value"><b class="num">${temp != null ? Number(temp).toFixed(0) : '—'}</b>${temp != null ? '<span>°C</span>' : ''}</div>
-        <div class="metric__sub">${m.cpu && m.cpu.temperatureMax != null ? `峰值 ${Number(m.cpu.temperatureMax).toFixed(0)}°C` : '当前平台不支持温度读取'}</div>
-      </div>`;
+    setText(box.querySelector('[data-v="cpu"]'), cpu.toFixed(1));
+    setText(box.querySelector('[data-s="cpu"]'), (state.system && state.system.cpuModel) || 'CPU 使用率');
+    setWidth(box.querySelector('[data-b="cpu"]'), cpu);
+    box.querySelector('[data-b="cpu"]').className = `bar__fill ${barClass(cpu)}`;
+    drawSpark(box.querySelector('[data-k="cpu"]'), state.history.cpu);
+
+    setText(box.querySelector('[data-v="mem"]'), mem.toFixed(1));
+    setText(box.querySelector('[data-s="mem"]'), `已用 ${fmtBytes(m.memory && m.memory.used)} / ${fmtBytes(m.memory && m.memory.total)}`);
+    setWidth(box.querySelector('[data-b="mem"]'), mem);
+    box.querySelector('[data-b="mem"]').className = `bar__fill ${barClass(mem)}`;
+    drawSpark(box.querySelector('[data-k="mem"]'), state.history.mem);
+
+    setText(box.querySelector('[data-v="net-down"]'), fmtSpeed(down));
+    setText(box.querySelector('[data-s="net"]'), `↑ ${fmtSpeed(up)}　↓ ${fmtSpeed(down)}`);
+    setWidth(box.querySelector('[data-b="net"]'), pct((down / (1024 * 1024 * 50)) * 100));
+    drawSpark(box.querySelector('[data-k="net"]'), state.history.net);
+
+    setText(box.querySelector('[data-v="temp"]'), temp != null ? Number(temp).toFixed(0) : '—');
+    const unit = box.querySelector('[data-u="temp"]');
+    if (unit) unit.hidden = temp == null;
+    setText(
+      box.querySelector('[data-s="temp"]'),
+      m.cpu && m.cpu.temperatureMax != null ? `峰值 ${Number(m.cpu.temperatureMax).toFixed(0)}°C` : '当前平台不支持温度读取'
+    );
   }
+
+  /** 上一次磁盘表格的数据指纹，没变就跳过整表重建 */
+  let _disksSig = '';
 
   function paintDisks() {
     const body = $('#disk-body');
@@ -889,9 +1031,19 @@
     if (count) count.textContent = `${disks.length} 个挂载点`;
 
     if (!disks.length) {
-      body.innerHTML = `<div class="empty">暂无磁盘数据</div>`;
+      if (body.dataset.empty !== '1') {
+        body.dataset.empty = '1';
+        body.innerHTML = `<div class="empty">暂无磁盘数据</div>`;
+      }
       return;
     }
+    body.dataset.empty = '0';
+
+    // 磁盘容量是分钟级变化的量，3 秒轮询里绝大多数时候指纹相同
+    const sig = disks.map(d => `${d.mount}|${d.fs}|${d.type}|${d.sizeFormatted}|${d.availableFormatted}`).join(';');
+    if (sig === _disksSig) return;
+    _disksSig = sig;
+
     body.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
       <thead><tr><th>挂载点</th><th class="tbl__num">容量</th><th class="tbl__num">可用</th><th style="width:32%">使用率</th></tr></thead>
       <tbody>${disks.map(d => {
@@ -921,28 +1073,54 @@
     </div>`;
   }
 
+  /**
+   * 定义列表就地更新。
+   * entries 为 [标签, 值]；值是 {html:'...'} 时写 innerHTML，否则写 textContent。
+   * 第一次调用建骨架，之后只改 dd，不再重建整个 <dl>。
+   */
+  function paintKv(host, entries) {
+    if (!host) return;
+    if (host.dataset.built !== '1' || host.children.length !== entries.length) {
+      host.dataset.built = '1';
+      host.innerHTML = entries
+        .map(([label], i) => `<div><dt>${escapeHtml(label)}</dt><dd data-i="${i}"></dd></div>`)
+        .join('');
+    }
+    entries.forEach(([, value], i) => {
+      const dd = host.querySelector(`dd[data-i="${i}"]`);
+      if (!dd) return;
+      if (value && typeof value === 'object' && typeof value.html === 'string') {
+        if (dd.innerHTML !== value.html) dd.innerHTML = value.html;
+      } else {
+        setText(dd, value);
+      }
+    });
+  }
+
   function paintDevice() {
     const s = state.system;
     const box = $('#device-kv');
     if (!box || !s) return;
-    box.innerHTML = `
-      <div><dt>设备名称</dt><dd>${escapeHtml(s.hostname || '—')}</dd></div>
-      <div><dt>系统版本</dt><dd class="num">v${escapeHtml(s.version || '—')}</dd></div>
-      <div><dt>处理器</dt><dd>${escapeHtml(s.cpuModel || '—')}</dd></div>
-      <div><dt>物理内存</dt><dd class="num">${escapeHtml(fmtBytes(s.totalMemory))}</dd></div>
-      <div><dt>运行时长</dt><dd class="num">${escapeHtml(fmtUptime(s.uptimeSec))}</dd></div>
-      <div><dt>启动时间</dt><dd class="num">${escapeHtml(fmtTime(s.startedAt))}</dd></div>`;
+    paintKv(box, [
+      ['设备名称', s.hostname || '—'],
+      ['系统版本', `v${s.version || '—'}`],
+      ['处理器', s.cpuModel || '—'],
+      ['物理内存', fmtBytes(s.totalMemory)],
+      ['运行时长', fmtUptime(s.uptimeSec)],
+      ['启动时间', fmtTime(s.startedAt)],
+    ]);
   }
 
   function paintService() {
     const s = state.system;
     const box = $('#service-kv');
     if (!box || !s) return;
-    box.innerHTML = `
-      <div><dt>服务状态</dt><dd><span class="tag tag--ok">运行中</span></dd></div>
-      <div><dt>HTTP 端口</dt><dd class="num">${escapeHtml(s.listen && s.listen.port)}</dd></div>
-      <div><dt>HTTPS</dt><dd>${s.listen && s.listen.httpsEnabled ? `<span class="tag tag--ok">${escapeHtml(s.listen.httpsPort)}</span>` : '<span class="tag">未启用</span>'}</dd></div>
-      <div><dt>Node 版本</dt><dd class="num">${escapeHtml(s.nodeVersion || '—')}</dd></div>`;
+    paintKv(box, [
+      ['服务状态', { html: '<span class="tag tag--ok">运行中</span>' }],
+      ['HTTP 端口', String(s.listen && s.listen.port)],
+      ['HTTPS', s.listen && s.listen.httpsEnabled ? { html: `<span class="tag tag--ok">${escapeHtml(s.listen.httpsPort)}</span>` } : { html: '<span class="tag">未启用</span>' }],
+      ['Node 版本', s.nodeVersion || '—'],
+    ]);
   }
 
   function paintNotice() {
@@ -951,7 +1129,7 @@
     if (!card || !body) return;
     if (!state.message) { card.hidden = true; return; }
     card.hidden = false;
-    body.textContent = state.message;
+    setText(body, state.message);
   }
 
   /** 网络服务页：把硬件监控的聚合速率渲染成定义列表 */
@@ -967,14 +1145,15 @@
     }
     const m = state.metrics;
     if (!m || !m.network) {
-      box.innerHTML = '<div><dt>状态</dt><dd>暂无监控数据</dd></div>';
+      paintKv(box, [['状态', '暂无监控数据']]);
       return;
     }
-    box.innerHTML = `
-      <div><dt>下载速率</dt><dd class="num">${escapeHtml(fmtSpeed(m.network.downloadBytesPerSec || 0))}</dd></div>
-      <div><dt>上传速率</dt><dd class="num">${escapeHtml(fmtSpeed(m.network.uploadBytesPerSec || 0))}</dd></div>
-      <div><dt>服务端标识</dt><dd class="mono">${escapeHtml((state.system && state.system.serverId) || '—')}</dd></div>
-      <div><dt>平台</dt><dd class="num">${escapeHtml((state.system && `${state.system.osType} ${state.system.osRelease}`) || '—')}</dd></div>`;
+    paintKv(box, [
+      ['下载速率', fmtSpeed(m.network.downloadBytesPerSec || 0)],
+      ['上传速率', fmtSpeed(m.network.uploadBytesPerSec || 0)],
+      ['服务端标识', (state.system && state.system.serverId) || '—'],
+      ['平台', (state.system && `${state.system.osType} ${state.system.osRelease}`) || '—'],
+    ]);
   }
 
   function logLineClass(line) {
@@ -1219,7 +1398,20 @@
       if (act === 'logout') logout();
       else if (act === 'refresh') route(state.page);
       else if (act === 'about') route('about');
+      else if (act === 'theme') toggleTheme();
     }));
+
+    // 登录页页脚的主题开关（未登录时顶栏菜单还不可见，得有个入口）
+    const authTheme = $('#auth-theme');
+    if (authTheme) authTheme.addEventListener('click', () => toggleTheme());
+
+    // 快捷键 Shift+D 切主题，和顶栏菜单、登录页按钮等效
+    document.addEventListener('keydown', e => {
+      if (e.shiftKey && (e.key === 'D' || e.key === 'd') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        toggleTheme();
+      }
+    });
 
     // 通知
     $('#btn-notice').addEventListener('click', () => {
@@ -1336,6 +1528,11 @@
     b64Encode,
     $,
     $$,
+    // 主题：页面模块跟着控制台一起切，不要各自实现一套
+    currentTheme,
+    setTheme,
+    toggleTheme,
+    applyTheme,
   };
 
   // 各页面模块在本文件之后加载。

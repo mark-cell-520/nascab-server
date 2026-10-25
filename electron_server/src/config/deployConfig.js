@@ -81,6 +81,13 @@ const DEFAULTS = {
     autoRestart: true,
     // 单个 worker 的最大自动重启次数（指数退避，达到上限后放弃并告警）
     maxRestarts: 10,
+    // express API worker 进程数。0 = 按机器规格自动决策（默认）
+    // 每个 express worker 常驻约 80~120MB（Windows 实测 ~98MB），
+    // 而 NAS 的 API 负载以文件流和数据库 IO 为主、不是 CPU 密集，
+    // 多开 worker 买到的是「一个崩了另一个还在听端口」的冗余，
+    // 而这已经由 worker.autoRestart 的 1 秒重启覆盖了。
+    // 小内存机器（容器限 512MB/1GB、ARM 开发板）上多 worker 的代价远大于收益
+    expressCount: 0,
   },
   console: {
     // 是否启用 Web 控制台（/）。关闭后只保留 API 与 /healthz 等探针，
@@ -337,6 +344,7 @@ class DeployConfig {
     return {
       autoRestart: parseBool(this.get('worker.autoRestart', DEFAULTS.worker.autoRestart, 'NASCAB_WORKER_AUTO_RESTART'), DEFAULTS.worker.autoRestart),
       maxRestarts: parseIntSafe(this.get('worker.maxRestarts', DEFAULTS.worker.maxRestarts, 'NASCAB_WORKER_MAX_RESTARTS'), DEFAULTS.worker.maxRestarts),
+      expressCount: parseIntSafe(this.get('worker.expressCount', DEFAULTS.worker.expressCount, 'NASCAB_EXPRESS_COUNT'), DEFAULTS.worker.expressCount),
     };
   }
 

@@ -39,6 +39,9 @@ services:
       NASCAB_BEHIND_PROXY: "${NASCAB_BEHIND_PROXY:-false}"
       NASCAB_ACCESS_LOG: "${NASCAB_ACCESS_LOG:-true}"
       NASCAB_WORKER_AUTO_RESTART: "true"
+      # express API worker 进程数。0 = 自动（默认 1 个，省内存）。
+      # 容器里每个 worker 常驻约 80~120MB，内存限额紧张时保持 1 个
+      NASCAB_EXPRESS_COUNT: "${NASCAB_EXPRESS_COUNT:-0}"
       NASCAB_LOG_MAX_SIZE: "20971520"
       NASCAB_LOG_MAX_FILES: "10"
       # Web 控制台：产品名（登录页/顶栏显示）。设为 false 可只提供 API

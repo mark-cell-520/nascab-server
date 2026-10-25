@@ -109,6 +109,10 @@ $xml = @"
   <env name="NASCAB_PORT_FALLBACK" value="false"/>
   <env name="NASCAB_ACCESS_LOG" value="true"/>
   <env name="NASCAB_WORKER_AUTO_RESTART" value="true"/>
+  <!-- express API worker 进程数。0 = 自动（默认 1 个）。
+       每个 worker 常驻约 80~120MB，而 API 负载以文件流与 SQLite IO 为主、不是 CPU 密集；
+       内存吃紧时保持 1 个，需要并发再按 CPU 核心数往大调 -->
+  <env name="NASCAB_EXPRESS_COUNT" value="0"/>
   <!-- Web 控制台显示的产品名 -->
   <env name="NASCAB_CONSOLE_TITLE" value="NasCabOS"/>
   <!-- 机器控制接口（/api/control）：面向脚本 / AI Agent 的 root 级控制面。

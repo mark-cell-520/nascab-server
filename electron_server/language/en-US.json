@@ -357,7 +357,7 @@
       "FETCH_FAILED": "Failed to fetch",
       "INVALID_PARAMS": "Invalid parameters",
       "PORT_FORBIDDEN": "System reserved port is not available",
-      "API_COUNT_TOO_LOW": "API process count cannot be less than 2",
+      "API_COUNT_TOO_LOW": "API process count cannot be less than 1",
       "API_COUNT_TOO_HIGH": "API process count cannot exceed CPU cores (%s)",
       "SAVE_SUCCESS": "Saved successfully",
       "SAVE_FAILED": "Failed to save"

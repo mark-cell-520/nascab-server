@@ -59,7 +59,9 @@
     "_autoRestart": "worker 进程崩溃后是否自动重启（指数退避 1s→30s）。服务器长时间运行建议开启",
     "autoRestart": true,
     "_maxRestarts": "单个 worker 的最大自动重启次数。稳定运行超过 60 秒后重置预算",
-    "maxRestarts": 10
+    "maxRestarts": 10,
+    "_expressCount": "express API worker 进程数。0 = 按机器规格自动决策（默认 1 个）。每个 worker 常驻约 80~120MB，而 API 负载以文件流与 SQLite IO 为主、不是 CPU 密集，多开只增加内存。需要并发再往大调，上限为 CPU 核心数。也可用环境变量 NASCAB_EXPRESS_COUNT",
+    "expressCount": 0
   },
 
   "console": {

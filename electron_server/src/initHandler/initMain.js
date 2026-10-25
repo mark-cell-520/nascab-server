@@ -189,6 +189,12 @@ module.exports = {
     if (process.env.NODE_ENV === 'development') {
       expressApiCount = 1;
     }
+    // 决策依据打出来：内存吃紧时有人会疑惑「为什么只有一个 worker」，
+    // 日志里能直接看到是按什么算的，以及怎么改
+    const decision = this.getExpressWorkerDecision && this.getExpressWorkerDecision();
+    if (decision) {
+      Logger.info(`🧮 express worker 数量 = ${expressApiCount}：${decision.reason}`);
+    }
     //cluster专门用于启用多个express worker进程
     cluster.setupPrimary({
       exec: path.resolve(__dirname, '..', 'workers', 'expressWorker.js'),

@@ -242,7 +242,7 @@ function __register(N) {
     const sel = fm.selected.has(item.path);
     const img = !isDir && item.type === 'image'
       ? `<img class="fm__cell-img" loading="lazy" alt="" src="${authedUrl('/api/file/tiny', { path: item.path })}">`
-      : `<div style="display:grid;place-items:center;aspect-ratio:1;background:#f6f8fb">${fileIcon(item).replace('fico', 'fico').replace('class="fico', 'class="fico" style="width:34px;height:34px"')}</div>`;
+      : `<div class="fm__cell-ph">${fileIcon(item).replace('class="fico', 'class="fico" style="width:34px;height:34px"')}</div>`;
     return `<div class="card fm__cell ${sel ? 'is-selected' : ''}" data-path="${escapeHtml(item.path)}" data-dir="${isDir ? 1 : 0}">
       ${img}
       <div class="fm__cell-body">

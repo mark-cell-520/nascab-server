@@ -67,6 +67,33 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 
 顶栏支持全局搜索菜单（按 `/` 聚焦）、系统通知、用户菜单；窄屏自动折叠为抽屉式侧边栏。
 
+### 主题（浅色 / 暗色）
+
+控制台支持暗色主题，三处入口等价：顶栏用户菜单的「暗色模式」、登录页页脚的主题按钮、快捷键 `Shift+D`。
+
+- 选择优先级：**用户手动选过**（`localStorage`）> 系统 `prefers-color-scheme`
+- 没有显式选择时跟随系统，系统在深浅之间切换会实时生效
+- 实现上 `console.js` 启动时把解析结果写到 `<html data-theme="light|dark">`，CSS 只认这一个属性，
+  所以暗色令牌只需声明一份，组件规则两边共用，不存在「两套样式各自漂移」的问题
+- `console.css` 里所有颜色都走 CSS 自定义属性；新增组件时请沿用变量，不要写死十六进制色值，
+  否则暗色下会漏出亮色块
+
+### 前端渲染与内存
+
+控制台要一直开着，轮询里的每一分浪费都会累加成风扇噪音和电量：
+
+| 项 | 做法 |
+|---|---|
+| 概览页 3 秒轮询 | 指标卡骨架只建一次，之后只改文本、进度条宽度与迷你图柱高，**不重建 DOM** |
+| 存储池表格 | 按数据指纹判断，容量没变就整表跳过（磁盘是分钟级变化的量） |
+| 设备信息 / 服务状态 | 定义列表建一次骨架，之后只更新 `<dd>` 文本 |
+| 日志查看器 5 秒轮询 | 日志文本没变就直接返回；且只在用户本来就在底部时才跟随滚动，往上翻看历史不会被拽走 |
+| 趋势数据 | `state.history` 固定上限 24 个采样点，不会无限增长 |
+
+服务端这边：`collectSystemInfo()` 的静态部分（`package.json`、CPU 型号、核心数）按进程缓存——
+其中 `os.cpus()` 在 Windows 上每次调用都会重新构造一份「每个逻辑核一个对象」的数组，
+概览页每 3 秒调一次，不缓存就是每分钟制造一整套纯垃圾。
+
 ### 控制台专用接口
 
 | 接口 | 鉴权 | 说明 |
@@ -308,6 +335,7 @@ JSON 里以 `_` 开头的键会被忽略，可以直接写注释（见 `config.e
 | `security.jwtSecret` | `JWT_SECRET` | 空 | JWT 密钥，生产建议显式设置 |
 | `worker.autoRestart` | `NASCAB_WORKER_AUTO_RESTART` | `true` | worker 崩溃自动重启 |
 | `worker.maxRestarts` | `NASCAB_WORKER_MAX_RESTARTS` | `10` | 单 worker 重启上限 |
+| `worker.expressCount` | `NASCAB_EXPRESS_COUNT` | `0` | express API worker 进程数，`0` = 自动（省内存，默认 1 个） |
 | `console.enabled` | `NASCAB_CONSOLE_ENABLED` | `true` | 是否启用 Web 控制台（挂在 `/`） |
 | `console.title` | `NASCAB_CONSOLE_TITLE` | `NasCabOS` | 登录页/顶栏/浏览器标题显示的产品名 |
 | `console.dir` | `NASCAB_CONSOLE_DIR` | `<root>/web/console` | 控制台静态资源目录 |
@@ -344,9 +372,13 @@ JSON 里以 `_` 开头的键会被忽略，可以直接写注释（见 `config.e
   "security": {
     "jwtSecret": "请换成随机长字符串"
   },
-  "worker": { "autoRestart": true, "maxRestarts": 10 }
+  "worker": { "autoRestart": true, "maxRestarts": 10, "expressCount": 1 }
 }
 ```
+
+> `expressCount: 1` 是内存优先的选择。NasCab 的 API 负载以文件流（内核态搬运，不占 JS 线程）、
+> SQLite 查询和缩略图转发放为主，不是 CPU 密集；多开 worker 买到的东西很有限，代价却是每个进程
+> 一份完整的 express + 路由 + 中间件常驻内存。真要提高并发再往大调，上限为核心数。
 
 ---
 
@@ -556,6 +588,15 @@ server {
 | `src/workers/expressWorker.js` | HTTP 就绪后启动控制接口独立监听，关停时一并关闭 |
 | `src/api/modules/console/consoleController.js` | 导出 `collectSystemInfo`/`requestHwMetrics` 供控制接口复用（避免两处各写一份系统信息） |
 | `deploy/config.example.json`、`deploy/docker/docker-compose.yml`、`deploy/windows/install-service.ps1` | 补充 `control.*` 配置项与 `NASCAB_CONTROL_*` 环境变量；compose 增加 6792 端口映射 |
+| `src/utils/expressWorkerCount.js` | **新增**。express worker 进程数决策：显式配置 > 数据库旧值 > 自动（省内存，默认 1 个）。启动路径与设置接口共用一份，避免两边算出不同的数 |
+| `src/initUtil.js`、`src/initHandler/initMain.js` | 接入上述决策，并打印「为什么是这个数」的可读理由 |
+| `src/api/modules/others/apiSetting/apiSettingController.js` | 设置接口改用同一份决策；进程数下限从 2 放开到 1，返回自动/手动来源与上限 |
+| `electron_server/language/*.json` | 「API 进程数量不能低于 2」改为「不能低于 1」，与新默认值一致 |
+| `web/console/console.css` | **重写为设计令牌 + 暗色主题**：所有颜色走 CSS 自定义属性，暗色只覆盖 `[data-theme="dark"]` 一层；新增键盘焦点环、细滚动条、选中色、卡片悬浮层次、页面进入动画、弹层缩放、高对比偏好适配 |
+| `web/console/console.js` | 主题系统（手动选择 > 系统偏好，`Shift+D` 快捷键）；概览指标卡/存储池/设备信息改为**就地更新**，不再每 3 秒整体重建 DOM；日志页内容未变则跳过重绘，且不再把正在往上翻的用户拽回底部 |
+| `web/console/index.html` | `color-scheme` 支持深浅；用户菜单与登录页页脚各加一个主题入口 |
+| `src/api/modules/console/consoleController.js` | `package.json`/CPU 型号/核心数按进程缓存——`os.cpus()` 在 Windows 上每次调用都重新构造整个数组，概览页 3 秒一次轮询，不缓存就是持续制造垃圾 |
+| `src/api/controlServer.js` | 多 worker 抢控制端口时按 info 记录而非 error（不是故障，报了会让运维误判）。补充说明：cluster worker 的 `listen` 会经主进程共享句柄完成绑定，多个 express worker 实际是**共享**同一个控制端口，单个 worker 挂掉不影响控制接口 |
 
 部署产物：`deploy/config.example.json`、`deploy/systemd/`、`deploy/docker/`、`deploy/windows/`、`deploy/scripts/`。
 
@@ -608,6 +649,7 @@ server {
 - 两个入口都可用：独立端口 `127.0.0.1:6792` 与主端口 `/api/control` 返回一致结果
 - 鉴权：无令牌 401、错误令牌 401、`Authorization: Bearer` / `X-NasCab-Token` / `?token=` 三种传法均可用；未知子路径返回 404 JSON
 - 自动生成的令牌在多个 express worker 间一致（`O_EXCL` 竞争创建），启动横幅只由抢到创建权的进程完整打印
+- 多个 express worker **共享**同一个控制端口（cluster worker 的 `listen` 经主进程共享句柄绑定），实测杀掉其中一个 worker 后控制接口仍正常，且 autoRestart 会把它拉起来
 - `NASCAB_CONTROL_TOKEN` 显式指定后立即生效，并同步写入 `<数据目录>/control.json`
 - `control.port=0` 时不再监听独立端口，主端口入口仍可用
 - `control.enabled=false` 时 `/api/control/*` 全部 404、独立端口不监听，`/healthz` 与 Web 控制台不受影响
@@ -620,3 +662,27 @@ server {
 - 下载器与容器接口在本机未安装对应组件时返回统一的 `{ok:false}` 结构，不抛异常、不挂起
 - 控制接口内部委托既有控制器（文件增删/容器/下载器），与 Web 控制台走同一套实现，未复制业务逻辑
 - 命令行客户端 `nascabctl` 实测：探活、总览、列目录、上传、下载（内容一致）、重命名、删除、共享目录增删、日志、下载器、容器、`raw` 直调、`--json`；连接信息可从 `control.json` 自动发现
+
+### 界面外观与内存优化（本轮新增）
+
+以下均在本机实测通过（Node 22.20.0，无界面模式，真实启动的服务端 + jsdom 渲染验证）：
+
+**内存**
+
+- express worker 进程数改为按机器规格自动决策，默认 **1 个**（原逻辑 `Math.max(2, …)` 强制至少 2 个）。
+  同一空数据目录启动，实测进程总 RSS 从 **346.0 MB 降到 249.5 MB（-96.5 MB，-28%）**
+- `NASCAB_EXPRESS_COUNT=4` 显式指定后按 4 个启动，超过核心数时压回核心数、超过硬上限 8 时压回 8
+- 决策依据打印在启动日志里（`🧮 express worker 数量 = 1：自动决策：…`），配了环境变量也会说明
+- 设置接口 `GET /api/apiSetting` 与启动路径返回同一个数，并额外给出 `expressApiCountAuto` / `expressApiCountReason` / `expressApiCountMax`
+- `collectSystemInfo()` 的静态部分改为进程级缓存，消除 `os.cpus()` 在 3 秒轮询里的重复构造
+
+**界面**
+
+- 暗色主题：三处入口（用户菜单 / 登录页页脚 / `Shift+D`）等价；手动选择持久化，未选择时跟随系统且实时响应系统切换
+- 重新加载页面后主题保持（`localStorage`）
+- 概览页轮询不再重建 DOM：连续两次轮询后指标卡与趋势图节点身份不变，趋势图柱数随时间增长且上限 24
+- 设备信息列表（`#device-kv`）同样只建一次骨架，`<dd>` 节点身份不变
+- 日志查看器内容未变时跳过重绘
+- CSS 中无硬编码浅色背景残留（原先网格视图占位块写死了 `#f6f8fb`，暗色下会漏出一块亮色）
+- 键盘焦点环（`:focus-visible`）、减少动画偏好（`prefers-reduced-motion`）、高对比偏好均已定义
+- 六个测试套件共 **243 项断言**全部通过（配置 57 / 控制台接口 38 / 页面渲染 51 / 文件管理 23 / 初始化向导 13 / 机器控制接口 61）

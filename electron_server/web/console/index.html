@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
 <title>NasCabOS</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6bff'/%3E%3Cpath d='M8 11h16M8 16h16M8 21h10' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="console.css">
@@ -117,6 +117,11 @@
       <span id="auth-version">—</span>
       <span class="auth__dot">·</span>
       <span>建议通过 HTTPS 或反向代理访问</span>
+      <span class="auth__dot">·</span>
+      <button type="button" class="auth__theme" id="auth-theme" title="切换浅色/暗色主题">
+        <svg viewBox="0 0 20 20"><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M5.3 5.3l1.4 1.4M13.3 13.3l1.4 1.4M14.7 5.3l-1.4 1.4M6.7 13.3l-1.4 1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span id="auth-theme-label">浅色</span>
+      </button>
     </footer>
   </div>
 </div>
@@ -172,6 +177,11 @@
               <strong id="menu-username">—</strong>
               <span id="menu-role">—</span>
             </div>
+            <button data-act="theme" class="themebtn" id="theme-toggle">
+              <svg viewBox="0 0 20 20" id="theme-icon"><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M5.3 5.3l1.4 1.4M13.3 13.3l1.4 1.4M14.7 5.3l-1.4 1.4M6.7 13.3l-1.4 1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              <span id="theme-label">切换主题</span>
+              <kbd id="theme-state">浅色</kbd>
+            </button>
             <button data-act="refresh"><svg viewBox="0 0 20 20"><path d="M15 10a5 5 0 11-1.6-3.7M15 3.5V7h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>刷新数据</button>
             <button data-act="about"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v4M10 6.6v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>关于本机</button>
             <button data-act="logout" class="is-danger"><svg viewBox="0 0 20 20"><path d="M8 6H5v8h3M11 8l3 2-3 2M12 10H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>退出登录</button>

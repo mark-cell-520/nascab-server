@@ -10,6 +10,70 @@ const userUtil = require('../../../utils/userUtil');
 const MAX_LOG_LINES = 1000;
 const MAX_LOG_BYTES = 1024 * 1024;
 
+/**
+ * 静态系统信息的进程级缓存。
+ * 概览页每 3 秒轮一次 /api/console/overview，而这些值进程存活期间不会变；
+ * 其中 os.cpus() 在 Windows 上每次调用都会重新构造一份「每个逻辑核一个对象」的数组，
+ * 每 3 秒制造一遍纯垃圾，所以必须缓存下来
+ */
+let _staticSystemInfo = null;
+function getStaticSystemInfo() {
+  if (_staticSystemInfo) return _staticSystemInfo;
+
+  let packageJson = {};
+  try {
+    packageJson = require(path.join(config.getRootPath(), 'package.json'));
+  } catch (_) {}
+
+  let cpuModel = '';
+  let cpuCores = 0;
+  try {
+    const cpus = os.cpus() || [];
+    cpuCores = cpus.length;
+    cpuModel = (cpus[0] && cpus[0].model) || '';
+  } catch (_) {}
+
+  _staticSystemInfo = { packageJson, cpuModel, cpuCores };
+  return _staticSystemInfo;
+}
+
+/** 控制台展示用的系统静态信息 */
+function collectSystemInfo() {
+  const { packageJson, cpuModel, cpuCores } = getStaticSystemInfo();
+
+  const dataDir = typeof config.getUserDataPath === 'function' ? config.getUserDataPath() : '';
+  const logDir = config.logging && config.logging.file ? config.logging.file.path : '';
+
+  return {
+    title: config.console.title,
+    version: packageJson.version || '',
+    productName: packageJson.name || '',
+    hostname: os.hostname(),
+    platform: process.platform,
+    arch: process.arch,
+    osType: os.type(),
+    osRelease: os.release(),
+    cpuModel,
+    cpuCores,
+    totalMemory: os.totalmem(),
+    nodeVersion: process.version,
+    electron: process.versions.electron || '',
+    chrome: process.versions.chrome || '',
+    serverId: process.env.SERVER_ID || '',
+    dataDir,
+    logDir,
+    consoleEnabled: config.console.enabled !== false,
+    listen: {
+      host: config.server.host,
+      port: config.app.port,
+      httpsPort: config.server.httpsEnabled ? config.server.httpsPort : null,
+      httpsEnabled: config.server.httpsEnabled !== false,
+    },
+    startedAt: Date.now() - Math.round(process.uptime() * 1000),
+    uptimeSec: Math.round(process.uptime()),
+  };
+}
+
 /** 与 hwController 一致的 IPC 取数方式：向主进程要一份硬件指标 */
 function requestHwMetrics(timeoutMs = 3000) {
   return new Promise(resolve => {
@@ -46,46 +110,6 @@ function requestHwMetrics(timeoutMs = 3000) {
   });
 }
 
-/** 控制台展示用的系统静态信息 */
-function collectSystemInfo() {
-  let packageJson = {};
-  try {
-    packageJson = require(path.join(config.getRootPath(), 'package.json'));
-  } catch (_) {}
-
-  const dataDir = typeof config.getUserDataPath === 'function' ? config.getUserDataPath() : '';
-  const logDir = config.logging && config.logging.file ? config.logging.file.path : '';
-
-  return {
-    title: config.console.title,
-    version: packageJson.version || '',
-    productName: packageJson.name || '',
-    hostname: os.hostname(),
-    platform: process.platform,
-    arch: process.arch,
-    osType: os.type(),
-    osRelease: os.release(),
-    cpuModel: (os.cpus() && os.cpus()[0] && os.cpus()[0].model) || '',
-    cpuCores: (os.cpus() || []).length,
-    totalMemory: os.totalmem(),
-    nodeVersion: process.version,
-    electron: process.versions.electron || '',
-    chrome: process.versions.chrome || '',
-    serverId: process.env.SERVER_ID || '',
-    dataDir,
-    logDir,
-    consoleEnabled: config.console.enabled !== false,
-    listen: {
-      host: config.server.host,
-      port: config.app.port,
-      httpsPort: config.server.httpsEnabled ? config.server.httpsPort : null,
-      httpsEnabled: config.server.httpsEnabled !== false,
-    },
-    startedAt: Date.now() - Math.round(process.uptime() * 1000),
-    uptimeSec: Math.round(process.uptime()),
-  };
-}
-
 class ConsoleController {
   /**
    * GET /api/console/bootstrap
@@ -94,10 +118,7 @@ class ConsoleController {
    */
   getBootstrap = async (req, res) => {
     try {
-      let packageJson = {};
-      try {
-        packageJson = require(path.join(config.getRootPath(), 'package.json'));
-      } catch (_) {}
+      const { packageJson } = getStaticSystemInfo();
       return ResponseUtil.success(
         req,
         res,

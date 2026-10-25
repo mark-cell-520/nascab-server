@@ -383,7 +383,7 @@
       "FETCH_FAILED": "获取失败",
       "INVALID_PARAMS": "参数无效",
       "PORT_FORBIDDEN": "系统保留端口无法使用",
-      "API_COUNT_TOO_LOW": "API进程数量不能低于2",
+      "API_COUNT_TOO_LOW": "API进程数量不能低于1",
       "API_COUNT_TOO_HIGH": "API进程数量不能超过CPU核心数（%s）",
       "SAVE_SUCCESS": "保存成功",
       "SAVE_FAILED": "保存失败"

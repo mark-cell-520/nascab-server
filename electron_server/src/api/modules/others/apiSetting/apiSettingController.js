@@ -2,6 +2,7 @@ const os = require('os');
 const tableConfig = require('../../../../db/table/tableConfig');
 const config = require('../../../../config/config');
 const ResponseUtil = require('../../../apiUtils/responseUtil');
+const expressWorkerCount = require('../../../../utils/expressWorkerCount');
 
 class ApiSettingController {
   async get(req, res) {
@@ -16,8 +17,11 @@ class ApiSettingController {
       const httpsPort = this._toNullablePort(rawHttps) ?? this._toNullablePort(config?.app?.httpsPort) ?? 9443;
 
       const cpuCores = Math.max(1, (os.cpus() || []).length);
-      const desiredCount = this._toNullableInt(rawCount) ?? 2;
-      const expressApiCount = Math.max(2, Math.min(cpuCores, desiredCount));
+      // 与启动路径共用同一份决策：环境变量/配置 > 数据库值 > 自动（默认 1 个）
+      const envConfigured = (config.worker && Number(config.worker.expressCount)) || 0;
+      const configured = envConfigured > 0 ? envConfigured : this._toNullableInt(rawCount) ?? 0;
+      const decision = expressWorkerCount.decide({ configured, cores: cpuCores });
+      const expressApiCount = decision.count;
       const welcomeText = typeof rawWelcomeText === 'string' && rawWelcomeText.trim().length > 0 ? rawWelcomeText.trim() : null;
       const customHostname =
         typeof rawCustomHostname === 'string' && rawCustomHostname.trim().length > 0
@@ -27,7 +31,17 @@ class ApiSettingController {
       return ResponseUtil.success(
         req,
         res,
-        { httpPort, httpsPort, expressApiCount, cpuCores, welcomeText, customHostname },
+        {
+          httpPort,
+          httpsPort,
+          expressApiCount,
+          expressApiCountAuto: decision.auto,
+          expressApiCountReason: decision.reason,
+          expressApiCountMax: Math.min(expressWorkerCount.MAX_WORKERS, cpuCores),
+          cpuCores,
+          welcomeText,
+          customHostname,
+        },
         'apiSetting.FETCH_SUCCESS'
       );
     } catch (e) {
@@ -74,11 +88,12 @@ class ApiSettingController {
       }
 
       const cpuCores = Math.max(1, (os.cpus() || []).length);
-      if (expressApiCount < 2) {
+      if (expressApiCount < 1) {
         return ResponseUtil.error(req, res, 'apiSetting.API_COUNT_TOO_LOW', 400);
       }
-      if (expressApiCount > cpuCores) {
-        return ResponseUtil.error(req, res, 'apiSetting.API_COUNT_TOO_HIGH', 400, null, [cpuCores]);
+      const maxCount = Math.min(expressWorkerCount.MAX_WORKERS, cpuCores);
+      if (expressApiCount > maxCount) {
+        return ResponseUtil.error(req, res, 'apiSetting.API_COUNT_TOO_HIGH', 400, null, [maxCount]);
       }
 
       const okHttp = await tableConfig.setConfigByKey(tableConfig.KEY_API_PORT_HTTP, String(httpPort));

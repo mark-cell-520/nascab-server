@@ -14,6 +14,7 @@ const Logger = require('./utils/logger');
 const { getSingletonWorkerManager } = require('./workers/singletonWorkerManager');
 const { getProcessRegistry } = require('./workers/processRegistry');
 const InitMsgUtil = require('./initMsgUtil');
+const expressWorkerCount = require('./utils/expressWorkerCount');
 
 const singletonWorkerManager = getSingletonWorkerManager();
 
@@ -41,12 +42,31 @@ class InitUtil {
     });
   }
 
-  getExpressApiCount(cpuCores, configuredCount) {
-    const cores = parseInt(cpuCores, 10);
-    const max = Math.max(2, Number.isFinite(cores) ? cores : 0);
-    const raw = parseInt(configuredCount, 10);
-    const desired = Number.isFinite(raw) ? raw : 2;
-    return Math.max(2, Math.min(max, desired));
+  /**
+   * express API worker 进程数决策
+   *
+   * 取值优先级：环境变量/配置（worker.expressCount）> 数据库历史值 > 自动决策。
+   * 策略见 utils/expressWorkerCount.js——默认只要 1 个，省下的是每个 worker
+   * 近 100MB 的常驻内存。
+   * @param {number} cpuCores CPU 逻辑核心数
+   * @param {number} dbConfiguredCount 数据库里持久化的历史值（0 表示未设置）
+   * @returns {number}
+   */
+  getExpressApiCount(cpuCores, dbConfiguredCount) {
+    const envConfigured = (config.worker && Number(config.worker.expressCount)) || 0;
+    // 环境变量/配置显式指定时压过数据库旧值；否则沿用数据库值（0 = 自动）
+    const configured = envConfigured > 0 ? envConfigured : parseInt(dbConfiguredCount, 10);
+    const decision = expressWorkerCount.decide({
+      configured: Number.isFinite(configured) ? configured : 0,
+      cores: cpuCores,
+    });
+    this.lastExpressWorkerDecision = decision;
+    return decision.count;
+  }
+
+  /** 最近一次 worker 数决策的说明，供启动日志与设置页展示「为什么是这个数」 */
+  getExpressWorkerDecision() {
+    return this.lastExpressWorkerDecision || null;
   }
 
   getExpressStatus() {
