@@ -590,6 +590,7 @@ struct SubtitleSheetInner {
                 }
                 .width(36)
                 .height(36)
+                .justifyContent(FlexAlign.Center)
                 .onClick(() => {
                   const ctrl = this.p.ctrl;
                   const t = ctrl === undefined ? undefined : findSubtitleTrack(ctrl, label);
@@ -902,33 +903,34 @@ struct SubtitleSearchSheetInner {
         List({ space: 0 }) {
           ForEach(this.items, (it: SubtitleSearchItem, index: number): void => {
             ListItem() {
-              Row({ space: 10 }) {
-                Text(`${index + 1}.`)
-                  .fontSize(12)
-                  .fontColor(subText())
-                  .width(26)
-                Column({ space: 6 }) {
+              Column({ space: 6 }) {
+                Row({ space: 10 }) {
+                  Text(`${index + 1}.`)
+                    .fontSize(12)
+                    .fontColor(subText())
+                    .width(26)
                   Text(it.title())
                     .fontSize(15)
                     .fontColor(onSurface())
                     .maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .width('100%')
-                  Row({ space: 10 }) {
-                    this.Chip(`${L10n.t('player_subtitle_language', '语言')}: ` +
-                      (it.language.length > 0 ? it.language
-                        : L10n.t('player_subtitle_language_unknown', '未知')))
-                    this.Chip(`${L10n.t('player_subtitle_type', '类型')}: ` +
-                      (it.ext.length > 0 ? it.ext : '-'))
-                  }
+                    .layoutWeight(1)
+                  SymbolGlyph($r('sys.symbol.square_and_arrow_down'))
+                    .fontSize(20)
+                    .fontColor([subText()])
                 }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-                SymbolGlyph($r('sys.symbol.square_and_arrow_down'))
-                  .fontSize(20)
-                  .fontColor([subText()])
+                .width('100%')
+                .alignItems(VerticalAlign.Center)
+                Row({ space: 10 }) {
+                  this.Chip(`${L10n.t('player_subtitle_language', '语言')}: ` +
+                    (it.language.length > 0 ? it.language
+                      : L10n.t('player_subtitle_language_unknown', '未知')))
+                  this.Chip(`${L10n.t('player_subtitle_type', '类型')}: ` +
+                    (it.ext.length > 0 ? it.ext : '-'))
+                }
+                .padding({ left: 36 })
               }
-              .alignItems(VerticalAlign.Center)
+              .alignItems(HorizontalAlign.Start)
               .width('100%')
               .padding({ left: 20, right: 20, top: 10, bottom: 10 })
               .onClick(() => {
