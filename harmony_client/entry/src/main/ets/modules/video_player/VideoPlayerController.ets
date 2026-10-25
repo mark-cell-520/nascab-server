@@ -155,6 +155,7 @@ export class VideoPlayerController {
   private skipOutroSuppressedByResume: boolean = false;
   private webSubtitleCacheKey: string = '';
   private webSubtitleLoading: boolean = false;
+  private webSubtitleQueuedKey: string = '';
   private speedBeforeBoost: number = 1.0;
   private deviceId: string = '';
 
@@ -378,9 +379,6 @@ export class VideoPlayerController {
     // 造成「超时 → 重建会话 → 超时」无限循环（reloadRetryCount 仅在切片源时重置）。
     this.isRecoveringFromError = false;
 
-    // 字幕：转码/外挂文本走客户端叠层
-    await this.applyClientSubtitleOverlayIfNeeded();
-
     if (this.currentQuality !== 'original') {
       this.positionMs = keepPosition ? lastPositionMs : this.transcodeBaseSeconds * 1000;
     }
@@ -447,6 +445,9 @@ export class VideoPlayerController {
     this.engine.setVolume(this.volume);
     this.isInitialized = true;
     this.isPlaying = true;
+    // 字幕叠层在起播后再异步加载：未命中缓存时服务端要现提取（ffmpeg），
+    // 若在 engine.open 之前 await，会一直卡到提取完成才起播（原画同样受影响）。
+    void this.applyClientSubtitleOverlayIfNeeded();
     if (shouldShowResumeTip) {
       this.startResumeTip(RESUME_TIP_THRESHOLD_SEC);
     }
@@ -928,6 +929,7 @@ export class VideoPlayerController {
     this.webSubtitleCues = [];
     this.webActiveSubtitleText = '';
     this.webSubtitleCacheKey = '';
+    this.webSubtitleQueuedKey = '';
   }
 
   webUpdateActiveCue(): void {
@@ -974,6 +976,12 @@ export class VideoPlayerController {
       return;
     }
     if (this.webSubtitleLoading) {
+      // 已有请求在途：记下最新要加载的字幕，等当前请求结束后再补一次，
+      // 否则切字幕会被静默丢弃（未命中缓存时服务端提取较慢，很容易撞上）。
+      if (key !== this.webSubtitleCacheKey) {
+        this.webSubtitleQueuedKey = key;
+        this.webSubtitleCacheKey = key;
+      }
       return;
     }
     this.webSubtitleLoading = true;
@@ -981,6 +989,9 @@ export class VideoPlayerController {
     try {
       const body = await this.apiService.getSubtitleVtt(item.path, idx,
         track.isExternal ? track.path : '');
+      if (this.webSubtitleCacheKey !== key) {
+        return;
+      }
       if (body === undefined) {
         this.webSubtitleCues = [];
         this.webActiveSubtitleText = '';
@@ -989,10 +1000,18 @@ export class VideoPlayerController {
       this.webSubtitleCues = parseWebVtt(body);
       this.webUpdateActiveCue();
     } catch (_e) {
+      if (this.webSubtitleCacheKey !== key) {
+        return;
+      }
       this.webSubtitleCues = [];
       this.webActiveSubtitleText = '';
     } finally {
       this.webSubtitleLoading = false;
+      const queued = this.webSubtitleQueuedKey;
+      if (queued.length > 0) {
+        this.webSubtitleQueuedKey = '';
+        void this.loadWebSubtitleIfNeeded(true);
+      }
     }
   }
 
