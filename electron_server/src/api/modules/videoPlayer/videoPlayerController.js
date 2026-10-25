@@ -31,10 +31,13 @@ function _isBitmapSubtitleCodec(codecName) {
   );
 }
 
-async function _fileExistsNonEmpty(p) {
+/** VTT 缓存必须至少包含一条 cue，编码异常时 ffmpeg 可能只输出 WEBVTT 头 */
+async function _isUsableVttFile(p) {
   try {
     const st = await fs.promises.stat(p);
-    return st && st.isFile() && Number(st.size) > 0;
+    if (!st || !st.isFile() || Number(st.size) <= 7) return false;
+    const text = await fs.promises.readFile(p, 'utf8');
+    return text.indexOf('-->') >= 0;
   } catch (_) {
     return false;
   }
@@ -577,7 +580,7 @@ class VideoPlayerController {
       await fs.promises.mkdir(cacheDir, { recursive: true });
       const outPath = path.join(cacheDir, `s_${subtitleIndex}.vtt`);
 
-      if (await _fileExistsNonEmpty(outPath)) {
+      if (await _isUsableVttFile(outPath)) {
         res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
         return res.sendFile(outPath);
@@ -643,7 +646,7 @@ class VideoPlayerController {
         });
       }
 
-      if (!(await _fileExistsNonEmpty(outPath))) {
+      if (!(await _isUsableVttFile(outPath))) {
         return res.status(500).json({
           success: false,
           code: 'SUBTITLE_VTT_MISSING',

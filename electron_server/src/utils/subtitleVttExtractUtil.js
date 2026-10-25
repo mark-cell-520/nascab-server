@@ -33,6 +33,60 @@ async function fileExistsNonEmpty(p) {
   }
 }
 
+/** 可用的 VTT 缓存必须至少包含一条 cue，避免把编码异常产生的空 WEBVTT 当成成功结果缓存 */
+async function vttFileHasCue(p) {
+  if (!(await fileExistsNonEmpty(p))) return false;
+  try {
+    const text = await fs.promises.readFile(p, 'utf8');
+    return text.indexOf('-->') >= 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+const TEXT_SUBTITLE_EXTS = ['.srt', '.ass', '.ssa', '.vtt', '.sub'];
+
+/**
+ * 外挂文本字幕常见 GBK/ANSI 编码：ffmpeg 默认按 UTF-8 解码会整条 decode error，
+ * 输出只有 WEBVTT 头的空文件，客户端因此看不到任何字幕。
+ * 返回需要传给 ffmpeg 的 -sub_charenc 值；UTF-8 或带 BOM 的文件返回 ''（无需指定）。
+ */
+function detectSubtitleCharset(filePath) {
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    if (!TEXT_SUBTITLE_EXTS.includes(ext)) return '';
+    const st = fs.statSync(filePath);
+    if (!st.isFile() || Number(st.size) === 0) return '';
+    const readLen = Math.min(Number(st.size), 1024 * 1024);
+    const buf = Buffer.allocUnsafe(readLen);
+    const fd = fs.openSync(filePath, 'r');
+    let n = 0;
+    try {
+      n = fs.readSync(fd, buf, 0, readLen, 0);
+    } finally {
+      fs.closeSync(fd);
+    }
+    if (n <= 0) return '';
+    const head = buf.subarray(0, n);
+    // UTF-8 BOM / UTF-16 BOM：ffmpeg 能自行识别
+    if (head.length >= 3 && head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf) return '';
+    if (head.length >= 2 &&
+      ((head[0] === 0xff && head[1] === 0xfe) || (head[0] === 0xfe && head[1] === 0xff))) {
+      return '';
+    }
+    try {
+      // stream 模式下不会因为末尾截断的多字节字符误判
+      new TextDecoder('utf-8', { fatal: true }).decode(head, { stream: true });
+      return '';
+    } catch (_) {
+      // 非 UTF-8，按 GB18030（兼容 GBK/GB2312）解码
+      return 'gb18030';
+    }
+  } catch (_) {
+    return '';
+  }
+}
+
 async function extractAllToVtt({ fileHash, filePath, subtitleCodecs }) {
   const input = path.resolve(String(filePath || '').trim());
   if (!input) return { ok: false, code: 'INVALID_PATH', message: 'invalid filePath' };
@@ -71,7 +125,7 @@ async function extractAllToVtt({ fileHash, filePath, subtitleCodecs }) {
       continue;
     }
     const outPath = path.join(cacheDir, `s_${i}.vtt`);
-    if (await fileExistsNonEmpty(outPath)) {
+    if (await vttFileHasCue(outPath)) {
       generated.push({ subtitleIndex: i, outPath, cached: true });
       continue;
     }
@@ -81,7 +135,12 @@ async function extractAllToVtt({ fileHash, filePath, subtitleCodecs }) {
 
   if (toGenerate.length > 0) {
     const inputPath = transCodeUtil.dealFfmpegPath(input);
-    const args = ['-y', '-nostdin', '-i', inputPath, '-vn', '-an'];
+    const inputCharset = detectSubtitleCharset(input);
+    const args = ['-y', '-nostdin'];
+    if (inputCharset) {
+      args.push('-sub_charenc', inputCharset);
+    }
+    args.push('-i', inputPath, '-vn', '-an');
     for (const item of toGenerate) {
       args.push('-map', `0:s:${item.subtitleIndex}`, '-c:s', 'webvtt', '-f', 'webvtt', item.tmpPath);
     }
@@ -131,9 +190,10 @@ async function extractAllToVtt({ fileHash, filePath, subtitleCodecs }) {
       try {
         await fs.promises.rm(item.outPath, { force: true }).catch(() => null);
         await fs.promises.rename(item.tmpPath, item.outPath);
-        if (await fileExistsNonEmpty(item.outPath)) {
+        if (await vttFileHasCue(item.outPath)) {
           generated.push({ subtitleIndex: item.subtitleIndex, outPath: item.outPath, cached: false });
         } else {
+          await fs.promises.rm(item.outPath, { force: true }).catch(() => null);
           skipped.push({ subtitleIndex: item.subtitleIndex, codec: item.codec, reason: 'empty_output' });
         }
       } catch (e) {
