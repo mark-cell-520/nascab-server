@@ -695,6 +695,10 @@ class VideoPlayerService {
         note: directPlay.note,
         videoCodec: directPlay.videoCodec,
         audioCodecs: directPlay.audioCodecs,
+        // 拿去问浏览器的候选 mime。注意 ok 只是「主流浏览器交集」的参考，
+        // 前端必须用 MediaSource.isTypeSupported 实测后才是结论——HEVC 在
+        // Safari 和带硬解的 Windows Edge/Chrome 上都能放，服务端不能一口断定。
+        mimeCandidates: webPlayableUtil.mimeCandidates(directPlay),
       },
     };
   }

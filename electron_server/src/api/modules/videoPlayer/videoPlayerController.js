@@ -116,31 +116,23 @@ function _isMp4CompatibleAudioCodec(codecName) {
 }
 
 /**
- * 这个源能不能原样推给浏览器（视频音频都不动）
+ * copy 路径下音频是否要转 aac。
  *
- * 上游只对 `.mov` 做音频回退，视频编码从头到尾没看过。改成按编码判断：
- * 只要有任一路音频浏览器解不了，copy 路径就把那一路转成 aac；视频编码
- * 解不了时必须重编码视频（HEVC / MPEG-4 Part2 都属此类），否则播放器只会
- * 收到一个必然失败的流。探测失败时返回 null，按「可以 copy」处理——
- * 让播放器自己报错，比在这里误杀原画直连好。
+ * 保持上游原样：只对 `.mov` 生效。曾经改成「按编码判断、与容器无关」，
+ * 那会让每个容器都多跑一次 ffprobe——原画直连的关键路径上平白多一次探测，
+ * 4K 大文件起播明显变慢，而真正需要它的场景（前端已知 directPlay 不可播）
+ * 已经由前端切档位解决了。所以这里退回最小改动。
  */
-async function _planWebPlayable(db, filePath) {
-  try {
-    const result = await videoPlayerService.getCachedOrProbeVideoInfo(db, filePath);
-    const streams =
-      result && result.videoInfo && Array.isArray(result.videoInfo.streams) ? result.videoInfo.streams : [];
-    if (!streams.length) return null;
-    return webPlayableUtil.analyzeDirectPlay(streams);
-  } catch (_) {
-    return null;
-  }
-}
+async function _shouldFallbackMovCopyAudio(db, filePath) {
+  const ext = path.extname(_normalizeText(filePath)).toLowerCase();
+  if (ext !== '.mov') return false;
 
-/** copy 路径下音频是否要转 aac（原 `.mov` 专用，现按编码判断，与容器无关） */
-async function _shouldFallbackCopyAudio(db, filePath) {
-  const plan = await _planWebPlayable(db, filePath);
-  if (!plan) return false;
-  return !plan.audioCopy;
+  const result = await videoPlayerService.getCachedOrProbeVideoInfo(db, filePath).catch(() => null);
+  const streams = result && result.videoInfo && Array.isArray(result.videoInfo.streams) ? result.videoInfo.streams : [];
+  const audioStream = streams.find(s => s && s.codec_type === 'audio');
+  if (!audioStream) return false;
+
+  return !_isMp4CompatibleAudioCodec(audioStream.codec_name);
 }
 
 /** Subtitle codecs that can be remuxed into MP4 with -c copy (bitmap / exotic subs still excluded). */
@@ -1102,17 +1094,20 @@ class VideoPlayerController {
             : 0;
       const targetBitrate = tier && tier.bitrate ? tier.bitrate : _normalizeText(req.query && req.query.bitrate);
       const needsScale = targetWidth > 0;
+      // 只按「要不要缩放」决定重编码。原来这里还会按编码判断（源里有浏览器解不了的
+      // 编码就退到重编码），那个方向是错的：HEVC 能不能放取决于浏览器和平台——
+      // Safari、以及 Windows 上带 HEVC 硬解的 Edge/Chrome 都能放，服务端拿一张
+      // 硬编码的表去猜必然误判。4K HEVC 被误判的代价尤其大：libx264 实时编码 4K
+      // 根本跟不上，原本能硬解直看的原片反而卡成幻灯片。
+      // 所以这里不再自己探测编码，「要不要转码」交给前端用浏览器实测能力决定
+      // （见 pages-media.js 的 autoSwitchOffDirectPlay），服务端只负责把档位执行好。
+      const effectiveMode = needsScale ? 'transcode' : mode;
       const scaleFilter = needsScale ? videoQualityUtil.scaleFilter(targetWidth) : null;
       const resolvedPath = path.resolve(filePath);
       if (!fs.existsSync(resolvedPath)) {
         res.status(404).send('Not Found');
         return;
       }
-      // 浏览器解不了的编码必须重编码，否则 copy 出去只是一个必然失败的流。
-      // 这一条让「原画」档位在 HEVC / DTS 这类源上也能放（画质不缩放，只换编码）。
-      const webPlan = await _planWebPlayable(req.dbVideo, resolvedPath);
-      const needsVideoEncode = !!webPlan && !webPlan.videoCopy;
-      const effectiveMode = needsScale || needsVideoEncode ? 'transcode' : mode;
       const inputPath = transCodeUtil.dealFfmpegPath(resolvedPath);
       const subInputPathBase =
         useExternalSubtitle && resolvedSubtitlePath
@@ -1144,7 +1139,7 @@ class VideoPlayerController {
         }
         cmd.outputOptions(['-movflags', 'frag_keyframe+empty_moov+delay_moov']).outputFormat('mp4');
         if (effectiveMode === 'copy') {
-          const fallbackMovAudio = await _shouldFallbackCopyAudio(req.dbVideo, resolvedPath);
+          const fallbackMovAudio = await _shouldFallbackMovCopyAudio(req.dbVideo, resolvedPath);
           const subPlan =
             actuallyUseExternalSubtitle
               ? { mapOptions: [], subtitleCodecOptions: [] }

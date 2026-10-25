@@ -1271,9 +1271,47 @@ function __register(N) {
    * 用户看到提示接着看到错误，比没有提示更难受。这里反过来：先确认放不出来，
    * 切过去并等流真正开始（playing 事件）再告知，切失败了由 onVideoError 说清原因。
    */
+  /**
+   * 浏览器自己说放不放得了这个编码。
+   *
+   * 服务端的 directPlay 只是「主流浏览器交集」的参考，不能当结论用——HEVC 就是
+   * 活例子：Safari 能放，Windows 上带 HEVC 硬解的 Edge/Chrome 也能放，服务端
+   * 一张硬编码的表必然误判，而误判的代价是让原本能硬解直看的 4K 原片去走实时
+   * 重编码（4K 的 libx264 服务器跟不上，反而看不了）。
+   * 所以最终以浏览器为准：MediaSource.isTypeSupported 和 canPlayType 有一个说
+   * 能播就当能播，两个都说不能才认定放不出来。
+   */
+  function browserCanPlay(mime) {
+    if (!mime) return false;
+    try {
+      const MS = window.MediaSource;
+      if (MS && typeof MS.isTypeSupported === 'function' && MS.isTypeSupported(mime)) return true;
+    } catch (_) {}
+    try {
+      const v = document.createElement('video');
+      if (v && typeof v.canPlayType === 'function' && v.canPlayType(mime)) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  /** 浏览器放得了原片吗？服务端给出候选 mime，逐个问浏览器 */
+  function canDirectPlayInThisBrowser() {
+    const dp = V.directPlay;
+    if (!dp) return true;                       // 没信息就当能放，别误杀原画
+    const list = Array.isArray(dp.mimeCandidates) ? dp.mimeCandidates : [];
+    if (!list.length) return true;              // 老服务端没这个字段，保持原行为
+    return list.some(browserCanPlay);
+  }
+
   function autoSwitchOffDirectPlay() {
     if (V._autoSwitched) return;
     if (!V.directPlay || V.directPlay.ok) return;
+    // 浏览器实测放得了就保持原画。这一步是「昨天还能直接看 4K 原片」的保证：
+    // 服务端说不在交集里，但浏览器说自己能硬解，那就该直连。
+    if (canDirectPlayInThisBrowser()) {
+      V.directPlay = Object.assign({}, V.directPlay, { ok: true, reason: '', note: '' });
+      return;
+    }
     if (V.quality === 'original') {
       V._autoSwitched = true;
       const tier = V.qualities.find(q => q.recommended && q.available)

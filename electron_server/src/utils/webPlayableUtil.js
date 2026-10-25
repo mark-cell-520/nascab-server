@@ -179,6 +179,64 @@ function isMp4CompatibleAudioCodec(codec) {
   return new Set(['aac', 'alac', 'ac3', 'eac3', 'ec3', 'mp3', 'mp2']).has(c);
 }
 
+/**
+ * 编码 → MediaSource 用的 codec 字符串。
+ *
+ * 给前端做能力实测用（`MediaSource.isTypeSupported('video/mp4; codecs="..."')`）。
+ * 服务端的黑名单只是「主流浏览器交集」的参考，最终能不能放要浏览器自己说——
+ * HEVC 就是反例：Safari 与带 HEVC 硬解的 Windows Edge/Chrome 都能放，服务端
+ * 一口咬定放不了，就会把原本能硬解直看的 4K 原片推上实时重编码。
+ * 所以这里给的是「可以拿去问浏览器」的候选，不是结论。
+ */
+const VIDEO_CODEC_STRINGS = {
+  h264: 'avc1.640028',       // High@4.0，最通用的一档
+  hevc: 'hvc1.1.6.L93.B0',   // Main profile
+  vp8: 'vp8',
+  vp9: 'vp9',
+  av1: 'av01.0.08M.08',
+  mpeg4: 'mp4v.20.9',
+};
+
+const AUDIO_CODEC_STRINGS = {
+  aac: 'mp4a.40.2',
+  mp3: 'mp4a.40.34',
+  ac3: 'ac-3',
+  eac3: 'ec-3',
+  ec3: 'ec-3',
+  opus: 'opus',
+  vorbis: 'vorbis',
+  flac: 'flac',
+  alac: 'alac',
+};
+
+function videoCodecString(codec) {
+  return VIDEO_CODEC_STRINGS[codecStem(codec)] || '';
+}
+
+function audioCodecString(codec) {
+  return AUDIO_CODEC_STRINGS[codecStem(codec)] || '';
+}
+
+/**
+ * 生成给前端实测的 mime 候选。
+ * @param {{videoCodec?:string, audioCodecs?:string[]}} src
+ * @returns {string[]} 形如 ['video/mp4; codecs="hvc1.1.6.L93.B0,mp4a.40.2"', ...]
+ *
+ * 给多个候选而不是一个：视频单独一个（有些源没音轨）、视频+第一路音频一个
+ * （真实播放要的是这个）、视频+其余音频轨各一个（切音轨后要能放）。
+ * 前端只要有一个候选浏览器说能播，就保持原画直连。
+ */
+function mimeCandidates(src) {
+  const v = videoCodecString(src && src.videoCodec);
+  if (!v) return [];
+  const audios = (src && Array.isArray(src.audioCodecs) ? src.audioCodecs : [])
+    .map(audioCodecString)
+    .filter(Boolean);
+  const out = [`video/mp4; codecs="${v}"`];
+  audios.forEach(a => out.push(`video/mp4; codecs="${v},${a}"`));
+  return out;
+}
+
 module.exports = {
   WEB_AUDIO_CODECS,
   WEB_VIDEO_CODECS,
@@ -190,4 +248,7 @@ module.exports = {
   isMp4CompatibleAudioCodec,
   pickStreams,
   analyzeDirectPlay,
+  videoCodecString,
+  audioCodecString,
+  mimeCandidates,
 };
