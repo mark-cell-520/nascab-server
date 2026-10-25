@@ -22,7 +22,8 @@ if (platform === 'mac' && arch !== 'x64' && arch !== 'arm64') {
 }
 
 var binaryName = platform === 'win' ? 'transmission-daemon.exe' : 'transmission-daemon';
-var transmissionPath = path.join(config.getRootPath(), 'libs', 'transmission', platform, arch, binaryName);
+// libs 根目录可通过 NASCAB_LIBS_DIR / libs.dir 覆盖，默认 <应用根目录>/libs
+var transmissionPath = path.join(config.getLibsPath(), 'transmission', platform, arch, binaryName);
 try {
   if (os.platform() === 'linux' && fs.existsSync(transmissionPath)) {
     fs.chmodSync(transmissionPath, 0o755);

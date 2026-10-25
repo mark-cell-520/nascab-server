@@ -6,6 +6,7 @@ const dbUtil = require('../db/dbUtil');
 const tableConfig = require('../db/table/tableConfig');
 const tableUser = require('../db/table/tableUser');
 const jwtUtil = require('../utils/jwtUtil');
+const runtimeFlags = require('../utils/runtimeFlags');
 const config = require('../config/config');
 
 let packageJson = {};
@@ -92,7 +93,7 @@ module.exports = {
       if (electronApp) return;
 
       const isInitialFlag = await tableConfig.getConfigByKey(tableConfig.KEY_IS_INITIAL_ADMIN, 0);
-      if (isInitialFlag === '1' && !packageJson.isDocker) return;
+      if (isInitialFlag === '1' && !runtimeFlags.isDocker()) return;
 
       const knexMain = knexUtil.getInstance(dbUtil.DB_PATHS.MAIN_DB);
       const row = await knexMain('user').where({ type: tableUser.TYPE_SUPER_ADMIN }).first();

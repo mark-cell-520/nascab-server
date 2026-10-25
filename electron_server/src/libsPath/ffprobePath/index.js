@@ -1,6 +1,7 @@
 var os = require('os');
 var path = require('path');
 const config = require('../../config/config');
+const runtimeFlags = require('../../utils/runtimeFlags');
 var package = require('../../../package.json');
 var fs = require('fs');
 
@@ -22,8 +23,8 @@ if (platform === 'mac' && arch !== 'x64' && arch !== 'arm64') {
   console.error('Unsupported architecture.');
   process.exit(1);
 }
-var ffprobePath = path.join(config.getRootPath(), 'libs', 'ffprobe', 'bin', platform, arch, platform === 'win' ? 'ffprobe.exe' : 'ffprobe');
-if (package.isDocker) {
+var ffprobePath = path.join(config.getLibsPath(), 'ffprobe', 'bin', platform, arch, platform === 'win' ? 'ffprobe.exe' : 'ffprobe');
+if (runtimeFlags.isDocker()) {
   //docker下使用系统的ffprobe
   ffprobePath = 'ffprobe';
 } else {

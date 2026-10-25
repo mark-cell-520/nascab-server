@@ -178,7 +178,13 @@ function sha256FileSync(filePath) {
 
 function resolveBundledPath(relativePath) {
   const rel = normalizeRelPath(relativePath);
-  return path.join(config.getRootPath(), ...rel.split('/'));
+  const parts = rel.split('/');
+  // libs/ 下的外部二进制支持通过 NASCAB_LIBS_DIR / libs.dir 指向独立目录，
+  // 便于服务器部署把二进制放到只读镜像之外的数据卷，或按平台分发到 /opt/nascab/libs
+  if (parts[0] === 'libs' && parts.length > 1 && typeof config.getLibsPath === 'function') {
+    return path.join(config.getLibsPath(), ...parts.slice(1));
+  }
+  return path.join(config.getRootPath(), ...parts);
 }
 
 function resolvePath(relativePath) {
@@ -190,6 +196,10 @@ function resolvePath(relativePath) {
 }
 
 function resolveOnnxModelsRoot() {
+  // 支持通过 NASCAB_ONNX_DIR / onnx.dir 指向独立模型目录
+  if (typeof config.getOnnxModelsPath === 'function') {
+    return config.getOnnxModelsPath();
+  }
   return resolvePath('onnx_models');
 }
 

@@ -1,6 +1,7 @@
 var os = require('os');
 var path = require('path');
 const config = require('../../config/config');
+const runtimeFlags = require('../../utils/runtimeFlags');
 var package = require('../../../package.json');
 const fs = require('fs');
 
@@ -23,8 +24,9 @@ if (platform === 'mac' && arch !== 'x64' && arch !== 'arm64') {
   process.exit(1);
 }
 
-var ffmpegPath = path.join(config.getRootPath(), 'libs', 'ffmpeg', 'bin', platform, arch, platform === 'win' ? 'ffmpeg.exe' : 'ffmpeg');
-if (package.isDocker) {
+// libs 根目录可通过 NASCAB_LIBS_DIR / libs.dir 覆盖，默认 <应用根目录>/libs
+var ffmpegPath = path.join(config.getLibsPath(), 'ffmpeg', 'bin', platform, arch, platform === 'win' ? 'ffmpeg.exe' : 'ffmpeg');
+if (runtimeFlags.isDocker()) {
   //docker下使用系统的ffmpeg
   ffmpegPath = 'ffmpeg';
 } else {

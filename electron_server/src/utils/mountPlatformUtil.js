@@ -1,10 +1,12 @@
+const runtimeFlags = require('./runtimeFlags');
+
 let packageJson = {};
 try {
   packageJson = require('../../package.json');
 } catch (_) {}
 
 function isDockerServer() {
-  return !!packageJson.isDocker;
+  return runtimeFlags.isDocker();
 }
 
 function assertMountSupportedOnPlatform(msgKey = 'fileMount.PLATFORM_NOT_SUPPORTED') {
