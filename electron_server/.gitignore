@@ -8,6 +8,9 @@ libs/ffmpeg/**/*
 libs/ffprobe/**/*
 libs/openlist/**/*
 libs/rclone/**/*
+# 第三方预编译可执行文件：体积大且属构建产物，不入库，取回办法见根目录 README
+libs/sftpgo/**/*
+libs/transmission/**/*
 onnx_models/**/*
 python/env/python-mac-arm64/**/*
 python/env/python-win-x64/**/*
