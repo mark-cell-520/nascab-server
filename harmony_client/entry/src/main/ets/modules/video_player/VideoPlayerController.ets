@@ -35,6 +35,10 @@ const RESUME_TIP_THRESHOLD_SEC = 10;
 const TRANSCODE_SEEK_DEBOUNCE_MS = 300;
 /** 播放失败重试上限 */
 const MAX_RELOAD_RETRIES = 2;
+/** 字幕 VTT 请求失败后的重试间隔（服务端首次提取可能超过单次请求时长） */
+const SUBTITLE_VTT_RETRY_INTERVAL_MS = 3000;
+/** 字幕 VTT 重试次数上限 */
+const SUBTITLE_VTT_MAX_RETRIES = 6;
 
 /**
  * 服务端 TranscodeWorker 用 UUID 校验 playId
@@ -156,6 +160,8 @@ export class VideoPlayerController {
   private webSubtitleCacheKey: string = '';
   private webSubtitleLoading: boolean = false;
   private webSubtitleQueuedKey: string = '';
+  private webSubtitleRetryTimer: number = -1;
+  private webSubtitleRetryCount: number = 0;
   private speedBeforeBoost: number = 1.0;
   private deviceId: string = '';
 
@@ -792,6 +798,8 @@ export class VideoPlayerController {
       'setSubtitleTrack label=%{public}s prevBitmap=%{public}s nextBitmap=%{public}s quality=%{public}s',
       trackLabel, String(prevBitmap), String(nextBitmap), this.currentQuality);
     this.currentSubtitleTrack = trackLabel;
+    this.cancelWebSubtitleRetry();
+    this.webSubtitleRetryCount = 0;
     this.savePreference();
 
     if (this.currentQuality === 'original') {
@@ -812,7 +820,8 @@ export class VideoPlayerController {
         this.webClearSubtitle();
         return;
       }
-      await this.loadWebSubtitleIfNeeded(true);
+      // 不阻塞字幕菜单：未命中缓存时服务端提取可能较久，加载完成后叠层会自动显示
+      void this.loadWebSubtitleIfNeeded(true);
       return;
     }
 
@@ -820,7 +829,7 @@ export class VideoPlayerController {
     if (nextBitmap || prevBitmap) {
       await this.initializePlayer(true, this.absolutePlaybackPositionMs());
       if (!nextBitmap) {
-        await this.loadWebSubtitleIfNeeded(true);
+        void this.loadWebSubtitleIfNeeded(true);
       }
       return;
     }
@@ -828,7 +837,7 @@ export class VideoPlayerController {
       this.webClearSubtitle();
       return;
     }
-    await this.loadWebSubtitleIfNeeded(true);
+    void this.loadWebSubtitleIfNeeded(true);
   }
 
   /**
@@ -930,6 +939,38 @@ export class VideoPlayerController {
     this.webActiveSubtitleText = '';
     this.webSubtitleCacheKey = '';
     this.webSubtitleQueuedKey = '';
+    this.cancelWebSubtitleRetry();
+    this.webSubtitleRetryCount = 0;
+  }
+
+  private cancelWebSubtitleRetry(): void {
+    if (this.webSubtitleRetryTimer >= 0) {
+      clearTimeout(this.webSubtitleRetryTimer);
+      this.webSubtitleRetryTimer = -1;
+    }
+  }
+
+  /**
+   * 服务端首次提取字幕可能超过单次请求时长（请求超时或 504），但 worker 会继续生成并落缓存，
+   * 因此定时重试，命中缓存后字幕即可自动出现，无需退出重进。
+   */
+  private scheduleWebSubtitleRetry(): void {
+    if (this.webSubtitleRetryTimer >= 0 ||
+      this.webSubtitleRetryCount >= SUBTITLE_VTT_MAX_RETRIES) {
+      return;
+    }
+    this.webSubtitleRetryTimer = setTimeout(() => {
+      this.webSubtitleRetryTimer = -1;
+      if (this.currentIsNoSubtitle || this.webSubtitleCues.length > 0) {
+        return;
+      }
+      if (this.webSubtitleLoading) {
+        this.scheduleWebSubtitleRetry();
+        return;
+      }
+      this.webSubtitleRetryCount += 1;
+      void this.loadWebSubtitleIfNeeded(true);
+    }, SUBTITLE_VTT_RETRY_INTERVAL_MS);
   }
 
   webUpdateActiveCue(): void {
@@ -995,9 +1036,12 @@ export class VideoPlayerController {
       if (body === undefined) {
         this.webSubtitleCues = [];
         this.webActiveSubtitleText = '';
+        this.scheduleWebSubtitleRetry();
         return;
       }
       this.webSubtitleCues = parseWebVtt(body);
+      this.webSubtitleRetryCount = 0;
+      this.cancelWebSubtitleRetry();
       this.webUpdateActiveCue();
     } catch (_e) {
       if (this.webSubtitleCacheKey !== key) {
@@ -1005,6 +1049,7 @@ export class VideoPlayerController {
       }
       this.webSubtitleCues = [];
       this.webActiveSubtitleText = '';
+      this.scheduleWebSubtitleRetry();
     } finally {
       this.webSubtitleLoading = false;
       const queued = this.webSubtitleQueuedKey;

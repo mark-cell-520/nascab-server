@@ -137,7 +137,8 @@ export class VideoPlayerApiService {
         method: http.RequestMethod.GET,
         header: authHeader(token),
         connectTimeout: 15000,
-        readTimeout: 30000
+        // 服务端首次提取字幕最长等待 60s，客户端需留余量，否则会在提取完成前先超时
+        readTimeout: 65000
       });
       if (resp.responseCode >= 200 && resp.responseCode < 300) {
         const text = resp.result as string;
