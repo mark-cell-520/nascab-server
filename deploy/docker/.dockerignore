@@ -1,0 +1,16 @@
+# Docker 构建时排除的文件（上下文根为 electron_server）
+node_modules
+npm-debug.log*
+logs
+data
+dist
+tmp
+web
+build
+.git
+.gitignore
+.DS_Store
+*.log
+.env
+.env.*
+config.json

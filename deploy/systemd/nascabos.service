@@ -1,0 +1,73 @@
+[Unit]
+# NasCabOS 服务端 - systemd 服务单元
+# 安装：sudo cp deploy/systemd/nascabos.service /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now nascabos
+Description=NasCabOS NAS Server
+Documentation=https://nas.cab
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 运行身份：默认 nobody。若数据目录 / libs 在其它属主下，改成对应用户（如 nascab）
+User=nascab
+Group=nascab
+
+# 应用根目录（package.json 所在目录）。按实际部署路径修改
+WorkingDirectory=/opt/nascab/app
+ExecStart=/usr/bin/node src/main_nascab_os.js
+
+# ---- 环境变量（与 config.json 二选一即可，环境变量优先）----
+Environment=NODE_ENV=production
+Environment=NASCAB_IS_DOCKER=0
+Environment=NASCAB_DATA_DIR=/var/lib/nascabos
+Environment=NASCAB_LIBS_DIR=/opt/nascab/libs
+Environment=NASCAB_ONNX_DIR=/opt/nascab/onnx_models
+Environment=NASCAB_LOG_DIR=/var/log/nascabos
+Environment=NASCAB_HOST=0.0.0.0
+Environment=PORT=6789
+Environment=HTTPS_PORT=6799
+# 反代场景下关闭内置 HTTPS，由 Nginx/Caddy 终止 TLS
+Environment=NASCAB_HTTPS_ENABLED=false
+# 服务器部署：禁止端口漂移，端口冲突时快速失败交给 systemd 重启
+Environment=NASCAB_PORT_FALLBACK=false
+Environment=NASCAB_ACCESS_LOG=true
+Environment=NASCAB_WORKER_AUTO_RESTART=true
+# JWT 密钥：生产环境务必设置，并纳入密钥管理（也可写在 config.json 的 security.jwtSecret）
+# Environment=JWT_SECRET=please-change-me
+
+# ---- 重启策略 ----
+Restart=always
+RestartSec=5
+# 优雅停止超时：worker 收尾（transmission 最长 12s）需要时间，给足 60s
+TimeoutStopSec=60
+KillMode=mixed
+KillSignal=SIGTERM
+
+# ---- 资源限制（按机器实际情况调整）----
+LimitNOFILE=65535
+# 图片/视频处理较吃内存，默认不设上限；如需限制可打开下面两行
+# MemoryMax=4G
+# MemoryHigh=3G
+
+# ---- 安全加固 ----
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+# 数据/日志/lib 目录必须可写，单独放行
+ReadWritePaths=/var/lib/nascabos /var/log/nascabos
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+
+# ---- 日志 ----
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nascabos
+
+[Install]
+WantedBy=multi-user.target

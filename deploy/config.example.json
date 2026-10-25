@@ -1,0 +1,64 @@
+{
+  "_README": "NasCabOS 服务端部署配置。放到 <应用根目录>/config.json，或用环境变量 NASCAB_CONFIG 指定路径。优先级：内置默认 < 本文件 < 环境变量。以 _ 开头的字段会被忽略，可自由写注释。",
+  "_locations": "配置文件搜索顺序：NASCAB_CONFIG 指定 > <应用根目录>/config.json > <当前工作目录>/config.json > <用户数据目录>/config.json",
+
+  "server": {
+    "_host": "监听地址。0.0.0.0 监听所有网卡（默认）；仅本机访问或前置反向代理时可设 127.0.0.1",
+    "host": "0.0.0.0",
+    "_port": "HTTP 端口。也可用环境变量 PORT",
+    "port": 6789,
+    "_httpsPort": "HTTPS 端口。也可用环境变量 HTTPS_PORT",
+    "httpsPort": 6799,
+    "_httpsEnabled": "是否启用 HTTPS。反代场景（Nginx/Caddy/Traefik 终止 TLS）建议关闭，避免再维护一套证书",
+    "httpsEnabled": true,
+    "_portFallback": "期望端口被占用时是否顺延到下一个端口。桌面端默认 true；服务器部署强烈建议 false，端口漂移会让探针和反代指向错误端口，快速失败才能被重启策略捕获",
+    "portFallback": false,
+    "_behindProxy": "是否运行在反向代理之后。true 时信任 X-Forwarded-*，req.ip 才能取到真实客户端 IP",
+    "behindProxy": false
+  },
+
+  "data": {
+    "_dir": "用户数据目录（数据库、缓存、证书、单例锁）。留空则按 环境变量userDataFolder > Docker的/nascabos_data > 当前目录/data 推导。也可用环境变量 NASCAB_DATA_DIR",
+    "dir": ""
+  },
+
+  "libs": {
+    "_dir": "外部二进制根目录（ffmpeg/ffprobe/rclone/sftpgo/transmission/openlist）。留空用 <应用根目录>/libs。服务器上可指向独立数据卷，如 /opt/nascab/libs。也可用环境变量 NASCAB_LIBS_DIR",
+    "dir": ""
+  },
+
+  "onnx": {
+    "_dir": "ONNX 模型目录（人脸/OCR/场景识别）。留空用 <应用根目录>/onnx_models。也可用环境变量 NASCAB_ONNX_DIR",
+    "dir": ""
+  },
+
+  "logging": {
+    "_level": "日志级别：error / warn / info / http / verbose / debug / silly。也可用环境变量 LOG_LEVEL",
+    "level": "info",
+    "_dir": "日志目录。留空用 <应用根目录>/logs；该目录不可写时自动回退到 <数据目录>/logs。也可用环境变量 NASCAB_LOG_DIR",
+    "dir": "",
+    "_file": "是否写日志文件",
+    "file": true,
+    "_accessLog": "是否记录 HTTP 访问日志（单独写 access.log，默认关闭）",
+    "accessLog": false,
+    "_rotate": "日志轮转：单文件大小上限（字节）与保留份数。生产建议 20MB x 10",
+    "rotate": {
+      "maxSize": 20971520,
+      "maxFiles": 10
+    }
+  },
+
+  "security": {
+    "_corsOrigins": "CORS 白名单。空数组 = 仅同源 + 本机回环 + file://（桌面客户端默认可用，推荐）；['*'] = 反射任意源（改造前的宽松行为，不推荐）；也可填具体来源数组。环境变量 NASCAB_CORS_ORIGINS 用逗号分隔",
+    "corsOrigins": [],
+    "_jwtSecret": "JWT 签名密钥。留空则沿用原有逻辑（数据库配置或环境变量 JWT_SECRET）。生产环境建议显式指定并纳入密钥管理",
+    "jwtSecret": ""
+  },
+
+  "worker": {
+    "_autoRestart": "worker 进程崩溃后是否自动重启（指数退避 1s→30s）。服务器长时间运行建议开启",
+    "autoRestart": true,
+    "_maxRestarts": "单个 worker 的最大自动重启次数。稳定运行超过 60 秒后重置预算",
+    "maxRestarts": 10
+  }
+}

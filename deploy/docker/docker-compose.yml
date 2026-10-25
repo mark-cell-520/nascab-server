@@ -1,0 +1,77 @@
+# NasCabOS 服务端 - Docker Compose 部署
+# 用法：docker compose -f deploy/docker/docker-compose.yml up -d
+#
+# 构建上下文是 electron_server 目录，因此从仓库根目录执行：
+#   docker compose -f deploy/docker/docker-compose.yml up -d --build
+
+services:
+  nascabos:
+    build:
+      # 构建上下文：electron_server（package.json 所在目录）
+      context: ../../electron_server
+      dockerfile: ../../deploy/docker/Dockerfile
+      args:
+        TARGETPLATFORM: ${TARGETPLATFORM:-linux/amd64}
+    image: nascabos-server:latest
+    container_name: nascabos
+    restart: unless-stopped
+
+    # 端口映射：左侧宿主机端口，右侧容器内端口（与容器内 PORT 保持一致）
+    ports:
+      - "${NASCAB_HTTP_PORT:-6789}:6789"
+      # 反代场景不需要映射 HTTPS；如需直连再打开下一行
+      # - "${NASCAB_HTTPS_PORT:-6799}:6799"
+
+    environment:
+      NODE_ENV: production
+      NASCAB_IS_DOCKER: "1"
+      # 监听所有网卡，容器内必须 0.0.0.0
+      NASCAB_HOST: "0.0.0.0"
+      PORT: "6789"
+      HTTPS_PORT: "6799"
+      # 反代终止 TLS 时关闭内置 HTTPS
+      NASCAB_HTTPS_ENABLED: "${NASCAB_HTTPS_ENABLED:-false}"
+      # 禁止端口漂移：端口冲突时快速失败，交给 restart 策略
+      NASCAB_PORT_FALLBACK: "false"
+      # 反代后置时打开，让 req.ip 取到真实客户端 IP
+      NASCAB_BEHIND_PROXY: "${NASCAB_BEHIND_PROXY:-false}"
+      NASCAB_ACCESS_LOG: "${NASCAB_ACCESS_LOG:-true}"
+      NASCAB_WORKER_AUTO_RESTART: "true"
+      NASCAB_LOG_MAX_SIZE: "20971520"
+      NASCAB_LOG_MAX_FILES: "10"
+      # 生产环境务必修改，并纳入密钥管理
+      JWT_SECRET: "${JWT_SECRET:-change-me-in-production}"
+
+    volumes:
+      # 数据目录：数据库、缓存、证书、日志、单例锁。必须持久化
+      - nascabos-data:/nascabos_data
+      # 媒体库：按需挂载，只读挂载可避免误删源文件
+      # - /srv/media:/media:ro
+      # 下载目录（Transmission 等写入）
+      # - /srv/downloads:/downloads
+
+    # 优雅停止超时：worker 收尾（transmission 最长 12s）需要时间
+    stop_grace_period: 60s
+
+    # 资源限制（按机器实际情况调整）
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 4G
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:6789/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+volumes:
+  nascabos-data:
+    driver: local
