@@ -3,8 +3,8 @@
  * - 由 mpv 负责解封装、解码（ohcodec 硬解）与渲染（gpu-next + OHOS GL），
  *   相比系统 AVPlayer 支持更多容器/编码格式（MKV、RMVB、AVI、VVC 等）。
  * - 对外接口与控制器保持一致：position/duration/seek 均为毫秒，mpv 内部秒值在此转换。
- * - 音轨/字幕：文本字幕由控制器 VTT 叠层绘制（mpv sid=no）；
- *   位图字幕（PGS/VobSub 等）由 mpv 原生渲染，无需转码烧录；音轨切换走后端 aid。
+ * - 音轨/字幕：原画内嵌字幕（文本/位图）由 mpv 原生渲染；
+ *   外挂字幕与转码流字幕由控制器 VTT 叠层绘制；音轨切换走后端 aid。
  */
 
 import { AudioTrack, Media, MpvLogLevel, Player, PlayerConfig, PlayerLog, SubtitleTrack } from '@mpv-ohos/mpv-arkts';
@@ -77,9 +77,8 @@ export class VideoPlayerEngine {
       hwdec: true,
       logLevel: MpvLogLevel.Info
     }));
-    // 默认关闭 mpv 字幕渲染（文本字幕由客户端 VTT 叠层绘制）：在加载前设置一次 sid=no，
-    // 避免在 open 的关键加载阶段写属性干扰 demuxer/轨道初始化；
-    // 位图字幕由控制器在播放开始后显式选轨，交给 mpv 原生渲染。
+    // 默认关闭 mpv 字幕渲染：外挂字幕与转码流由控制器走客户端 VTT 叠层；
+    // 原画内嵌字幕在起播后由控制器显式选轨，交给 mpv 原生渲染（保留 ASS/SSA 样式）。
     this.player.disableSubtitleTrack();
     // 强制保持宽高比：surface 尺寸变化（会话重建/页面重排）时也不会把画面拉伸变形
     this.player.native.setProperty('keepaspect', true);
@@ -345,7 +344,7 @@ export class VideoPlayerEngine {
 
   /**
    * 按同类序号（mapIndex，从 0 开始）选中内嵌字幕，由 mpv 原生渲染。
-   * 文本字幕仍走客户端 VTT 叠层，此方法主要用于 PGS/VobSub 等 mpv 能直接渲染的位图字幕。
+   * 原画下的内嵌文本字幕与位图字幕都走这条路径。
    */
   async selectSubtitleTrackByOrder(orderIndex: number): Promise<boolean> {
     if (this.released) {
@@ -374,7 +373,7 @@ export class VideoPlayerEngine {
     return true;
   }
 
-  /** 关闭 mpv 原生字幕渲染（文本字幕交给客户端 VTT 叠层时调用） */
+  /** 关闭 mpv 原生字幕渲染（外挂字幕/转码字幕交给客户端 VTT 叠层时调用） */
   disableSubtitle(): void {
     if (!this.released) {
       this.player.disableSubtitleTrack();
