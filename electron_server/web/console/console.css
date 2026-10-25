@@ -872,6 +872,76 @@ input[type="range"]::-moz-range-thumb { width: 11px; height: 11px; border: 0; bo
 .qsel__key em { font-style: normal; font-size: 10px; font-weight: 700; color: var(--blue); margin-left: 4px; padding: 1px 4px; border-radius: 4px; background: var(--blue-50); }
 .qsel__item.is-active .qsel__key em { background: var(--blue); color: #fff; }
 .qsel__desc { font-size: 11px; color: var(--text-3); }
+.qsel__item.is-static { cursor: default; }
+.qsel__menu--wide { min-width: 300px; max-width: min(360px, 84vw); max-height: 62vh; overflow: auto; }
+/* 顶栏有 7 个控件，窄屏下先牺牲文字标签保图标，别让播放器溢出视口 */
+@media (max-width: 900px) {
+  .vstage__top { flex-wrap: wrap; }
+  .qsel__btn span { display: none; }
+  .qsel__btn { padding: 0 10px; }
+  .vstage__vol input[type="range"] { width: 56px; }
+}
+.qsel__acts { display: flex; gap: 6px; margin-top: 5px; padding-top: 6px; border-top: 1px solid var(--line); }
+.qsel__acts .btn { flex: 1; }
+.qsel__acts--col { flex-direction: column; gap: 2px; }
+.vswitch { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-xs); font-size: 12px; color: var(--text-2); cursor: pointer; }
+.vswitch:hover { background: var(--bg-sunk); }
+.vswitch input { accent-color: var(--blue); }
+
+/* ---- 播放器：加载态 / 缓冲条 ---- */
+.vstage__load { position: absolute; z-index: 1; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; color: #cbd5e1; font-size: 12.5px; pointer-events: none; }
+.vstage__load[hidden] { display: none; }
+.vstage__spin { width: 30px; height: 30px; border-radius: 50%; border: 2.5px solid rgba(255, 255, 255, .22); border-top-color: #fff; animation: vspin .8s linear infinite; }
+@keyframes vspin { to { transform: rotate(360deg); } }
+.vstage__barwrap { position: relative; flex: 1; display: flex; align-items: center; }
+.vstage__buffered { position: absolute; left: 0; right: 0; top: 50%; height: 4px; transform: translateY(-50%); border-radius: 999px; background: rgba(255, 255, 255, .16); overflow: hidden; pointer-events: none; }
+.vstage__buffered i { display: block; height: 100%; width: 0; background: rgba(255, 255, 255, .34); transition: width .3s ease; }
+.vstage__seek input[type="range"] { position: relative; z-index: 1; }
+
+/* ---- 播放器：音量 / 跳过片头 / 下一集 ---- */
+.vstage__vol { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.vstage__vol input[type="range"] { width: 84px; }
+.vstage__skip { position: absolute; z-index: 2; left: 50%; bottom: 118px; transform: translateX(-50%); height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .92); color: #0f172a; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
+.vstage__skip[hidden] { display: none; }
+.vstage__skip:hover { background: #fff; }
+.vstage__next { position: absolute; z-index: 3; right: 22px; bottom: 112px; display: flex; align-items: center; gap: 8px; max-width: min(420px, 80vw); padding: 10px 12px; border-radius: var(--radius); background: rgba(10, 14, 24, .9); border: 1px solid rgba(255, 255, 255, .16); color: #e2e8f0; font-size: 12px; }
+.vstage__next[hidden] { display: none; }
+.vstage__next span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- 字幕：走原生 <track>，样式只借 ::cue 的口子 ---- */
+#vstage-video::cue {
+  background: var(--cue-bg, rgba(0, 0, 0, .72));
+  color: var(--cue-fg, #fff);
+  font-size: calc(1em * var(--cue-scale, 1));
+  line-height: 1.42;
+  font-family: var(--cue-font, inherit);
+  text-shadow: var(--cue-shadow, 0 1px 2px rgba(0, 0, 0, .9));
+  white-space: pre-line;
+}
+/* 容器才是控制垂直位置的地方，::cue 管不到（Chromium 有效，其余内核忽略） */
+#vstage-video::-webkit-media-text-track-container {
+  bottom: var(--cue-bottom, 7%);
+  transition: bottom .18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vstage__spin { animation-duration: 2.4s; }
+}
+
+/* ---- 字幕外观面板 ---- */
+.cueform { display: grid; gap: 10px; }
+.cueform__row { display: grid; grid-template-columns: 46px 1fr 62px; align-items: center; gap: 10px; font-size: 12.5px; }
+.cueform__row > span { color: var(--text-3); }
+.cueform__row b { font-size: 11.5px; font-weight: 600; text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* ---- 剧集列表 ---- */
+.eplist { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.eplist__hd { font-size: 12px; color: var(--text-3); margin-bottom: 8px; }
+.eplist__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; max-height: 240px; overflow: auto; }
+.eplist__item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius-xs); background: var(--card); color: var(--text); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.eplist__item:hover { border-color: var(--blue); background: var(--blue-50); }
+.eplist__item b { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--bg-sunk); font-size: 11px; }
+.eplist__item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eplist__item i { flex: none; font-style: normal; font-size: 10.5px; color: var(--text-3); }
 
 /* ---- 影片详情 ---- */
 .vdetail { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 16px; }

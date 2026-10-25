@@ -29,7 +29,7 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 
 单页应用，前端路由（刷新 / 直接访问子路径不会 404）。页面：概览、存储管理、用户管理、
 网络服务、安全中心、应用中心、进程管理、系统日志、关于本机；另有 Web 文件管理器与
-挂载 / 分享 / 下载 / 容器四个 NAS 管理页面。
+挂载 / 分享 / 下载 / 容器四个 NAS 管理页面，以及音乐与影视两个媒体页面。
 
 界面做了设计令牌化，浅色 / 暗色双主题：暗色只覆盖 `[data-theme="dark"]` 一层令牌，
 组件规则两边共用。未显式选择时跟随系统 `prefers-color-scheme` 并实时响应，
@@ -43,10 +43,16 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 底部是**常驻播放器栏**，切页面不中断。带播放队列抽屉（上移 / 下移 / 移除 / 点选）、
 顺序 / 随机 / 单曲三种模式、进度拖动、音量、LRC 歌词逐行高亮；队列存 `localStorage`，刷新不丢。
 
-「影视」页：海报墙 + 详情弹层 + 全屏播放器。播放器可选**五档清晰度**
+「影视」页：海报墙 + 详情弹层（含分集列表）+ 全屏播放器。播放器可选**五档清晰度**
 （原画 / 1080P / 720P / 480P / 360P），档位表由 `GET /api/videoPlayer/qualities` 按源分辨率算出——
 源只有 720p 时 1080p 会被禁用并标注「高于源分辨率，不推荐」。切清晰度从当前位置接着播，
 偏好写进 `video_play_preference.quality`。
+
+播放器另外四组能力：**字幕**（内嵌轨 + 外挂文件合成一份菜单，走 `<track>` + WebVTT，
+可调字号/位置/颜色/描边与延时，也支持上传与在线搜索；图像字幕禁用并说明原因）、
+**音轨**（多音轨按 `audioMapIndex` 重封装，切换不断进度）、**倍速**（0.5x–3x）、
+**剧集连播**（分集列表、上一集/下一集、播完自动连播、跳过片头）。
+另有缓冲进度、加载态、音量/静音、全屏、画中画与一套完整快捷键。
 
 这两个页面修掉了上游两处残缺：
 
@@ -54,6 +60,7 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 |---|---|---|
 | 歌单顺序 | `play_list2index` 没有顺序字段；列表按 `m.id desc` 排；`playlist/get` 不返回曲目 | 新增 `position` 列（老库自动补列回填）+ reorder/move/clear 三个接口，列表按 `position` 排 |
 | 清晰度 | `resolution` 只认 `1920x1080`，传 `"1080p"` 被静默忽略；没有档位表；`bitrate` 不带 `-maxrate/-bufsize` | 档位收敛成 `src/utils/videoQualityUtil.js` 一份定义，`/transcode` 与 `/stream-mp4` 共用 |
+| 播放器能力 | Web 端没有任何播放器；服务端有字幕/音轨相关接口但前端无处可用 | 新增 `mediaTrackLabelUtil.js` + `GET /api/videoPlayer/tracks`，字幕/音轨/倍速/连播全部落到 Web 播放器 |
 
 ### 机器控制接口 `/api/control`
 

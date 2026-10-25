@@ -134,6 +134,9 @@ router.get(
 // List selectable quality tiers for a video
 router.get('/qualities', authenticateJWT, requirePermission(['download', 'view'], { from: 'query.filePath' }), videoPlayerController.listQualities);
 
+// List selectable audio / subtitle tracks for a video
+router.get('/tracks', authenticateJWT, requirePermission(['download', 'view'], { from: 'query.filePath' }), videoPlayerController.listTracks);
+
 // Check info
 router.get(
   '/info',

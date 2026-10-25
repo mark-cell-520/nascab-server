@@ -543,7 +543,9 @@ class VideoPlayerController {
         sourcePath = path.resolve(filePathRaw);
       }
       if (!sourcePath || !fs.existsSync(sourcePath)) {
-        return ResponseUtil.error(req, res, 'file.FILE_NOT_EXIST');
+        // 404 而不是默认的 500：播放器列出的外挂字幕可能已被删掉，
+        // 这是常态而不是服务端故障
+        return ResponseUtil.error(req, res, 'file.FILE_NOT_EXIST', 404);
       }
 
       // For embedded subtitles, validate codec (bitmap not supported as VTT)
@@ -695,11 +697,43 @@ class VideoPlayerController {
         const preference = await videoPlayerService
           .getVideoPreference(req.dbVideo, req.user.id, filePath)
           .catch(() => null);
-        if (preference && preference.quality) {
-          payload.preference = { quality: preference.quality };
+        if (preference) {
+          // 整份偏好都返回：播放器一次请求就能恢复清晰度、字幕、音轨与倍速，
+          // 不用再为一个下拉框多发一次 /info
+          payload.preference = {
+            quality: preference.quality || null,
+            subtitle_ref: preference.subtitle_ref || null,
+            audio_index: preference.audio_index == null ? null : Number(preference.audio_index),
+            speed: preference.speed || null,
+            playback_position: Number(preference.playback_position) || 0,
+          };
         }
       }
       return ResponseUtil.success(req, res, payload);
+    } catch (e) {
+      return ResponseUtil.error(req, res, 'videoPlayer.GET_INFO_FAILED', 500, { error: e.message });
+    }
+  }
+
+  /**
+   * 列出可选的音轨与字幕轨
+   * Query: filePath
+   * 响应: { audio: [...], subtitles: [...], openSkip: {startSec,endSec}, source: {width,height} }
+   *
+   * 播放器用这一个请求渲染「音轨 / 字幕」两个菜单，并据此决定：
+   *  - 音轨切换 → 重连流（stream-mp4 的 audioMapIndex）
+   *  - 文本字幕 → <track> 指向 /subtitle-vtt，不重连流
+   *  - 图像字幕 → 菜单里禁用，因为浏览器拿不到文本
+   */
+  async listTracks(req, res) {
+    try {
+      const filePath = req.query && req.query.filePath ? String(req.query.filePath).trim() : '';
+      if (!filePath) {
+        return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+      }
+      const uid = req.user && req.user.id ? req.user.id : 0;
+      const tracks = await videoPlayerService.getTrackInfo(req.dbVideo, filePath, uid);
+      return ResponseUtil.success(req, res, tracks);
     } catch (e) {
       return ResponseUtil.error(req, res, 'videoPlayer.GET_INFO_FAILED', 500, { error: e.message });
     }
@@ -1309,11 +1343,22 @@ class VideoPlayerController {
 
   /**
    * Save video playback preference
-   * Body: filePath, playback_position, subtitle_index, audio_index
+   * Body: filePath, playback_position, subtitle_label, audio_label, quality,
+   *       subtitle_ref, audio_index, speed
    */
   async saveVideoPreference(req, res) {
     try {
-      const { filePath, internalPath, playback_position, subtitle_label, audio_label, quality } = req.body || {};
+      const {
+        filePath,
+        internalPath,
+        playback_position,
+        subtitle_label,
+        audio_label,
+        quality,
+        subtitle_ref,
+        audio_index,
+        speed,
+      } = req.body || {};
       console.log('saveVideoPreference', filePath, playback_position);
       if (!filePath) {
         return ResponseUtil.error(req, res, 'file.INVALID_PATH');
@@ -1324,6 +1369,9 @@ class VideoPlayerController {
         subtitle_label,
         audio_label,
         quality,
+        subtitle_ref,
+        audio_index,
+        speed,
         internalPath,
       });
 

@@ -104,16 +104,27 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 `/api/music/list` 带 `list_id` 时改为按 `position` 排序——改造前走的是 `m.id desc`，
 用户排的顺序根本不会生效。`playlist/get` 现在也返回曲目列表。
 
-**影视**：海报墙（搜索 / 类型 / 排序 / 分页）+ 详情弹层（评分、时长、分辨率、演员、简介、续播进度）。
-播放器是全屏舞台，核心是**清晰度选择**：`原画 / 1080P / 720P / 480P / 360P` 五档，
-档位表由 `GET /api/videoPlayer/qualities` 按源分辨率算出——源只有 720p 时 1080p 一档会被禁用并标注
-「高于源分辨率，不推荐」，放大不会更清晰只会浪费带宽。切清晰度从当前播放位置接着播，不从头开始。
+**影视**：海报墙（搜索 / 类型 / 排序 / 分页）+ 详情弹层（评分、时长、分辨率、演员、简介、续播进度、分集列表）。
+剧集在详情弹层里直接列出分集，点某一集即播；播放中可上一集/下一集，播完自动连播（5 秒倒计时可取消）。
+播放器是全屏舞台，提供四组可选能力：
+
+| 能力 | 做法 |
+|---|---|
+| 清晰度 | `原画 / 1080P / 720P / 480P / 360P` 五档，档位表由 `GET /api/videoPlayer/qualities` 按源分辨率算出——源只有 720p 时 1080p 一档会被禁用并标注「高于源分辨率，不推荐」，放大不会更清晰只会浪费带宽。切清晰度从当前播放位置接着播，不从头开始 |
+| 字幕 | 内嵌字幕轨与外挂字幕（同目录 + 用户上传过的）合成一份菜单，走 `<track>` + `/subtitle-vtt` 出 WebVTT——切换即时、不用重连流、原画路径也不被破坏。可选字号/位置/颜色/背景/描边与 ±10s 延时。图像字幕（PGS/VOBSUB）在菜单里禁用并说明原因，不给「选了没反应」的死选项。另支持上传字幕与在线搜索（迅雷字幕服务） |
+| 音轨 | 多音轨（国语/英语/导演评论）列出语言 + 编码 + 声道数，切换时服务端按 `audioMapIndex` 重封装并从当前位置续上 |
+| 倍速与播放行为 | 0.5x–3x 八档；「自动跳过片头」「自动连播下一集」两个开关。片头片尾区间来自 `video_index.open_skip_*_sec`，播放中浮出「跳过片头」按钮 |
+
+播放器另有缓冲进度条、起播/缓冲加载态、音量与静音、全屏、画中画，
+以及一套完整快捷键：`空格`/`K` 播放暂停、`←`/`→` ±10s、`J`/`L` ±30s、`↑`/`↓` 音量、
+`0`–`9` 跳百分比、`M` 静音、`F` 全屏、`P` 画中画、`C` 字幕、`A` 音轨、`S` 倍速、`N` 下一集、`,`/`.` 字幕延时、`Esc` 退出。
+断点续播每 10 秒落一次库，关掉页面也不丢。
 
 上游的转码接口只接受 `width` / `resolution` / `bitrate` 三个裸参数，其中 `resolution` 还只认
 `1920x1080` 这种 WxH 写法——传 `"1080p"` 会被 `parseResolution` 静默忽略，结果是「选了清晰度但没有任何变化」。
 新增 `src/utils/videoQualityUtil.js` 把档位收敳成一份 canonical 定义（档位 key → 宽/高/码率/maxrate/bufsize），
 `/transcode` 与 `/stream-mp4` 都从这儿取参数，前端也只认档位 key。显式传 `width`/`bitrate` 的老调用方行为不变。
-清晰度偏好写进 `video_play_preference.quality`，下次打开同一部影片自动回到上次选的档位。
+清晰度、字幕、音轨、倍速四类偏好都写进 `video_play_preference`，下次打开同一部影片自动恢复。
 
 服务端这边：`collectSystemInfo()` 的静态部分（`package.json`、CPU 型号、核心数）按进程缓存——
 其中 `os.cpus()` 在 Windows 上每次调用都会重新构造一份「每个逻辑核一个对象」的数组，
@@ -131,10 +142,16 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 
 | 接口 | 鉴权 | 说明 |
 |---|---|---|
-| `GET /api/videoPlayer/qualities?filePath=...` | 登录用户 + 文件 view/download 权限 | 可选清晰度档位表 + 源分辨率 + 用户上次选择 |
+| `GET /api/videoPlayer/qualities?filePath=...` | 登录用户 + 文件 view/download 权限 | 可选清晰度档位表 + 源分辨率 + 用户上次选择（清晰度/字幕/音轨/倍速） |
+| `GET /api/videoPlayer/tracks?filePath=...` | 同上 | 可选音轨与字幕轨清单（含内嵌/外挂、语言、编码、可否走 WebVTT）+ 片头片尾区间 |
 | `GET /api/videoPlayer/transcode?...&quality=720p` | 同上 | HLS 转码；`quality` 为档位 key，`original` 会 400 指引走原画直链 |
-| `GET /api/videoPlayer/stream-mp4?...&quality=480p` | 同上 | fMP4 流；带缩放参数时自动重编码 |
-| `POST /api/videoPlayer/preference` | 同上 | 续播位置 + 清晰度偏好 |
+| `GET /api/videoPlayer/stream-mp4?...&quality=480p&audioMapIndex=1` | 同上 | fMP4 流；带缩放参数时自动重编码；`audioMapIndex` 选音轨 |
+| `GET /api/videoPlayer/subtitle-vtt?filePath=...&subtitleIndex=3` | 同上 | 内嵌字幕轨导成 WebVTT（带缓存）；`subtitlePath=` 则直接转外挂文件 |
+| `POST /api/videoPlayer/uploadSubtitle` | 同上 | 上传外挂字幕到 `subtitleUpload/<视频 hash>/<uid>/` |
+| `POST /api/videoPlayer/searchSubtitle` | 同上 | 迅雷字幕搜索（`searchType=keyword` 或按影片特征） |
+| `POST /api/videoPlayer/downloadSearchedSubtitle` | 同上 | 把搜到的字幕下载到上传目录 |
+| `POST /api/videoPlayer/deleteExternalSubtitle` | 同上 | 删除自己上传的字幕 |
+| `POST /api/videoPlayer/preference` | 同上 | 续播位置 + 清晰度/字幕/音轨/倍速偏好 |
 | `POST /api/music/playlist/index/reorder` | 登录用户 | 整体重排，`index_ids` 为完整顺序（可为子集） |
 | `POST /api/music/playlist/index/move` | 登录用户 | 单曲移到 `to_position`（0 基，越界夹紧） |
 | `POST /api/music/playlist/index/clear` | 登录用户 | 清空歌单曲目，不动歌单本身 |
@@ -641,16 +658,17 @@ server {
 | `src/api/modules/console/consoleController.js` | `package.json`/CPU 型号/核心数按进程缓存——`os.cpus()` 在 Windows 上每次调用都重新构造整个数组，概览页 3 秒一次轮询，不缓存就是持续制造垃圾 |
 | `src/api/controlServer.js` | 多 worker 抢控制端口时按 info 记录而非 error（不是故障，报了会让运维误判）。补充说明：cluster worker 的 `listen` 会经主进程共享句柄完成绑定，多个 express worker 实际是**共享**同一个控制端口，单个 worker 挂掉不影响控制接口 |
 | `src/utils/videoQualityUtil.js` | **新增**。清晰度档位的唯一来源：档位 key → 宽/高/码率/maxrate/bufsize，`normalizeQualityKey` 兼容 `1080p`/`FHD`/`1920x1080`/`source` 等写法，`listQualities` 按源分辨率收窄档位（不放大），`resolveQuality` 出 ffmpeg 参数 |
-| `src/api/modules/videoPlayer/videoPlayerController.js` | `/transcode` 新增 `quality` 参数并映射到 resolution/bitrate/maxrate/bufsize；新增 `GET /qualities` 返回可选档位表；`/info` 附带档位表；`/stream-mp4` 支持 `width`/`bitrate`/`quality`（带缩放参数时自动从 `mode=copy` 退到重编码，避免「选了 720p 出来还是原画」）；`/preference` 持久化清晰度 |
+| `src/utils/mediaTrackLabelUtil.js` | **新增**。音轨/字幕轨标签与可达性的唯一来源：ISO 639 语言码 → 中文名、字幕编码 → 中文名（含「PGS 图像字幕」）、声道数 → 5.1/立体声、`isTextSubtitleCodec` 判定能否转 WebVTT、倍速白名单归一 |
+| `src/api/modules/videoPlayer/videoPlayerController.js` | `/transcode` 新增 `quality` 参数并映射到 resolution/bitrate/maxrate/bufsize；新增 `GET /qualities`（返回档位表与整份偏好）与 `GET /tracks`（音轨/字幕轨清单 + 片头片尾）；`/info` 附带档位表；`/stream-mp4` 支持 `width`/`bitrate`/`quality`/`audioMapIndex`（带缩放参数时自动从 `mode=copy` 退到重编码，避免「选了 720p 出来还是原画」）；`/preference` 持久化清晰度/字幕/音轨/倍速；`/subtitle-vtt` 文件不存在时返回 404 而非默认 500 |
 | `src/workers/transcodeWorker.js` | 透出 `options.maxrate`/`options.bufsize` 到 `-maxrate`/`-bufsize`（只有 `-b:v` 时 x264 在复杂场景会冲到远超目标值，流式播放表现为带宽抖动） |
-| `src/db/table/tableVideoPlayPreference.js` | 新增 `quality` 列，老库自动 `ADD COLUMN` |
-| `src/api/modules/videoPlayer/videoPlayerService.js` | 偏好读写带上 `quality`，落库前过一遍 `normalizeQualityKey`，脏值落空而不是把任意字符串存进库 |
+| `src/db/table/tableVideoPlayPreference.js` | 新增 `quality`、`subtitle_ref`、`audio_index`、`speed` 四列，老库逐列自动 `ADD COLUMN`（幂等） |
+| `src/api/modules/videoPlayer/videoPlayerService.js` | 偏好读写带上四列，落库前归一化：清晰度过 `normalizeQualityKey`、字幕引用只认 `emb:<流号>`/`ext:<文件名>`、音轨序号带上限、倍速过白名单——脏值一律落空而不是把任意字符串存进库；新增 `getTrackInfo` 汇总音轨/字幕轨清单 |
 | `src/db/table/tableMusicPlayList2Index.js` | **新增 `position` 列**（播放顺序），老库自动补列并按 `create_time` + `index_id` 回填；新增 `(list_id, position)` 索引 |
 | `src/api/modules/music/playlist/playListService.js` | 加歌按调用方传入的顺序分配 position；新增 `reorderIndexes`（整体重排，提交子集时未提到的按原相对次序移到队尾）、`moveIndex`（单曲移到指定位置，越界夹紧）、`clearIndexes`（清空曲目）；`getList` 现在返回曲目列表；歌单预览图改按播放顺序取 |
 | `src/api/modules/music/playlist/playListController.js`、`musicRouter.js` | 新增 `playlist/index/reorder`、`playlist/index/move`、`playlist/index/clear` 三个接口 |
 | `src/api/modules/music/list/musicListService.js` | 带 `list_id` 时按 `pl.position` 排序——**改造前固定 `m.id desc`，用户在歌单里排的顺序完全不会生效** |
-| `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度）+ 全屏播放器（清晰度选择、断点续播、Esc/空格快捷键） |
-| `web/console/console.js`、`console.css`、`index.html` | 导航新增「媒体」分组（影视/音乐）；补足播放器栏、队列抽屉、歌词面板、海报墙、清晰度菜单、影片详情的样式（同样走设计令牌，暗色自动生效） |
+| `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度、分集列表）+ 全屏播放器（清晰度选择、字幕菜单与外观调节、音轨切换、倍速、跳过片头、自动连播、画中画/全屏、缓冲进度、完整快捷键、断点续播） |
+| `web/console/console.js`、`console.css`、`index.html` | 导航新增「媒体」分组（影视/音乐）；补足播放器栏、队列抽屉、歌词面板、海报墙、清晰度/字幕/音轨/倍速菜单、加载态、缓冲条、跳过片头、分集列表的样式（同样走设计令牌，暗色自动生效） |
 | `electron_server/language/*.json` | 新增 `videoPlayer.QUALITY_ORIGINAL_USE_RAW`（原画不走转码，应改走原画直链） |
 
 部署产物：`deploy/config.example.json`、`deploy/systemd/`、`deploy/docker/`、`deploy/windows/`、`deploy/scripts/`。
@@ -686,6 +704,22 @@ server {
 - 事务内误用 `knex` 而非 `trx` 导致 SQLite 单连接池死锁——已修，测试可复现
 - 页面渲染：音乐页库导航/歌单栏/播放全部、常驻播放器栏与队列抽屉创建、播放器控件齐全、队列从 `localStorage` 恢复、影视页筛选栏与海报网格，均无运行时错误
 - 用无头 Chrome 实际截图核对浅色/暗色下的音乐页、影视页与播放器舞台（含清晰度菜单）
+
+### 播放器功能增强（本轮新增）
+
+以下在本机实测通过（Node 22.20.0，真实启动的服务端 + jsdom + 无头 Chrome）：
+
+- `GET /api/videoPlayer/tracks` 返回 `audio`/`subtitles` 两个数组与 `openSkip`；探针失败时是空数组而不是 500；缺 `filePath` 与无 token 均被拒
+- 四类偏好分别落库与读回；越界 `audio_index`（99）、白名单外 `speed`（9）、`subtitle_ref=off`、路径穿越写法的 `subtitle_ref` 全部落空，不会把脏值写进库
+- 外挂 `subtitle_ref` 归一成文件名（`ext:/任意/路径/a.zh.srt` → `ext:a.zh.srt`）——绝对路径会随挂载点变动失效
+- `video_play_preference` 老库（只有上游三列）自动补齐 `quality`/`subtitle_ref`/`audio_index`/`speed`，重复执行 `createTable` 幂等
+- `/subtitle-vtt` 指向不存在的字幕文件时返回 404 而不是默认 500（播放器列出的外挂字幕可能已被删掉，这是常态）
+- 标签映射：`chi`→国语、`hdmv_pgs_subtitle`→「PGS 图像字幕」、6 声道→5.1；`tags.title`（导演评论音轨）优先于语言码；无任何元数据时补序号，否则同一文件里几条字幕长得一模一样分不出来
+- 文本字幕（subrip/ass/mov_text/webvtt）判为可转 WebVTT，图像字幕（pgs/vobsub/dvdsub）判为不可——菜单里禁用并说明原因，不给死选项
+- 播放器 UI：四个菜单（清晰度/字幕/音轨/倍速）都能开合；字幕菜单带「关闭字幕」+ 上传/搜索/样式三个动作；倍速八档加「自动跳过片头」「自动连播下一集」两个开关；倍速写进 `video.playbackRate` 并持久化；音量写进 `video.volume`
+- 快捷键全表无运行时错误；数字键 `5` 重连流的 `src` 带 `seek=3600`（7200 秒的 50%）
+- 剧集：详情弹层列出分集，点某一集直接起播并把标题换成该集名字
+- 用 CDP 驱动无头 Chrome 截图核对播放器各状态（播放器/字幕菜单/倍速菜单/清晰度菜单/音轨菜单），以及 780px 窄屏下顶栏自动收起文字标签只留图标、浅色主题下菜单跟随主题而视频区保持深色
 
 ### Web 控制台（本轮新增）
 

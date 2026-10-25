@@ -25,6 +25,12 @@ class tableVideoPlayPreference {
         table.string('audio_label').nullable();
         // 清晰度偏好：档位 key（original/1080p/720p/...），见 utils/videoQualityUtil
         table.string('quality').nullable();
+        // 字幕偏好：emb:<ffprobe 流号> 或 ext:<字幕文件名>，见 utils/mediaTrackLabelUtil
+        table.string('subtitle_ref').nullable();
+        // 音轨偏好：在音频流中的序号（对应 stream-mp4 的 audioMapIndex）
+        table.integer('audio_index').nullable();
+        // 倍速偏好：白名单内的字符串，如 '1.5'
+        table.string('speed').nullable();
         table.timestamp('last_watched_at').defaultTo(knex.fn.now());
       });
       Logger.info(`✅ video_play_preference table created`);
@@ -42,13 +48,22 @@ class tableVideoPlayPreference {
     } catch (_) {
       return;
     }
-    const has = cols.some(c => String(c && c.name) === 'quality');
-    if (has) return;
-    try {
-      await knex.raw(`ALTER TABLE ${this.tableName} ADD COLUMN quality TEXT NULL`);
-      Logger.info(`✅ video_play_preference 增加 quality 列`);
-    } catch (e) {
-      Logger.warn(`video_play_preference 增加 quality 列失败: ${e && e.message ? e.message : e}`);
+    const have = new Set((cols || []).map(c => String(c && c.name)));
+    // 列名 → DDL 片段。逐列 ALTER，缺哪列补哪列，重复执行是幂等的。
+    const wanted = [
+      ['quality', 'TEXT NULL'],
+      ['subtitle_ref', 'TEXT NULL'],
+      ['audio_index', 'INTEGER NULL'],
+      ['speed', 'TEXT NULL'],
+    ];
+    for (const [name, ddl] of wanted) {
+      if (have.has(name)) continue;
+      try {
+        await knex.raw(`ALTER TABLE ${this.tableName} ADD COLUMN ${name} ${ddl}`);
+        Logger.info(`✅ video_play_preference 增加 ${name} 列`);
+      } catch (e) {
+        Logger.warn(`video_play_preference 增加 ${name} 列失败: ${e && e.message ? e.message : e}`);
+      }
     }
   }
 

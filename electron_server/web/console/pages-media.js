@@ -30,6 +30,13 @@ function __register(N) {
     shuffle: '<svg viewBox="0 0 20 20"><path d="M4 5.5h3l6 9h3M14 5.5h2v2M14 12.5h2v2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 4.2l1.6 1.3-1.6 1.3M16.4 11.2l1.6 1.3-1.6 1.3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     repeat: '<svg viewBox="0 0 20 20"><path d="M5 7.5h8.5a2.5 2.5 0 012.5 2.5v0M15 12.5H6.5a2.5 2.5 0 01-2.5-2.5v0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 5.2L4.8 7.5 7 9.8M13 10.2l2.2 2.3L13 14.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     repeat1: '<svg viewBox="0 0 20 20"><path d="M5 7.5h8.5a2.5 2.5 0 012.5 2.5v0M15 12.5H6.5a2.5 2.5 0 01-2.5-2.5v0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 5.2L4.8 7.5 7 9.8M13 10.2l2.2 2.3L13 14.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 7.4v4h-1.1" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+    cc: '<svg viewBox="0 0 20 20"><rect x="2.6" y="4.4" width="14.8" height="11.2" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 8.6a1.9 1.9 0 100 2.8M13.4 8.6a1.9 1.9 0 100 2.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    audio: '<svg viewBox="0 0 20 20"><path d="M10 4.2L6.4 7.2H4v5.6h2.4L10 15.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 7.6a3.4 3.4 0 010 4.8M15.4 5.6a6.2 6.2 0 010 8.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    mute: '<svg viewBox="0 0 20 20"><path d="M10 4.2L6.4 7.2H4v5.6h2.4L10 15.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13.4 8l4 4M17.4 8l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    speed: '<svg viewBox="0 0 20 20"><path d="M3.6 14.4a7 7 0 1112.8 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 10.6l3.4-2.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="11.4" r="1.2" fill="currentColor"/></svg>',
+    fs: '<svg viewBox="0 0 20 20"><path d="M4 8V4.6h4M16 12v3.4h-4M16 8V4.6h-4M4 12v3.4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    pip: '<svg viewBox="0 0 20 20"><rect x="2.6" y="4.4" width="14.8" height="11.2" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="11.4" y="9.6" width="4.6" height="4" rx=".8" fill="currentColor"/></svg>',
+    text: '<svg viewBox="0 0 20 20"><path d="M4.5 5.5h11M10 5.5v10M7.4 15.5h5.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   };
 
   /* ---------------- 工具 ---------------- */
@@ -856,6 +863,23 @@ function __register(N) {
     duration: 0,
     baseSeek: 0,
     filePath: '',
+    /* 音轨 / 字幕 / 倍速：都由 GET /api/videoPlayer/tracks 给出候选 */
+    audioTracks: [],
+    audioIndex: 0,
+    subtitleTracks: [],
+    subtitleRef: '',          // '' 表示关闭字幕
+    subOffset: 0,             // 字幕延时（秒），正数延后
+    speed: '1',
+    /* 片头片尾（video_index.open_skip_*_sec） */
+    openSkip: { startSec: 0, endSec: 0 },
+    autoSkipIntro: false,
+    /* 连播：tvPlayInfo 的 playlist */
+    episodes: [],
+    epIndex: -1,
+    autoplayNext: true,
+    _fellBack: false,
+    _introSkipped: false,
+    _nextTimer: 0,
   };
 
   async function renderVideo(body, actions) {
@@ -968,11 +992,28 @@ function __register(N) {
     }
   }
 
+  /** 剧集列表：tv 走 /episodes，season 直接就是一级列表 */
+  async function loadEpisodeList(item) {
+    const type = String(item.media_type || '');
+    if (type !== 'tv' && type !== 'season') return [];
+    try {
+      const data = await api.get(`/api/video/episodes?index_id=${encodeURIComponent(item.id)}&page=1&page_size=200&sort_order=asc`);
+      const d = data.data || {};
+      const items = Array.isArray(d.items) ? d.items : (Array.isArray(d.list) ? d.list : []);
+      return items.filter(x => x && Number(x.is_file) === 1);
+    } catch (_) {
+      return [];
+    }
+  }
+
   function openVideoDetailModal(d) {
     const item = d.item || {};
     const poster = artUrl(item.poster_path, 400);
     const hist = d.history || {};
     const progress = hist.duration ? Math.min(100, (hist.playback_position / hist.duration) * 100) : 0;
+    const seasons = Array.isArray(d.seasonList) ? d.seasonList : [];
+    const episodes = Array.isArray(d.episodeList) ? d.episodeList : [];
+    const isSeries = String(item.media_type || '') === 'tv' || String(item.media_type || '') === 'season';
     openModal({
       title: item.nfo_name || item.filename || '影片详情',
       wide: true,
@@ -991,13 +1032,45 @@ function __register(N) {
             ${progress > 0 ? `<div class="vdetail__progress"><div class="vdetail__progressbar"><i style="width:${progress.toFixed(1)}%"></i></div><span>已看 ${progress.toFixed(0)}%</span></div>` : ''}
             <div class="vdetail__plot">${escapeHtml(item.nfo_storyline || '暂无简介')}</div>
           </div>
-        </div>`,
+        </div>
+        ${isSeries ? `<div class="eplist" id="vd-eplist"><div class="eplist__hd">剧集加载中…</div></div>` : ''}`,
       okText: hist.playback_position ? '继续播放' : '播放',
       onOk: () => { startVideo(item, Number(hist.playback_position) || 0); return true; },
+      after: () => { if (isSeries) paintEpisodes(item, seasons, episodes); },
     });
   }
 
+  async function paintEpisodes(item, seasons, episodes) {
+    const box = $('#vd-eplist');
+    if (!box) return;
+    let list = episodes;
+    if (!list.length) list = await loadEpisodeList(item);
+    if (!list.length) { box.innerHTML = '<div class="eplist__hd">没有取到剧集列表</div>'; return; }
+    box.innerHTML = `<div class="eplist__hd">共 ${list.length} 集${seasons.length ? ` · ${seasons.length} 季` : ''}</div>
+      <div class="eplist__grid">${list.map((ep, i) => {
+        const num = Number(ep.episod_num) || (i + 1);
+        const name = ep.nfo_name || ep.filename || `第 ${num} 集`;
+        const p = Number(ep.duration) || 0;
+        return `<button class="eplist__item" data-ep="${i}" title="${escapeHtml(String(name))}">
+          <b>${num}</b><span>${escapeHtml(String(name))}</span>${p ? `<i>${fmtDur(p)}</i>` : ''}</button>`;
+      }).join('')}</div>`;
+    $$('[data-ep]', box).forEach(b => b.addEventListener('click', () => {
+      const ep = list[Number(b.dataset.ep)];
+      if (ep) startVideo(ep, 0);
+    }));
+  }
+
   /* ---------------- 视频播放器 ---------------- */
+
+  /** 字幕 WebVTT 地址。内嵌轨按 ffprobe 流号取，外挂轨直接给字幕文件路径 */
+  function subtitleVttUrl(t) {
+    if (!t) return '';
+    const p = t.kind === 'external'
+      ? { subtitlePath: t.path, subtitleIndex: 0 }
+      : { filePath: V.filePath, subtitleIndex: t.index };
+    return mediaUrl('/api/videoPlayer/subtitle-vtt', p);
+  }
+
   function ensureVideoStage() {
     if ($('#vstage')) return;
     const st = document.createElement('div');
@@ -1006,67 +1079,170 @@ function __register(N) {
     st.hidden = true;
     st.innerHTML = `
       <video id="vstage-video" class="vstage__video" playsinline preload="metadata"></video>
+      <div class="vstage__load" id="vstage-load" hidden><i class="vstage__spin"></i><span id="vstage-loadtxt">起播中…</span></div>
       <div class="vstage__top">
         <div class="vstage__title" id="vstage-title">—</div>
         <div class="vstage__topact">
           <div class="qsel" id="vstage-qsel">
-            <button class="qsel__btn" id="vstage-qbtn"><span id="vstage-qlabel">清晰度</span>${I.gear}</button>
+            <button class="qsel__btn" id="vstage-qbtn" title="清晰度"><span id="vstage-qlabel">清晰度</span>${I.gear}</button>
             <div class="qsel__menu" id="vstage-qmenu" hidden></div>
           </div>
-          <button class="vstage__btn" id="vstage-close" title="退出播放">${I.close}</button>
+          <div class="qsel" id="vstage-ssel">
+            <button class="qsel__btn" id="vstage-sbtn" title="字幕">${I.cc}<span id="vstage-slabel">字幕</span></button>
+            <div class="qsel__menu qsel__menu--wide" id="vstage-smenu" hidden></div>
+          </div>
+          <div class="qsel" id="vstage-asel">
+            <button class="qsel__btn" id="vstage-abtn" title="音轨">${I.audio}<span id="vstage-alabel">音轨</span></button>
+            <div class="qsel__menu" id="vstage-amenu" hidden></div>
+          </div>
+          <div class="qsel" id="vstage-rsel">
+            <button class="qsel__btn" id="vstage-rbtn" title="倍速">${I.speed}<span id="vstage-rlabel">倍速</span></button>
+            <div class="qsel__menu" id="vstage-rmenu" hidden></div>
+          </div>
+          <button class="vstage__btn" id="vstage-pip" title="画中画">${I.pip}</button>
+          <button class="vstage__btn" id="vstage-fs" title="全屏 (F)">${I.fs}</button>
+          <button class="vstage__btn" id="vstage-close" title="退出播放 (Esc)">${I.close}</button>
         </div>
       </div>
+      <button class="vstage__skip" id="vstage-skipintro" hidden>跳过片头</button>
+      <div class="vstage__next" id="vstage-next" hidden></div>
       <div class="vstage__err" id="vstage-err" hidden></div>
       <div class="vstage__bottom">
         <div class="vstage__seek">
           <span id="vstage-cur">0:00</span>
-          <input id="vstage-bar" type="range" min="0" max="1000" value="0" step="1" aria-label="播放进度">
+          <div class="vstage__barwrap">
+            <div class="vstage__buffered"><i id="vstage-buf"></i></div>
+            <input id="vstage-bar" type="range" min="0" max="1000" value="0" step="1" aria-label="播放进度">
+          </div>
           <span id="vstage-dur">0:00</span>
         </div>
         <div class="vstage__ctrls">
-          <button class="vstage__btn vstage__btn--main" id="vstage-toggle">${I.play}</button>
+          <button class="vstage__btn" id="vstage-prev" title="上一集" hidden>${I.prev}</button>
+          <button class="vstage__btn vstage__btn--main" id="vstage-toggle" title="播放/暂停 (空格)">${I.play}</button>
+          <button class="vstage__btn" id="vstage-next" title="下一集 (N)" hidden>${I.next}</button>
           <span class="vstage__stat" id="vstage-stat"></span>
+          <div class="vstage__vol">
+            <button class="vstage__btn" id="vstage-mute" title="静音 (M)">${I.audio}</button>
+            <input id="vstage-vol" type="range" min="0" max="100" value="100" aria-label="音量">
+          </div>
         </div>
       </div>`;
     document.body.appendChild(st);
 
     const v = $('#vstage-video');
     v.addEventListener('timeupdate', onVideoTime);
-    v.addEventListener('play', () => { $('#vstage-toggle').innerHTML = I.pause; });
+    v.addEventListener('progress', paintBuffered);
+    v.addEventListener('play', () => { $('#vstage-toggle').innerHTML = I.pause; setLoading(false); });
+    v.addEventListener('playing', () => setLoading(false));
+    v.addEventListener('waiting', () => setLoading(true, '缓冲中…'));
     v.addEventListener('pause', () => { $('#vstage-toggle').innerHTML = I.play; });
     v.addEventListener('error', onVideoError);
+    v.addEventListener('ended', onVideoEnded);
+    v.addEventListener('loadedmetadata', () => { setLoading(false); paintBuffered(); });
+
     $('#vstage-toggle').addEventListener('click', () => { if (v.paused) v.play().catch(() => {}); else v.pause(); });
     $('#vstage-close').addEventListener('click', closeVideo);
     $('#vstage-bar').addEventListener('input', e => {
       seekVideo((Number(e.target.value) / 1000) * (V.duration || 0));
     });
-    $('#vstage-qbtn').addEventListener('click', e => {
-      e.stopPropagation();
-      $('#vstage-qmenu').hidden = !$('#vstage-qmenu').hidden;
-    });
+    $('#vstage-vol').addEventListener('input', e => setVolume(Number(e.target.value) / 100));
+    $('#vstage-mute').addEventListener('click', toggleMute);
+    $('#vstage-fs').addEventListener('click', toggleFullscreen);
+    $('#vstage-pip').addEventListener('click', togglePip);
+    $('#vstage-skipintro').addEventListener('click', () => seekVideo(V.openSkip.endSec));
+    $('#vstage-prev').addEventListener('click', () => playEpisode(V.epIndex - 1));
+    $('#vstage-next').addEventListener('click', () => playEpisode(V.epIndex + 1));
+
+    bindMenu('#vstage-qsel', '#vstage-qmenu', '#vstage-qbtn');
+    bindMenu('#vstage-ssel', '#vstage-smenu', '#vstage-sbtn');
+    bindMenu('#vstage-asel', '#vstage-amenu', '#vstage-abtn');
+    bindMenu('#vstage-rsel', '#vstage-rmenu', '#vstage-rbtn');
+
     document.addEventListener('click', e => {
-      const m = $('#vstage-qmenu');
-      if (m && !m.hidden && !e.target.closest('#vstage-qsel')) m.hidden = true;
+      $$('.qsel__menu').forEach(m => {
+        if (!m.hidden && !e.target.closest('.qsel')) m.hidden = true;
+      });
     });
-    document.addEventListener('keydown', e => {
-      if ($('#vstage').hidden) return;
-      if (e.key === 'Escape') closeVideo();
-      else if (e.key === ' ') { e.preventDefault(); $('#vstage-toggle').click(); }
+    document.addEventListener('keydown', onVideoKey);
+    document.addEventListener('fullscreenchange', () => {
+      $('#vstage-fs').innerHTML = document.fullscreenElement ? I.close : I.fs;
     });
+    applyCueStyle();
+  }
+
+  /** 菜单外层点击切换、点选项后收起。每个菜单一个闭包，避免互相干扰 */
+  function bindMenu(wrapSel, menuSel, btnSel) {
+    const btn = $(btnSel);
+    if (!btn) return;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const menu = $(menuSel);
+      const willOpen = menu.hidden;
+      $$('.qsel__menu').forEach(m => { m.hidden = true; });
+      menu.hidden = !willOpen;
+    });
+  }
+
+  /* ---------------- 加载态 / 缓冲条 ---------------- */
+  function setLoading(on, text) {
+    const box = $('#vstage-load');
+    if (!box) return;
+    box.hidden = !on;
+    if (on) {
+      const t = $('#vstage-loadtxt');
+      if (t) t.textContent = text || '起播中…';
+    }
+  }
+
+  function paintBuffered() {
+    const v = $('#vstage-video');
+    const bar = $('#vstage-buf');
+    if (!v || !bar) return;
+    let end = 0;
+    try {
+      if (v.buffered && v.buffered.length) end = v.buffered.end(v.buffered.length - 1);
+    } catch (_) {}
+    // 直播式流的 duration 可能是 Infinity，只能按元数据时长算比例
+    const pct = V.duration > 0 ? Math.min(100, (end / V.duration) * 100) : 0;
+    bar.style.width = `${pct.toFixed(1)}%`;
+  }
+
+  /* ---------------- 进度 / 续播 / 片头 ---------------- */
+  function currentPos() {
+    const v = $('#vstage-video');
+    if (!v) return V.baseSeek;
+    return V.baseSeek + (Number(v.currentTime) || 0);
   }
 
   function onVideoTime() {
     const v = $('#vstage-video');
     if (!v) return;
-    const pos = V.baseSeek + (Number(v.currentTime) || 0);
+    const pos = currentPos();
     const cur = $('#vstage-cur');
     const dur = $('#vstage-dur');
     const bar = $('#vstage-bar');
     if (cur) cur.textContent = fmtDur(pos);
     if (dur) dur.textContent = V.duration ? fmtDur(V.duration) : '--:--';
-    if (bar && V.duration > 0) bar.value = String(Math.floor((pos / V.duration) * 1000));
+    if (bar && V.duration > 0 && document.activeElement !== bar) {
+      bar.value = String(Math.floor((pos / V.duration) * 1000));
+    }
     // 断点续播：整数秒时落一次，关掉页面也不丢
     if (V.filePath && Math.floor(pos) % 10 === 0) saveVideoProgress(pos);
+    paintSkipIntro(pos);
+  }
+
+  function paintSkipIntro(pos) {
+    const btn = $('#vstage-skipintro');
+    if (!btn) return;
+    const { startSec, endSec } = V.openSkip;
+    const inIntro = startSec > 0 && endSec > startSec + 1 && pos >= startSec - 0.5 && pos < endSec - 1;
+    btn.hidden = !inIntro;
+    if (!inIntro) return;
+    if (V.autoSkipIntro && !V._introSkipped) {
+      V._introSkipped = true;
+      seekVideo(endSec);
+      toast('已自动跳过片头', 'ok');
+    }
   }
 
   let _progTimer = 0;
@@ -1077,12 +1253,16 @@ function __register(N) {
         filePath: V.filePath,
         playback_position: Math.floor(pos),
         quality: V.quality,
+        subtitle_ref: V.subtitleRef,
+        audio_index: V.audioIndex,
+        speed: V.speed,
       }).catch(() => {});
     }, 1500);
   }
 
   function onVideoError() {
     const box = $('#vstage-err');
+    setLoading(false);
     if (!box) return;
     // 非原画起播失败时回落一次原画，别直接把用户扔在错误页上
     if (V.quality !== 'original' && !V._fellBack) {
@@ -1095,6 +1275,35 @@ function __register(N) {
     box.textContent = '播放失败：浏览器无法解码这个源。可尝试切换清晰度（会重编码），或下载后用本地播放器观看。';
   }
 
+  function onVideoEnded() {
+    clearTimeout(V._nextTimer);
+    const box = $('#vstage-next');
+    if (!box) return;
+    const nextIdx = V.epIndex + 1;
+    if (!V.autoplayNext || nextIdx >= V.episodes.length) { box.hidden = true; return; }
+    let left = 5;
+    const ep = V.episodes[nextIdx];
+    box.hidden = false;
+    const paint = () => {
+      box.innerHTML = `<span>${left} 秒后播放下一集：${escapeHtml(ep && ep.name ? ep.name : '')}</span>
+        <button class="btn btn--sm btn--primary" id="vstage-nextnow">立即播放</button>
+        <button class="btn btn--sm btn--ghost" id="vstage-nextcancel">取消</button>`;
+      $('#vstage-nextnow').addEventListener('click', () => { clearTimeout(V._nextTimer); box.hidden = true; playEpisode(nextIdx); });
+      $('#vstage-nextcancel').addEventListener('click', () => { clearTimeout(V._nextTimer); box.hidden = true; });
+    };
+    paint();
+    V._nextTimer = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearTimeout(V._nextTimer);
+        box.hidden = true;
+        playEpisode(nextIdx);
+      } else {
+        paint();
+      }
+    }, 1000);
+  }
+
   function videoStreamUrl(seek) {
     const params = { filePath: V.filePath, mode: 'copy' };
     if (seek > 0) params.seek = String(Math.floor(seek));
@@ -1103,7 +1312,21 @@ function __register(N) {
       params.quality = V.quality;
       delete params.mode;
     }
+    // 音轨只能靠服务端重封装选出，所以切音轨必须重连流
+    if (V.audioIndex > 0) params.audioMapIndex = String(V.audioIndex);
     return mediaUrl('/api/videoPlayer/stream-mp4', params);
+  }
+
+  /** 换源但保留当前位置：清晰度 / 音轨切换都走这儿 */
+  function reloadVideo() {
+    const v = $('#vstage-video');
+    const pos = currentPos();
+    V.baseSeek = Math.max(0, Math.floor(pos));
+    V._fellBack = false;
+    $('#vstage-err').hidden = true;
+    setLoading(true, V.quality === 'original' ? '起播中…' : '转码起播中…');
+    v.src = videoStreamUrl(V.baseSeek);
+    v.play().catch(() => {});
   }
 
   async function startVideo(item, seek) {
@@ -1115,6 +1338,14 @@ function __register(N) {
     V.baseSeek = Number(seek) || 0;
     V.quality = 'original';
     V._fellBack = false;
+    V._introSkipped = false;
+    V.subtitleRef = '';
+    V.subOffset = 0;
+    V.audioIndex = 0;
+    V.speed = '1';
+    clearTimeout(V._nextTimer);
+    const nextBox = $('#vstage-next');
+    if (nextBox) nextBox.hidden = true;
 
     ensureVideoStage();
     $('#vstage').hidden = false;
@@ -1122,29 +1353,99 @@ function __register(N) {
     $('#vstage-title').textContent = item.nfo_name || item.filename || '—';
     $('#vstage-err').hidden = true;
     $('#vstage-qlabel').textContent = '原画';
+    $('#vstage-slabel').textContent = '字幕';
+    $('#vstage-alabel').textContent = '音轨';
+    $('#vstage-rlabel').textContent = '倍速';
+    removeSubtitleTracks();
+    paintQualityMenu();
+    paintSubtitleMenu();
+    paintAudioMenu();
+    paintSpeedMenu();
 
     const v = $('#vstage-video');
+    setLoading(true, '起播中…');
     v.src = videoStreamUrl(V.baseSeek);
     v.play().catch(() => {});
-    paintQualityMenu();
+    setVolume(loadPrefs().videoVolume == null ? 1 : Number(loadPrefs().videoVolume), true);
+    v.playbackRate = 1;
 
-    // 档位表 + 用户上次的选择
+    // 档位表 + 用户上次的选择（一次请求恢复全部偏好）
     try {
       const q = await api.get(`/api/videoPlayer/qualities?filePath=${encodeURIComponent(filePath)}`);
       V.qualities = (q.data && q.data.qualities) || [];
-      const pref = q.data && q.data.preference && q.data.preference.quality;
-      if (pref && pref !== 'original') {
-        const tier = V.qualities.find(x => x.key === pref);
+      const pref = (q.data && q.data.preference) || {};
+      if (pref.quality && pref.quality !== 'original') {
+        const tier = V.qualities.find(x => x.key === pref.quality);
         if (tier && tier.available) {
-          V.quality = pref;
-          v.src = videoStreamUrl(V.baseSeek);
+          V.quality = pref.quality;
           $('#vstage-qlabel').textContent = tier.label;
         }
       }
+      if (pref.audio_index != null && Number(pref.audio_index) > 0) V.audioIndex = Number(pref.audio_index);
+      if (pref.speed) V.speed = String(pref.speed);
+      if (pref.subtitle_ref) V.subtitleRef = String(pref.subtitle_ref);
+      if (V.audioIndex > 0 || (V.quality !== 'original') || (V.speed && V.speed !== '1')) {
+        // 偏好与原画直连不一致，按偏好重连一次
+        reloadVideo();
+      }
+      if (V.speed && V.speed !== '1') {
+        v.playbackRate = Number(V.speed);
+        $('#vstage-rlabel').textContent = `${V.speed}x`;
+      }
       paintQualityMenu();
+      paintAudioMenu();
+      paintSpeedMenu();
+    } catch (_) {}
+
+    // 音轨 / 字幕 / 片头片尾：单独一个请求，失败不影响播放
+    try {
+      const t = await api.get(`/api/videoPlayer/tracks?filePath=${encodeURIComponent(filePath)}`);
+      const d = t.data || {};
+      V.audioTracks = Array.isArray(d.audio) ? d.audio : [];
+      V.subtitleTracks = Array.isArray(d.subtitles) ? d.subtitles : [];
+      V.openSkip = d.openSkip && typeof d.openSkip === 'object' ? d.openSkip : { startSec: 0, endSec: 0 };
+      if (V.audioIndex > 0 && !V.audioTracks.some(a => a.index === V.audioIndex)) V.audioIndex = 0;
+      buildSubtitleTracks();
+      paintAudioMenu();
+      paintSubtitleMenu();
+      paintSkipIntro(currentPos());
+    } catch (_) {}
+
+    // 剧集连播：只有多集才有意义
+    V.episodes = [];
+    V.epIndex = -1;
+    $('#vstage-prev').hidden = true;
+    $('#vstage-next').hidden = true;
+    try {
+      const info = await api.get(`/api/video/tvPlayInfo?index_id=${encodeURIComponent(item.id)}`);
+      const pl = (info.data && info.data.playlist) || [];
+      if (pl.length > 1) {
+        V.episodes = pl;
+        V.epIndex = Math.max(0, Number(info.data.initialIndex) || 0);
+        $('#vstage-prev').hidden = V.epIndex <= 0;
+        $('#vstage-next').hidden = V.epIndex >= pl.length - 1;
+      }
     } catch (_) {}
   }
 
+  function playEpisode(i) {
+    if (i < 0 || i >= V.episodes.length) return;
+    const ep = V.episodes[i];
+    V.epIndex = i;
+    const name = ep && ep.name ? ep.name : `第 ${i + 1} 集`;
+    $('#vstage-title').textContent = name;
+    $('#vstage-prev').hidden = i <= 0;
+    $('#vstage-next').hidden = i >= V.episodes.length - 1;
+    V.baseSeek = 0;
+    V._introSkipped = false;
+    $('#vstage-err').hidden = true;
+    const v = $('#vstage-video');
+    setLoading(true, '起播中…');
+    v.src = videoStreamUrl(0);
+    v.play().catch(() => {});
+  }
+
+  /* ---------------- 清晰度 ---------------- */
   function paintQualityMenu() {
     const menu = $('#vstage-qmenu');
     if (!menu) return;
@@ -1168,23 +1469,506 @@ function __register(N) {
       return;
     }
     if (key === V.quality) return;
-    const v = $('#vstage-video');
-    // 从当前播放位置接着切，不让用户从头看
-    const pos = V.baseSeek + (Number(v.currentTime) || 0);
     V.quality = key;
-    V.baseSeek = pos;
-    V._fellBack = false;
     $('#vstage-qlabel').textContent = (tier && tier.label) || '原画';
-    v.src = videoStreamUrl(pos);
-    v.play().catch(() => {});
+    reloadVideo();
     paintQualityMenu();
-    saveVideoProgress(pos);
+    saveVideoProgress(currentPos());
     if (!silent) toast(`已切换到 ${(tier && tier.label) || key}${key === 'original' ? '' : '（转码需要几秒起播）'}`, 'ok');
+  }
+
+  /* ---------------- 字幕 ---------------- */
+  function removeSubtitleTracks() {
+    const v = $('#vstage-video');
+    if (!v) return;
+    $$('track', v).forEach(t => t.remove());
+    try {
+      const list = v.textTracks;
+      for (let i = list.length - 1; i >= 0; i -= 1) {
+        if (list[i] && list[i].kind === 'subtitles') list[i].mode = 'disabled';
+      }
+    } catch (_) {}
+  }
+
+  /**
+   * 把可选字幕挂成 <track>。
+   * 走 WebVTT 而不是让服务端把字幕烧进画面：文本字幕转 VTT 是零成本导出，
+   * 切换即时、不用重连流、原画路径也不被破坏；图像字幕（PGS/VOBSUB）转不出
+   * 文本，服务端那条路本来就到不了，就在菜单里禁用并说明原因。
+   */
+  function buildSubtitleTracks() {
+    const v = $('#vstage-video');
+    if (!v) return;
+    removeSubtitleTracks();
+    const usable = V.subtitleTracks.filter(t => t && t.render === 'vtt' && !t.disabled);
+    for (const t of usable) {
+      const el = document.createElement('track');
+      el.kind = 'subtitles';
+      el.label = t.label;
+      el.srclang = (t.language || 'zh').toLowerCase();
+      el.src = subtitleVttUrl(t);
+      el.dataset.ref = t.ref;
+      el.addEventListener('load', () => {
+        const tt = findTextTrack(t.ref);
+        if (tt) applySubtitleOffset(tt, V.subOffset);
+      });
+      el.addEventListener('error', () => {
+        toast(`字幕「${t.label}」加载失败`, 'warn');
+      });
+      v.appendChild(el);
+    }
+    applySubtitleRef(V.subtitleRef, true);
+  }
+
+  function findTextTrack(ref) {
+    const v = $('#vstage-video');
+    if (!v) return null;
+    try {
+      const list = v.textTracks;
+      for (let i = 0; i < list.length; i += 1) {
+        if (list[i] && list[i].ref === ref) return list[i];
+        if (list[i] && list[i].label && list[i].label === ref) return list[i];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function paintSubtitleMenu() {
+    const menu = $('#vstage-smenu');
+    if (!menu) return;
+    const rows = [{ ref: '', label: '关闭字幕', disabled: false, reason: '' }].concat(V.subtitleTracks);
+    menu.innerHTML = rows.map(t => `
+      <button class="qsel__item ${String(t.ref || '') === V.subtitleRef ? 'is-active' : ''}" data-s="${escapeHtml(String(t.ref || ''))}" ${t.disabled ? 'disabled' : ''}>
+        <span class="qsel__key">${escapeHtml(t.label || '字幕')}</span>
+        <span class="qsel__desc">${escapeHtml(t.reason || '')}</span>
+      </button>`).join('');
+    // 底部固定动作：样式 / 上传 / 在线搜索
+    menu.innerHTML += `<div class="qsel__acts">
+        <button class="btn btn--ghost btn--sm" id="vstage-sub-style">样式</button>
+        <button class="btn btn--ghost btn--sm" id="vstage-sub-upload">上传</button>
+        <button class="btn btn--ghost btn--sm" id="vstage-sub-search">搜索</button>
+      </div>`;
+    $$('[data-s]', menu).forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      menu.hidden = true;
+      applySubtitleRef(b.dataset.s, false);
+    }));
+    const sty = $('#vstage-sub-style');
+    if (sty) sty.addEventListener('click', e => { e.stopPropagation(); menu.hidden = true; openSubtitleStylePanel(); });
+    const up = $('#vstage-sub-upload');
+    if (up) up.addEventListener('click', e => { e.stopPropagation(); menu.hidden = true; uploadSubtitleFlow(); });
+    const se = $('#vstage-sub-search');
+    if (se) se.addEventListener('click', e => { e.stopPropagation(); menu.hidden = true; searchSubtitleFlow(); });
+  }
+
+  function applySubtitleRef(ref, silent) {
+    const v = $('#vstage-video');
+    V.subtitleRef = ref || '';
+    const hit = V.subtitleTracks.find(t => String(t.ref || '') === V.subtitleRef);
+    $('#vstage-slabel').textContent = hit ? shortSubLabel(hit.label) : '字幕';
+    if (v) {
+      try {
+        const list = v.textTracks;
+        for (let i = 0; i < list.length; i += 1) {
+          const tt = list[i];
+          if (!tt) continue;
+          tt.mode = 'disabled';
+        }
+        if (V.subtitleRef) {
+          const tt = findTextTrack(V.subtitleRef);
+          if (tt) {
+            tt.mode = 'showing';
+            applySubtitleOffset(tt, V.subOffset);
+          } else {
+            // <track> 可能还没被浏览器收进 textTracks，用元素上的 mode 再推一次
+            const el = $$('track', v).find(t => t.dataset.ref === V.subtitleRef);
+            if (el) el.mode = 'showing';
+          }
+        }
+      } catch (_) {}
+    }
+    paintSubtitleMenu();
+    saveVideoProgress(currentPos());
+    if (!silent) toast(hit ? `字幕：${hit.label}` : '已关闭字幕');
+  }
+
+  function shortSubLabel(label) {
+    const s = String(label || '');
+    // 顶栏空间有限，「国语 · SRT（同目录）」截成「国语 · SRT」
+    return s.split('（')[0].slice(0, 10);
+  }
+
+  /* ---------------- 字幕外观 ----------------
+     原生 <track> 只暴露 ::cue 一个样式口子，能改的是字号/颜色/背景/描边；
+     垂直位置要动 -webkit-media-text-track-container（Chromium 有效，其余内核忽略）。
+     这些值写进 CSS 变量，改一处即可全局生效，用户偏好存 localStorage。 */
+  const CUE_PRESETS = {
+    fg: { white: '#ffffff', yellow: '#ffe066', cyan: '#8ee7f5', green: '#b6f09b' },
+    bg: { dim: 'rgba(0,0,0,.72)', solid: 'rgba(0,0,0,.94)', none: 'transparent' },
+    shadow: { none: 'none', soft: '0 1px 2px rgba(0,0,0,.9)', strong: '0 0 3px #000, 0 2px 4px #000' },
+  };
+
+  function cueStyle() {
+    const s = loadPrefs().cue || {};
+    return {
+      scale: Number(s.scale) || 1,
+      bottom: Number(s.bottom) || 7,
+      fg: CUE_PRESETS.fg[s.fg] ? s.fg : 'white',
+      bg: CUE_PRESETS.bg[s.bg] ? s.bg : 'dim',
+      shadow: CUE_PRESETS.shadow[s.shadow] ? s.shadow : 'soft',
+    };
+  }
+
+  function applyCueStyle() {
+    const v = $('#vstage-video');
+    if (!v) return;
+    const s = cueStyle();
+    v.style.setProperty('--cue-scale', String(s.scale));
+    v.style.setProperty('--cue-bottom', `${s.bottom}%`);
+    v.style.setProperty('--cue-fg', CUE_PRESETS.fg[s.fg]);
+    v.style.setProperty('--cue-bg', CUE_PRESETS.bg[s.bg]);
+    v.style.setProperty('--cue-shadow', CUE_PRESETS.shadow[s.shadow]);
+  }
+
+  function openSubtitleStylePanel() {
+    const s = cueStyle();
+    const opt = (map, cur) => Object.keys(map).map(k =>
+      `<option value="${k}" ${k === cur ? 'selected' : ''}>${k === 'white' ? '白' : k === 'yellow' ? '黄' : k === 'cyan' ? '青' : k === 'green' ? '绿' : k === 'dim' ? '半透明' : k === 'solid' ? '不透明' : k === 'none' ? '无' : k === 'soft' ? '轻' : '重'}</option>`).join('');
+    openModal({
+      title: '字幕样式',
+      body: `<div class="cueform">
+        <label class="cueform__row"><span>字号</span>
+          <input id="cue-scale" type="range" min="0.7" max="2" step="0.05" value="${s.scale}">
+          <b>${Math.round(s.scale * 100)}%</b></label>
+        <label class="cueform__row"><span>位置</span>
+          <input id="cue-bottom" type="range" min="0" max="45" step="1" value="${s.bottom}">
+          <b>距底 ${s.bottom}%</b></label>
+        <label class="cueform__row"><span>颜色</span>
+          <select class="input input--sel" id="cue-fg">${opt(CUE_PRESETS.fg, s.fg)}</select></label>
+        <label class="cueform__row"><span>背景</span>
+          <select class="input input--sel" id="cue-bg">${opt(CUE_PRESETS.bg, s.bg)}</select></label>
+        <label class="cueform__row"><span>描边</span>
+          <select class="input input--sel" id="cue-shadow">${opt(CUE_PRESETS.shadow, s.shadow)}</select></label>
+        <label class="cueform__row"><span>延时</span>
+          <input id="cue-offset" type="range" min="-10" max="10" step="0.5" value="${V.subOffset}">
+          <b>${V.subOffset > 0 ? '+' : ''}${V.subOffset.toFixed(1)}s</b></label>
+        <div class="u-muted" style="font-size:11.5px">位置只在 Chromium 内核浏览器生效，其余内核会保持默认底部。</div>
+      </div>`,
+      okText: '完成',
+      onOk: () => true,
+      after: () => {
+        const p = loadPrefs();
+        p.cue = p.cue || {};
+        const sync = () => {
+          p.cue.scale = Number($('#cue-scale').value);
+          p.cue.bottom = Number($('#cue-bottom').value);
+          p.cue.fg = $('#cue-fg').value;
+          p.cue.bg = $('#cue-bg').value;
+          p.cue.shadow = $('#cue-shadow').value;
+          savePrefs(p);
+          applyCueStyle();
+        };
+        $('#cue-scale').addEventListener('input', e => { e.target.nextElementSibling.textContent = `${Math.round(Number(e.target.value) * 100)}%`; sync(); });
+        $('#cue-bottom').addEventListener('input', e => { e.target.nextElementSibling.textContent = `距底 ${e.target.value}%`; sync(); });
+        ['#cue-fg', '#cue-bg', '#cue-shadow'].forEach(sel => $(sel).addEventListener('change', sync));
+        $('#cue-offset').addEventListener('input', e => {
+          V.subOffset = Number(e.target.value);
+          e.target.nextElementSibling.textContent = `${V.subOffset > 0 ? '+' : ''}${V.subOffset.toFixed(1)}s`;
+          const tt = V.subtitleRef ? findTextTrack(V.subtitleRef) : null;
+          if (tt) applySubtitleOffset(tt, V.subOffset);
+        });
+        applyCueStyle();
+      },
+    });
+  }
+
+  /** 字幕延时：直接改 cue 的起止时间，不动播放位置 */
+  function applySubtitleOffset(track, offsetSec) {
+    if (!track || !track.cues) return;
+    const cues = track.cues;
+    for (let i = 0; i < cues.length; i += 1) {
+      const c = cues[i];
+      if (!c) continue;
+      if (c.__origStart === undefined) { c.__origStart = c.startTime; c.__origEnd = c.endTime; }
+      c.startTime = Math.max(0, c.__origStart + offsetSec);
+      c.endTime = Math.max(c.startTime + 0.01, c.__origEnd + offsetSec);
+    }
+  }
+
+  function nudgeSubtitleOffset(delta) {
+    V.subOffset = Math.round((V.subOffset + delta) * 100) / 100;
+    const tt = V.subtitleRef ? findTextTrack(V.subtitleRef) : null;
+    if (tt) applySubtitleOffset(tt, V.subOffset);
+    toast(`字幕延时 ${V.subOffset > 0 ? '+' : ''}${V.subOffset.toFixed(2)} 秒`);
+  }
+
+  /* ---------------- 上传 / 搜索字幕 ---------------- */
+  function uploadSubtitleFlow() {
+    openModal({
+      title: '上传字幕',
+      body: `<div class="field"><label class="field__label">字幕文件（.srt / .ass / .ssa / .vtt / .sub）</label>
+        <input class="input" id="sub-file" type="file" accept=".srt,.ass,.ssa,.vtt,.sub"></div>`,
+      okText: '上传',
+      onOk: async () => {
+        const input = $('#sub-file');
+        const file = input && input.files && input.files[0];
+        if (!file) { toast('先选一个字幕文件', 'warn'); return false; }
+        const fd = new FormData();
+        fd.append('filePath', V.filePath);
+        fd.append('file', file);
+        try {
+          // 只能用裸 fetch：api.post 会 JSON.stringify 请求体，会把二进制字幕弄坏
+          const resp = await fetch('/api/videoPlayer/uploadSubtitle', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${api.token}` },
+            body: fd,
+          });
+          const text = await resp.text();
+          let json = null;
+          try { json = text ? JSON.parse(text) : null; } catch (_) {}
+          if (!resp.ok || (json && json.success === false)) {
+            throw new Error((json && json.message) || `上传失败（${resp.status}）`);
+          }
+          toast('字幕已上传，正在刷新列表', 'ok');
+          await refreshTracks();
+          return true;
+        } catch (err) {
+          toast(err.message || '上传失败', 'warn');
+          return false;
+        }
+      },
+    });
+  }
+
+  async function refreshTracks() {
+    try {
+      const t = await api.get(`/api/videoPlayer/tracks?filePath=${encodeURIComponent(V.filePath)}`);
+      const d = t.data || {};
+      V.subtitleTracks = Array.isArray(d.subtitles) ? d.subtitles : [];
+      buildSubtitleTracks();
+      paintSubtitleMenu();
+    } catch (_) {}
+  }
+
+  function searchSubtitleFlow() {
+    const guess = (V.filePath || '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+    openModal({
+      title: '搜索字幕',
+      body: `<div class="field"><label class="field__label">关键字</label>
+        <input class="input" id="sub-kw" type="text" value="${escapeHtml(guess)}"></div>
+        <div id="sub-res" class="picklist"></div>`,
+      okText: '',
+      after: () => {
+        const kw = $('#sub-kw');
+        const run = async () => {
+          const box = $('#sub-res');
+          box.innerHTML = '<div class="u-muted">搜索中…</div>';
+          try {
+            const data = await api.post('/api/videoPlayer/searchSubtitle', {
+              filePath: V.filePath,
+              searchType: 'keyword',
+              keyword: kw.value.trim(),
+            });
+            const items = (data.data && data.data.items) || [];
+            if (!items.length) { box.innerHTML = '<div class="u-muted">没有搜到</div>'; return; }
+            box.innerHTML = items.map((s, i) => `
+              <button class="picklist__item" data-sub="${i}">
+                <span>${escapeHtml(s.sname || s.name || '字幕')}</span>
+                <em>${escapeHtml(s.language || '')}</em></button>`).join('');
+            $$('[data-sub]', box).forEach(b => b.addEventListener('click', async () => {
+              const s = items[Number(b.dataset.sub)];
+              try {
+                await api.post('/api/videoPlayer/downloadSearchedSubtitle', {
+                  filePath: V.filePath,
+                  surl: s.surl,
+                  sname: s.sname || s.name,
+                  language: s.language,
+                });
+                toast('字幕已下载', 'ok');
+                await refreshTracks();
+                closeModal();
+              } catch (err) {
+                toast(err.message || '下载失败', 'warn');
+              }
+            }));
+          } catch (err) {
+            box.innerHTML = `<div class="u-muted">${escapeHtml(err.message || '搜索失败')}</div>`;
+          }
+        };
+        kw.addEventListener('change', run);
+        run();
+      },
+    });
+  }
+
+  /* ---------------- 音轨 ---------------- */
+  function paintAudioMenu() {
+    const menu = $('#vstage-amenu');
+    if (!menu) return;
+    if (!V.audioTracks.length) {
+      menu.innerHTML = '<div class="qsel__item is-static"><span class="qsel__desc">没有取到音轨信息</span></div>';
+      return;
+    }
+    menu.innerHTML = V.audioTracks.map(a => `
+      <button class="qsel__item ${a.index === V.audioIndex ? 'is-active' : ''}" data-a="${a.index}">
+        <span class="qsel__key">${escapeHtml(a.label || `音轨 ${a.index + 1}`)}</span>
+        <span class="qsel__desc">${a.index === 0 ? '默认' : ''}</span>
+      </button>`).join('');
+    $$('[data-a]', menu).forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      menu.hidden = true;
+      setAudio(Number(b.dataset.a));
+    }));
+  }
+
+  function setAudio(index) {
+    if (index === V.audioIndex) return;
+    const hit = V.audioTracks.find(a => a.index === index);
+    V.audioIndex = index;
+    $('#vstage-alabel').textContent = hit ? shortSubLabel(hit.label) : '音轨';
+    // 音轨只能由服务端重封装选出，必须重连流；位置由 reloadVideo 保留
+    reloadVideo();
+    paintAudioMenu();
+    saveVideoProgress(currentPos());
+    toast(`音轨：${hit ? hit.label : index}`);
+  }
+
+  /* ---------------- 倍速 / 音量 ---------------- */
+  const SPEEDS = ['0.5', '0.75', '1', '1.25', '1.5', '1.75', '2', '3'];
+
+  function paintSpeedMenu() {
+    const menu = $('#vstage-rmenu');
+    if (!menu) return;
+    menu.innerHTML = SPEEDS.map(s => `
+      <button class="qsel__item ${s === V.speed ? 'is-active' : ''}" data-r="${s}">
+        <span class="qsel__key">${s}x${s === '1' ? ' <em>正常</em>' : ''}</span>
+        <span class="qsel__desc"></span>
+      </button>`).join('');
+    // 倍速菜单同时也是「播放行为」的入口：这两个开关都影响播放流程，
+    // 单独再开一个设置面板只会让顶栏更挤
+    menu.innerHTML += `<div class="qsel__acts qsel__acts--col">
+        <label class="vswitch"><input type="checkbox" id="v-auto-skip" ${V.autoSkipIntro ? 'checked' : ''}><span>自动跳过片头</span></label>
+        <label class="vswitch"><input type="checkbox" id="v-auto-next" ${V.autoplayNext ? 'checked' : ''}><span>自动连播下一集</span></label>
+      </div>`;
+    $$('[data-r]', menu).forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      menu.hidden = true;
+      setSpeed(b.dataset.r);
+    }));
+    const skip = $('#v-auto-skip');
+    if (skip) skip.addEventListener('change', () => {
+      V.autoSkipIntro = !!skip.checked;
+      const p = loadPrefs(); p.autoSkipIntro = V.autoSkipIntro; savePrefs(p);
+      if (V.autoSkipIntro) paintSkipIntro(currentPos());
+    });
+    const next = $('#v-auto-next');
+    if (next) next.addEventListener('change', () => {
+      V.autoplayNext = !!next.checked;
+      const p = loadPrefs(); p.autoplayNext = V.autoplayNext; savePrefs(p);
+    });
+  }
+
+  function setSpeed(s) {
+    V.speed = s;
+    const v = $('#vstage-video');
+    if (v) v.playbackRate = Number(s);
+    $('#vstage-rlabel').textContent = s === '1' ? '倍速' : `${s}x`;
+    paintSpeedMenu();
+    const p = loadPrefs(); p.videoSpeed = s; savePrefs(p);
+  }
+
+  function setVolume(val, silent) {
+    const v = $('#vstage-video');
+    if (!v) return;
+    const n = Math.max(0, Math.min(1, Number(val) || 0));
+    v.volume = n;
+    v.muted = n === 0;
+    const bar = $('#vstage-vol');
+    if (bar) bar.value = String(Math.round(n * 100));
+    $('#vstage-mute').innerHTML = n === 0 ? I.mute : I.audio;
+    if (!silent) { const p = loadPrefs(); p.videoVolume = n; savePrefs(p); }
+  }
+
+  function toggleMute() {
+    const v = $('#vstage-video');
+    if (!v) return;
+    if (v.muted || v.volume === 0) setVolume(loadPrefs().videoVolume || 1);
+    else setVolume(0);
+  }
+
+  function toggleFullscreen() {
+    const st = $('#vstage');
+    if (!st) return;
+    if (document.fullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    } else if (st.requestFullscreen) {
+      st.requestFullscreen().catch(() => toast('浏览器拒绝了全屏请求', 'warn'));
+    }
+  }
+
+  function togglePip() {
+    const v = $('#vstage-video');
+    if (!v) return;
+    if (document.pictureInPictureElement) {
+      if (document.exitPictureInPicture) document.exitPictureInPicture().catch(() => {});
+    } else if (v.requestPictureInPicture) {
+      v.requestPictureInPicture().catch(() => toast('浏览器拒绝了画中画请求', 'warn'));
+    } else {
+      toast('当前浏览器不支持画中画', 'warn');
+    }
+  }
+
+  /* ---------------- 快捷键 ---------------- */
+  function onVideoKey(e) {
+    if ($('#vstage').hidden) return;
+    const tag = e.target && e.target.tagName ? String(e.target.tagName).toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    const v = $('#vstage-video');
+    const k = e.key;
+    const seekBy = sec => { seekVideo(Math.max(0, Math.min(V.duration || 0, currentPos() + sec))); };
+    switch (k) {
+      case ' ': case 'k': e.preventDefault(); $('#vstage-toggle').click(); return;
+      case 'ArrowLeft': e.preventDefault(); seekBy(-10); return;
+      case 'ArrowRight': e.preventDefault(); seekBy(10); return;
+      case 'j': case 'J': seekBy(-30); return;
+      case 'l': case 'L': seekBy(30); return;
+      case 'ArrowUp': e.preventDefault(); setVolume((Number(v.volume) || 0) + 0.05); return;
+      case 'ArrowDown': e.preventDefault(); setVolume((Number(v.volume) || 0) - 0.05); return;
+      case 'm': case 'M': toggleMute(); return;
+      case 'f': case 'F': toggleFullscreen(); return;
+      case 'p': case 'P': togglePip(); return;
+      case 'c': case 'C': $('#vstage-sbtn').click(); return;
+      case 'a': case 'A': $('#vstage-abtn').click(); return;
+      case 's': case 'S': $('#vstage-rbtn').click(); return;
+      case 'n': case 'N': playEpisode(V.epIndex + 1); return;
+      case ',': nudgeSubtitleOffset(-0.5); return;
+      case '.': nudgeSubtitleOffset(0.5); return;
+      case '<': stepSpeed(-1); return;
+      case '>': stepSpeed(1); return;
+      case 'Escape':
+        // 全屏时先退全屏，再按一次才关播放器
+        if (document.fullscreenElement) return;
+        closeVideo();
+        return;
+      default: break;
+    }
+    if (/^[0-9]$/.test(k) && V.duration > 0) {
+      e.preventDefault();
+      seekVideo((Number(k) / 10) * V.duration);
+    }
+  }
+
+  function stepSpeed(dir) {
+    const i = SPEEDS.indexOf(V.speed);
+    const next = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, (i < 0 ? 2 : i) + dir))];
+    setSpeed(next);
+    toast(`倍速 ${next}x`);
   }
 
   function seekVideo(t) {
     const v = $('#vstage-video');
     V.baseSeek = Math.max(0, Math.floor(t));
+    setLoading(true, V.quality === 'original' ? '起播中…' : '转码起播中…');
     v.src = videoStreamUrl(V.baseSeek);
     v.play().catch(() => {});
     saveVideoProgress(V.baseSeek);
@@ -1193,11 +1977,14 @@ function __register(N) {
   function closeVideo() {
     const st = $('#vstage');
     if (!st) return;
+    clearTimeout(V._nextTimer);
     const v = $('#vstage-video');
-    const pos = V.baseSeek + (Number(v.currentTime) || 0);
+    const pos = currentPos();
     try { v.pause(); v.removeAttribute('src'); v.load(); } catch (_) {}
+    removeSubtitleTracks();
     st.hidden = true;
     document.body.classList.remove('has-vstage');
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
     if (V.filePath && pos > 3) saveVideoProgress(pos);
   }
 
@@ -1256,6 +2043,9 @@ function __register(N) {
   ensurePlayerBar();
   const prefs = loadPrefs();
   if (prefs.mode) P.mode = prefs.mode;
+  // 播放行为偏好：这两个开关是纯本地体验项，没必要落库
+  V.autoSkipIntro = prefs.autoSkipIntro === true;
+  V.autoplayNext = prefs.autoplayNext !== false;
   restoreQueue();
 }
 

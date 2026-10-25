@@ -5,6 +5,14 @@ const config = require('../../../config/config');
 const tableConfig = require('../../../db/table/tableConfig');
 const FileUtil = require('../../../utils/fileUtil');
 const VideoFfprobeUtil = require('../../../utils/videoFfprobeUtil');
+const mediaTrackLabelUtil = require('../../../utils/mediaTrackLabelUtil');
+const videoQualityUtil = require('../../../utils/videoQualityUtil');
+
+/** 字幕引用前缀：emb:<ffprobe 流号> / ext:<文件名> */
+const SUBTITLE_REF_EMBEDDED = 'emb:';
+const SUBTITLE_REF_EXTERNAL = 'ext:';
+/** 音轨序号上限：真实文件不会有几十条音轨，超了的一律当脏值 */
+const MAX_AUDIO_INDEX = 32;
 
 /** 顶层 box 声明尺寸超过剩余字节时，其后多为厂商私有尾巴；低于此阈值不触发 remux，避免误伤极小填充。 */
 const NON_ISO_TRAILING_TAIL_REMUX_THRESHOLD_BYTES = 64 * 1024;
@@ -549,22 +557,150 @@ class VideoPlayerService {
     return path.join(baseDir, String(playId || '').trim());
   }
 
+  /**
+   * 归一化字幕引用。
+   * 只接受 emb:<数字> 与 ext:<文件名> 两种形状，其余一律落空——
+   * 偏好是要写进数据库的，不能把调用方传来的任意字符串原样存下去。
+   */
+  normalizeSubtitleRef(input) {
+    const raw = String(input == null ? '' : input).trim();
+    if (!raw) return null;
+    const lower = raw.toLowerCase();
+    if (lower === 'off' || lower === 'none' || lower === '0') return null;
+    if (lower.startsWith(SUBTITLE_REF_EMBEDDED)) {
+      const n = Number(raw.slice(SUBTITLE_REF_EMBEDDED.length));
+      if (!Number.isInteger(n) || n < 0) return null;
+      return `${SUBTITLE_REF_EMBEDDED}${n}`;
+    }
+    if (lower.startsWith(SUBTITLE_REF_EXTERNAL)) {
+      // 只保留文件名：绝对路径会随挂载点变动而失效，而候选集是按视频目录扫出来的，
+      // 同一部视频下同名字幕只有一份
+      const name = path.basename(String(raw.slice(SUBTITLE_REF_EXTERNAL.length)).trim());
+      if (!name || name === '.' || name === '..') return null;
+      return `${SUBTITLE_REF_EXTERNAL}${name}`;
+    }
+    return null;
+  }
+
+  /** 归一化音轨序号（对应 stream-mp4 的 audioMapIndex，即音频流内的序号） */
+  normalizeAudioIndex(input, audioCount = 0) {
+    const n = Number(input);
+    if (!Number.isInteger(n) || n < 0) return null;
+    // 调用方给得出真实条数时按条数卡；给不出时也要有个上限，
+    // 否则一个越界值会被原样存进库，下次读回来再传给 ffmpeg
+    const limit = audioCount > 0 ? audioCount : MAX_AUDIO_INDEX;
+    if (n >= limit) return null;
+    return n;
+  }
+
+  /**
+   * 播放器的音轨 / 字幕轨清单。
+   *
+   * 独立于 getVideoInfo 是为了让播放器只发一次轻量请求：/info 会顺带
+   * ffprobe、目录扫描与播放提示，而播放器要的只是「有哪些轨可选」。
+   *
+   * 字幕分三种可达性：
+   *  - render: 'vtt'   文本字幕，转成 WebVTT 走 <track>，切换不重连流
+   *  - render: 'none'  图像字幕（PGS/VOBSUB），浏览器拿不到文本，菜单里禁用并说明原因
+   *  - render: 'mux'   留给外挂但扩展名不认识的情况，同样禁用
+   */
+  async getTrackInfo(db, filePath, uid) {
+    // 一次 getVideoInfo 拿全：流表（含 tags）、同目录外挂字幕、上传过的字幕、
+    // 片头片尾标记。ffprobe 结果有 video_ffmpeg_info 缓存，第二次起是读库。
+    const info = await this.getVideoInfo(db, filePath, { uid });
+    const streams = Array.isArray(info.streams) ? info.streams : [];
+
+    const audio = [];
+    const subtitles = [];
+    let audioOrdinal = 0;
+    let subtitleOrdinal = 0;
+    for (const s of streams) {
+      if (!s || typeof s !== 'object') continue;
+      if (s.codec_type === 'audio') {
+        const idx = Number(s.index);
+        if (!Number.isInteger(idx) || idx < 0) continue;
+        audio.push({
+          index: audioOrdinal,
+          stream_index: idx,
+          label: mediaTrackLabelUtil.audioTrackLabel(s, audioOrdinal),
+          language: String((s.tags && s.tags.language) || ''),
+          codec: String(s.codec_name || ''),
+          channels: Number(s.channels) || 0,
+        });
+        audioOrdinal += 1;
+      } else if (s.codec_type === 'subtitle') {
+        const idx = Number(s.index);
+        if (!Number.isInteger(idx) || idx < 0) continue;
+        const codec = String(s.codec_name || '');
+        const render = mediaTrackLabelUtil.isTextSubtitleCodec(codec) ? 'vtt' : 'none';
+        subtitles.push({
+          ref: `${SUBTITLE_REF_EMBEDDED}${idx}`,
+          kind: 'embedded',
+          index: idx,
+          label: mediaTrackLabelUtil.subtitleTrackLabel(s, subtitleOrdinal),
+          language: String((s.tags && s.tags.language) || ''),
+          codec,
+          render,
+          disabled: render !== 'vtt',
+          reason: render !== 'vtt' ? '图像字幕无法转成文本，浏览器不能直接渲染' : '',
+        });
+        subtitleOrdinal += 1;
+      }
+    }
+
+    // 外挂字幕：同目录扫描 + 该用户上传过的（规则与 getVideoInfo 一致）
+    const externalList = Array.isArray(info.externalSubtitles) ? info.externalSubtitles : [];
+    const external = externalList
+      .filter(s => s && s.path && mediaTrackLabelUtil.isExternalSubtitleFile(s.filename || s.path))
+      .map(s => {
+        const filename = path.basename(String(s.filename || s.path));
+        return {
+          ref: `${SUBTITLE_REF_EXTERNAL}${filename}`,
+          kind: 'external',
+          path: String(s.path),
+          filename,
+          label: mediaTrackLabelUtil.externalSubtitleLabel(filename, s.source),
+          source: String(s.source || 'folder'),
+          render: 'vtt',
+          disabled: false,
+          reason: '',
+        };
+      });
+
+    const skip = info.openSkip && typeof info.openSkip === 'object' ? info.openSkip : {};
+    return {
+      audio,
+      subtitles: subtitles.concat(external),
+      openSkip: {
+        startSec: Math.max(0, Number(skip.startSec) || 0),
+        endSec: Math.max(0, Number(skip.endSec) || 0),
+      },
+      source: { width: Number(info.width) || 0, height: Number(info.height) || 0 },
+    };
+  }
+
   async saveVideoPreference(db, uid, filePath, preference) {
     const logicalFilePath = path.resolve(String(filePath || '').trim());
     const logicalFileHash = await FileUtil.getFileHash(logicalFilePath);
     if (!logicalFileHash) throw new Error('File not found');
     const fileHash = logicalFileHash;
+    const pref = preference && typeof preference === 'object' ? preference : {};
     // 清晰度只接受规范档位 key，脏值直接落空而不是把任意字符串存进库
-    const videoQualityUtil = require('../../../utils/videoQualityUtil');
-    const quality = videoQualityUtil.normalizeQualityKey(preference.quality);
+    const quality = videoQualityUtil.normalizeQualityKey(pref.quality);
+    const subtitleRef = this.normalizeSubtitleRef(pref.subtitle_ref != null ? pref.subtitle_ref : pref.subtitle_label);
+    const audioIndex = this.normalizeAudioIndex(pref.audio_index != null ? pref.audio_index : pref.audio_label);
+    const speed = mediaTrackLabelUtil.normalizePlaybackRate(pref.speed);
     await db('video_play_preference')
       .insert({
         uid: uid,
         file_hash: fileHash,
-        playback_position: preference.playback_position || 0,
-        subtitle_label: preference.subtitle_label,
-        audio_label: preference.audio_label,
+        playback_position: pref.playback_position || 0,
+        subtitle_label: pref.subtitle_label,
+        audio_label: pref.audio_label,
         quality: quality || null,
+        subtitle_ref: subtitleRef,
+        audio_index: audioIndex,
+        speed: speed,
         last_watched_at: db.fn.now(),
       })
       .onConflict(['uid', 'file_hash'])
