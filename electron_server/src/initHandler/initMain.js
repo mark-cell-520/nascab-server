@@ -133,12 +133,22 @@ module.exports = {
     const safeDesiredHttp = forbidden.has(desiredHttp) ? config.app.port : desiredHttp;
     const safeDesiredHttps = forbidden.has(desiredHttps) ? config.app.httpsPort : desiredHttps;
 
+    // 端口漂移开关：默认 true（沿用桌面端行为，端口被占用就顺延下一个）；
+    // 服务器部署建议设为 false——静默换端口会让运维、探针、反向代理全部指向错误的端口，
+    // 快速失败才能被 systemd / Docker 的重启策略和告警捕获
+    const allowPortDrift = config.server.portFallback !== false;
     const getFreeAllowedPort = async (basePort, avoidPorts = new Set()) => {
       let cursor = basePort;
       while (true) {
         const p = await appUtil.getFreePort(cursor);
         if (!p) return null;
-        if (forbidden.has(p) || avoidPorts.has(p)) {
+        if (forbidden.has(p) || avoidPorts.has(p) || p !== basePort) {
+          if (!allowPortDrift) {
+            throw new Error(
+              `期望端口 ${basePort} 不可用（被占用、被禁用或与其它端口冲突），且 server.portFallback=false 已禁止端口漂移。` +
+                '请释放该端口，或在配置文件 / 环境变量中更换端口。'
+            );
+          }
           cursor = p + 1;
           continue;
         }

@@ -8,6 +8,8 @@ const Logger = require('./utils/logger');
 const tableConfig = require('./db/table/tableConfig');
 const { getVfsCacheRoot } = require('./utils/rcloneMountPerf');
 const { getSingletonWorkerManager } = require('./workers/singletonWorkerManager');
+const singletonLock = require('./utils/singletonLock');
+const config = require('./config/config');
 // 单例Worker管理器
 const singletonWorkerManager = getSingletonWorkerManager();
 
@@ -215,27 +217,63 @@ function main() {
   }
 
   // ---------- Docker/无界面模式：仅启动后端服务，不做窗口/托盘/检查更新 ----------
-  process.on('SIGTERM', async () => {
-    try {
-      await singletonWorkerManager.gracefulShutdown();
-      Logger.info('✅ All singleton workers stopped, process may exit');
-      process.exit(0);
-    } catch (error) {
-      Logger.error('❌ Failed to stop singleton workers:', error);
+
+  // 单例锁：Electron 模式有 requestSingleInstanceLock，服务模式此前没有保护，
+  // 重复启动会两个进程抢同一批 SQLite 库
+  let releaseSingletonLock = () => {};
+  try {
+    const lock = singletonLock.acquire(config.getUserDataPath());
+    releaseSingletonLock = lock.release;
+    if (lock.lockPath) {
+      Logger.info(`🔒 单例锁已获取: ${lock.lockPath}`);
+    }
+  } catch (err) {
+    if (err && err.code === 'EINSTANCEALREADYRUNNING') {
+      Logger.error(`❌ ${err.message}`);
       process.exit(1);
     }
+    Logger.warn(`⚠️  单例锁检查失败，继续启动: ${err && err.message}`);
+  }
+
+  // 全局异常兜底：服务模式下没有界面兜底，未捕获异常若被静默吞掉，
+  // 会留下一个「进程活着但 API 已死」的僵尸服务，systemd/Docker 也无法感知
+  process.on('uncaughtException', err => {
+    Logger.error('❌ Uncaught exception (headless mode):', err);
+  });
+  process.on('unhandledRejection', (reason, promise) => {
+    Logger.error('❌ Unhandled rejection (headless mode):', reason);
   });
 
-  process.on('SIGINT', async () => {
+  // 进程即将退出时清理锁文件（正常退出、异常退出都会走到）
+  process.on('exit', () => {
+    releaseSingletonLock();
+  });
+
+  const shutdown = async signal => {
+    Logger.info(`📡 Received ${signal}, stopping singleton workers...`);
+    // 先禁止自动重启，否则关停过程中 worker 会被重新拉起
+    try {
+      if (initUtil && typeof initUtil.beginShutdown === 'function') initUtil.beginShutdown();
+    } catch (_) {}
     try {
       await singletonWorkerManager.gracefulShutdown();
       Logger.info('✅ All singleton workers stopped, process may exit');
+      releaseSingletonLock();
       process.exit(0);
     } catch (error) {
       Logger.error('❌ Failed to stop singleton workers:', error);
+      releaseSingletonLock();
       process.exit(1);
     }
-  });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  // Windows 服务场景：winsw/nssm 等包装器停止服务时发送的是 CTRL_BREAK（SIGBREAK），
+  // Node 在 Windows 上不保证收到 SIGTERM，这里必须显式监听才能优雅关停并释放单例锁
+  process.on('SIGBREAK', () => shutdown('SIGBREAK'));
 
   initUtil.init().catch(err => {
     Logger.error('Docker mode init failed', err);

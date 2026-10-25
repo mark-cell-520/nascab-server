@@ -13,6 +13,12 @@ class SingletonWorkerManager {
   constructor() {
     this.workers = new Map(); // 存储所有单例worker
     this.workerConfigs = new Map(); // worker配置信息
+    /** 正在主动停止的 worker（用于区分「主动停止」与「崩溃」，避免停止后又被自动重启拉起） */
+    this._stoppingWorkers = new Set();
+    /** 自动重启计数（workerName -> 已重启次数） */
+    this._restartAttempts = new Map();
+    /** 整体关闭中：为 true 时禁止任何自动重启 */
+    this._shuttingDown = false;
     this.init();
   }
 
@@ -116,6 +122,9 @@ class SingletonWorkerManager {
       Logger.warn(`⚠️ stop requested for unknown worker: ${workerName}`);
       return Promise.resolve(false);
     }
+
+    // 标记为主动停止，退出事件中据此跳过自动重启
+    this._stoppingWorkers.add(workerName);
 
     const worker = this.workers.get(workerName);
     const config = this.workerConfigs.get(workerName);
@@ -253,18 +262,25 @@ class SingletonWorkerManager {
 
     // 监听worker退出事件
     worker.on('exit', (code, signal) => {
-
+      const workerConfig = this.workerConfigs.get(workerName);
 
       // 从workers映射中移除
       this._cleanupWorkerEntry(workerName);
       getProcessRegistry().removeProcessByPid(worker.pid);
 
+      // 主动停止（stopWorker/gracefulShutdown/destroy）不触发自动重启
+      const intentional = this._stoppingWorkers.has(workerName) || this._shuttingDown;
+      this._stoppingWorkers.delete(workerName);
+
       // 调用错误回调
-      if (config && signal && typeof config.options.onError === 'function') {
-        config.options.onError(code, signal);
-      } else if (config && typeof config.options.onStop === 'function') {
-        config.options.onStop(code, signal);
+      if (workerConfig && signal && typeof workerConfig.options.onError === 'function') {
+        workerConfig.options.onError(code, signal);
+      } else if (workerConfig && typeof workerConfig.options.onStop === 'function') {
+        workerConfig.options.onStop(code, signal);
       }
+
+      // 崩溃自动重启：服务器长时间运行时 worker 挂掉不能一直离线
+      this._maybeAutoRestart(workerName, workerConfig, intentional, code, signal);
     });
 
     // 监听worker错误事件
@@ -289,6 +305,67 @@ class SingletonWorkerManager {
   }
 
   /**
+   * worker 异常退出时按需自动重启
+   * 策略：指数退避（1s/2s/4s…上限 30s）+ 次数上限；稳定运行超过 60s 后重新计算预算，
+   * 避免长期运行的服务因一次崩溃就永久放弃
+   * @param {string} workerName worker 名称
+   * @param {Object} workerConfig workerConfigs 中的配置快照
+   * @param {boolean} intentional 是否为主动停止
+   * @param {number} code 退出码
+   * @param {string} signal 退出信号
+   */
+  _maybeAutoRestart(workerName, workerConfig, intentional, code, signal) {
+    if (intentional || !workerConfig) return;
+
+    // 正常退出（无信号且退出码为 0）不重启：部分 worker 在没有可索引目录等场景下
+    // 会主动以 0 退出，若一律重启会形成无限重启循环，白白消耗 CPU
+    const codeNum = typeof code === 'number' ? code : Number(code);
+    const codeValid = Number.isFinite(codeNum) ? codeNum : null;
+    const abnormal = !!signal || (codeValid !== null && codeValid !== 0);
+    if (!abnormal) {
+      Logger.info(`🔚 worker ${workerName} 正常退出(code=0)，不自动重启`);
+      return;
+    }
+
+    const options = workerConfig.options || {};
+    // 单个 worker 可通过 options.autoRestart = false 选择退出自动重启
+    if (options.autoRestart === false) return;
+    // 全局开关：部署配置 worker.autoRestart / NASCAB_WORKER_AUTO_RESTART，默认开启
+    if (config.worker && config.worker.autoRestart === false) return;
+
+    const maxRestarts = (config.worker && Number(config.worker.maxRestarts)) || 10;
+    // 稳定运行超过 60s 说明不是启动即崩，重置重启预算
+    const ranFor = Date.now() - (workerConfig.startTime || 0);
+    let attempts = ranFor > 60000 ? 1 : (this._restartAttempts.get(workerName) || 0) + 1;
+    this._restartAttempts.set(workerName, attempts);
+
+    if (attempts > maxRestarts) {
+      Logger.error(
+        `❌ worker ${workerName} 反复异常退出，自动重启次数已达上限(${maxRestarts})，放弃重启（code=${code}, signal=${signal}）`
+      );
+      return;
+    }
+
+    const delay = Math.min(1000 * Math.pow(2, attempts - 1), 30000);
+    Logger.warn(
+      `⚠️ worker ${workerName} 异常退出(code=${code}, signal=${signal})，${delay}ms 后执行第 ${attempts}/${maxRestarts} 次自动重启`
+    );
+
+    setTimeout(() => {
+      if (this._shuttingDown) return;
+      // 期间又被主动拉起过则跳过
+      const current = this.workers.get(workerName);
+      if (current && current.connected) return;
+      try {
+        this.startWorker(workerName, workerConfig.workerPath, workerConfig.options);
+        Logger.info(`✅ worker ${workerName} 自动重启完成`);
+      } catch (err) {
+        Logger.error(`❌ worker ${workerName} 自动重启失败:`, err);
+      }
+    }, delay);
+  }
+
+  /**
    * 设置全局错误处理
    */
   setupGlobalErrorHandling() {
@@ -308,6 +385,8 @@ class SingletonWorkerManager {
    */
   async gracefulShutdown() {
     Logger.info('📡 Shutting down all singleton workers...');
+    // 进入整体关闭流程，禁止自动重启把服务又拉起来
+    this._shuttingDown = true;
 
     const stopPromises = [];
     for (const [workerName] of this.workers) {
@@ -324,6 +403,7 @@ class SingletonWorkerManager {
    */
   destroy() {
     Logger.info('🧹 Destroying singleton worker manager');
+    this._shuttingDown = true;
 
     // 停止所有worker
     for (const [workerName] of this.workers) {
@@ -334,6 +414,8 @@ class SingletonWorkerManager {
 
     this.workers.clear();
     this.workerConfigs.clear();
+    this._restartAttempts.clear();
+    this._stoppingWorkers.clear();
   }
 }
 

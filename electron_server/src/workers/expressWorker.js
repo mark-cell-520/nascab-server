@@ -25,6 +25,10 @@ class ExpressWorker {
     // 获取环境变量中的端口和配置
     this.port = parseInt(process.env.WORKER_PORT) || config.app.port;
     this.httpsPort = parseInt(process.env.WORKER_HTTPS_PORT) || config.app.httpsPort;
+    // 监听地址：服务器部署可限定为 127.0.0.1（配合反向代理）
+    this.host = config.server.host;
+    // 是否启用 HTTPS：反代场景下可关闭，由代理层终止 TLS
+    this.httpsEnabled = config.server.httpsEnabled !== false;
 
     this.setupGracefulShutdown();
 
@@ -33,10 +37,10 @@ class ExpressWorker {
   }
   async startServer() {
     try {
-      // 启动HTTP服务器
-      this.server = app.listen(this.port, async () => {
+      // 启动HTTP服务器（显式指定监听地址，避免隐式绑定全部网卡）
+      this.server = app.listen(this.port, this.host, async () => {
         this.isRunning = true;
-        Logger.info(`✅ HTTP server listening on port: ${this.port}`);
+        Logger.info(`✅ HTTP server listening on ${this.host}:${this.port}`);
 
         // 立即通知主进程 API 已就绪（不依赖 HTTPS），打包后若证书路径异常导致 HTTPS 失败，界面与后台 Worker 仍能正常
         if (typeof process.send === 'function') {
@@ -44,12 +48,16 @@ class ExpressWorker {
             type: 'expressStarted',
             data: {
               httpPort: this.port,
-              httpsPort: this.httpsPort,
+              httpsPort: this.httpsEnabled ? this.httpsPort : null,
             },
           });
         }
-        // HTTP服务器启动成功后尝试启动HTTPS服务器
-        this.startHttpsServer();
+        // HTTP服务器启动成功后尝试启动HTTPS服务器（可通过配置关闭）
+        if (this.httpsEnabled) {
+          this.startHttpsServer();
+        } else {
+          Logger.info('ℹ️  HTTPS disabled by config (server.httpsEnabled=false), running HTTP only');
+        }
       });
 
       if (this.server && typeof this.server.removeListener === 'function') {
@@ -68,7 +76,9 @@ class ExpressWorker {
     Logger.error(`❌ HTTP server start failed:`, err && err.message ? err.message : err);
     this.isRunning = false;
 
-    if (err && err.code === 'EADDRINUSE') {
+    // 端口被占用：默认沿用桌面端的 +1 重试；服务器部署建议关闭（server.portFallback=false），
+    // 端口漂移会让运维和健康检查找不到服务，快速失败更利于被 systemd/Docker 的重启策略接管
+    if (err && err.code === 'EADDRINUSE' && config.server.portFallback !== false) {
       Logger.error(`HTTP port ${this.port} in use, trying fallback`);
       this.port = this.port + 1;
       this.startServer();
@@ -77,6 +87,11 @@ class ExpressWorker {
 
     if (typeof process.send === 'function') {
       process.send({ type: 'expressEnded', data: { port: this.port } });
+    }
+
+    if (err && err.code === 'EADDRINUSE' && config.server.portFallback === false) {
+      Logger.error(`HTTP port ${this.port} in use and server.portFallback is disabled, giving up`);
+      process.exit(1);
     }
   }
 
@@ -113,9 +128,9 @@ class ExpressWorker {
       this.httpsServer = https.createServer(options, this.app);
       this._attachHttpsUpgradeToExistingWss();
 
-      this.httpsServer.listen(this.httpsPort, async () => {
+      this.httpsServer.listen(this.httpsPort, this.host, async () => {
         this.httpsRunning = true;
-        Logger.info(`🔒 HTTPS server listening on port: ${this.httpsPort}`);
+        Logger.info(`🔒 HTTPS server listening on ${this.host}:${this.httpsPort}`);
 
         // 仅更新主进程的 HTTPS 端口（expressStarted 已在 HTTP 启动时发送）
         if (typeof process.send === 'function') {
@@ -165,7 +180,7 @@ class ExpressWorker {
     Logger.error(`❌ HTTPS server start failed:`, err && err.message ? err.message : err);
     this.httpsRunning = false;
 
-    if (err && err.code === 'EADDRINUSE') {
+    if (err && err.code === 'EADDRINUSE' && config.server.portFallback !== false) {
       Logger.error(`HTTPS port ${this.httpsPort} in use, trying fallback`);
       const retryWithDefault = !!this._httpsCertFallbackUsed;
       this._cleanupHttpsServer();
@@ -299,6 +314,8 @@ class ExpressWorker {
     // 注册信号处理
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    // Windows 服务包装器（winsw/nssm）停止服务时发送的是 CTRL_BREAK
+    process.on('SIGBREAK', () => gracefulShutdown('SIGBREAK'));
     process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // nodemon重启信号
 
     // uncaughtException处理

@@ -70,6 +70,20 @@ module.exports = {
     });
   },
 
+  /**
+   * 标记进入关闭流程：禁止 express worker 自动重启，并取消待执行的重启定时器
+   * 由主进程的优雅关停流程调用
+   */
+  beginShutdown() {
+    this._shuttingDown = true;
+    try {
+      if (this._expressRestartTimer) {
+        clearTimeout(this._expressRestartTimer);
+        this._expressRestartTimer = null;
+      }
+    } catch (_) {}
+  },
+
   startOneExpressWorker(httpPort, httpsPort, serverId, jwtSecret) {
     const worker = cluster.fork(
       getWorkerEnv({
@@ -91,7 +105,8 @@ module.exports = {
     try {
       if (!Array.isArray(this.expressWorkers)) this.expressWorkers = [];
       this.expressWorkers.push(worker);
-      worker.on('exit', () => {
+      const startedAt = Date.now();
+      worker.on('exit', (code, signal) => {
         const exitPid = getClusterWorkerPid(worker);
         if (exitPid > 0) getProcessRegistry().removeProcessByPid(exitPid);
         if (exitPid > 0) detachSessionsByWorkerPid(exitPid);
@@ -102,6 +117,47 @@ module.exports = {
             this.expressWorkers = (this.expressWorkers || []).filter(w => w && w !== worker);
           } catch (_) {}
         }
+
+        // express worker 是唯一对外提供 HTTP/WS 的进程，崩溃后必须自动拉起，
+        // 否则服务「进程还活着但 API 已死」，外部探针只能看到主进程假活
+        const codeNum = typeof code === 'number' ? code : Number(code);
+        const codeValid = Number.isFinite(codeNum) ? codeNum : null;
+        const abnormal = !!signal || (codeValid !== null && codeValid !== 0);
+        if (!abnormal) {
+          Logger.info(`🔚 express worker exited normally, code: ${code}`);
+          return;
+        }
+        if (this._shuttingDown) return;
+        if (config.worker && config.worker.autoRestart === false) {
+          Logger.error(`❌ express worker 异常退出(code=${code}, signal=${signal})，但 worker.autoRestart 已关闭，不重启`);
+          return;
+        }
+        if (this._expressRestartTimer) return;
+
+        const maxRestarts = (config.worker && Number(config.worker.maxRestarts)) || 10;
+        // 稳定运行超过 60s 说明不是启动即崩，重置重启预算
+        const ranFor = Date.now() - startedAt;
+        this._expressRestartCount = ranFor > 60000 ? 1 : (this._expressRestartCount || 0) + 1;
+        if (this._expressRestartCount > maxRestarts) {
+          Logger.error(
+            `❌ express worker 反复异常退出，自动重启次数已达上限(${maxRestarts})，放弃重启（code=${code}, signal=${signal}）`
+          );
+          return;
+        }
+
+        // 指数退避：1s、2s、4s…上限 30s，避免疯狂重启拖垮机器
+        const delay = Math.min(1000 * Math.pow(2, this._expressRestartCount - 1), 30000);
+        Logger.warn(
+          `⚠️  express worker 异常退出(code=${code}, signal=${signal})，${delay}ms 后执行第 ${this._expressRestartCount}/${maxRestarts} 次自动重启`
+        );
+        this._expressRestartTimer = setTimeout(() => {
+          this._expressRestartTimer = null;
+          try {
+            this.startOneExpressWorker(httpPort, httpsPort, serverId, jwtSecret);
+          } catch (e) {
+            Logger.error(`❌ express worker auto-restart failed:`, e);
+          }
+        }, delay);
       });
     } catch (_) {}
 
