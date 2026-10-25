@@ -31,7 +31,7 @@
     "products": [
       {
         "name": "publish",
-        "signingConfig": "default",
+        "signingConfig": "publish",
         "targetSdkVersion": "6.0.2(22)",
         "compatibleSdkVersion": "6.0.2(22)",
         "runtimeOS": "HarmonyOS",
@@ -44,7 +44,7 @@
       },
       {
         "name": "default",
-        "signingConfig": "default",
+        "signingConfig": "publish",
         "targetSdkVersion": "6.0.2(22)",
         "compatibleSdkVersion": "6.0.2(22)",
         "runtimeOS": "HarmonyOS",
@@ -73,7 +73,8 @@
         {
           "name": "default",
           "applyToProducts": [
-            "default"
+            "default",
+            "publish"
           ]
         }
       ]
