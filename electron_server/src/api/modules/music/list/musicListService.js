@@ -200,6 +200,7 @@ class MusicListService {
     const knex = this.knexMusic;
 
     const listId = Number(params && (params.list_id ?? params.listId));
+    const isPlayList = Number.isFinite(listId) && listId > 0;
     if (Number.isFinite(listId) && listId > 0) {
       const listRow = await knex('play_list')
         .where({ id: listId })
@@ -392,6 +393,11 @@ class MusicListService {
 
     if (isHistoryList) {
       query.orderBy('h.last_listen_at', 'desc');
+    } else if (isPlayList) {
+      // 播放列表的顺序是用户显式排出来的，必须压过 sortBy/mtime。
+      // 改造前这里走的是 m.id desc，用户听到的顺位和界面上看到的完全不同。
+      query.orderBy('pl.position', 'asc');
+      query.orderBy('m.id', 'asc');
     } else if (sortBy === 'filename' || sortBy === 'file_name') {
       query.orderByRaw(`lower(m.filename) ${sortOrder}`);
     } else if (sortBy === 'title' || sortBy === 'name') {

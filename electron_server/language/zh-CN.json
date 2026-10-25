@@ -2,7 +2,8 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "该字幕文件已失效，请下载其他字幕",
-      "SUBTITLE_DELETE_FAILED": "字幕删除失败"
+      "SUBTITLE_DELETE_FAILED": "字幕删除失败",
+      "QUALITY_ORIGINAL_USE_RAW": "原画不走转码，请改用原画直链播放"
     },
     "fileMount": {
       "START_FAILED": "挂载启动失败：%s",

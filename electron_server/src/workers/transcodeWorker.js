@@ -968,6 +968,16 @@ async function startTranscoding(playId, filePath, options = {}) {
         command.videoBitrate(options.bitrate);
       }
 
+      // 清晰度档位会一起带 maxrate/bufsize（见 utils/videoQualityUtil）：
+      // 只有 -b:v 时 x264 在复杂场景会冲到远超目标值，流式播放表现为带宽抖动。
+      // 裸 bitrate 的老调用方不带这两个值，行为与改造前一致。
+      if (options.maxrate) {
+        command.outputOptions(['-maxrate', String(options.maxrate)]);
+        if (options.bufsize) {
+          command.outputOptions(['-bufsize', String(options.bufsize)]);
+        }
+      }
+
       if (needsHdrToSdr) {
         const tonemapLabel = isDolbyVision
           ? hdrTonemapStrategy === HDR_TONEMAP_LIBPLACEBO

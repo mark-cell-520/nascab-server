@@ -554,6 +554,9 @@ class VideoPlayerService {
     const logicalFileHash = await FileUtil.getFileHash(logicalFilePath);
     if (!logicalFileHash) throw new Error('File not found');
     const fileHash = logicalFileHash;
+    // 清晰度只接受规范档位 key，脏值直接落空而不是把任意字符串存进库
+    const videoQualityUtil = require('../../../utils/videoQualityUtil');
+    const quality = videoQualityUtil.normalizeQualityKey(preference.quality);
     await db('video_play_preference')
       .insert({
         uid: uid,
@@ -561,6 +564,7 @@ class VideoPlayerService {
         playback_position: preference.playback_position || 0,
         subtitle_label: preference.subtitle_label,
         audio_label: preference.audio_label,
+        quality: quality || null,
         last_watched_at: db.fn.now(),
       })
       .onConflict(['uid', 'file_hash'])

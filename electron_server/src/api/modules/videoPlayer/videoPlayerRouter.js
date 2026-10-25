@@ -131,6 +131,9 @@ router.get(
   rawController.getRawFile
 );
 
+// List selectable quality tiers for a video
+router.get('/qualities', authenticateJWT, requirePermission(['download', 'view'], { from: 'query.filePath' }), videoPlayerController.listQualities);
+
 // Check info
 router.get(
   '/info',

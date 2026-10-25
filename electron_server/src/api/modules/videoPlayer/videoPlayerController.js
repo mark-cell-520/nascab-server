@@ -13,6 +13,7 @@ const { spawnSync } = require('node:child_process');
 const config = require('../../../config/config');
 const FileUtil = require('../../../utils/fileUtil');
 const { hasPermission } = require('../../../utils/permissionUtil');
+const videoQualityUtil = require('../../../utils/videoQualityUtil');
 const thunderSubtitleService = require('./thunderSubtitleService');
 
 ffmpeg.setFfmpegPath(ffmpegPath.path);
@@ -500,6 +501,11 @@ class VideoPlayerController {
           info.preference = preference;
         }
       }
+      // 可选清晰度档位：前端播放器据此渲染「清晰度」菜单，
+      // 不需要自己维护一份档位表，也不会出现选了不存在的档位
+      try {
+        info.qualities = videoQualityUtil.listQualities({ width: info.width, height: info.height });
+      } catch (_) {}
       return ResponseUtil.success(req, res, info);
     } catch (e) {
       return ResponseUtil.error(req, res, 'videoPlayer.GET_INFO_FAILED', 500, { error: e.message });
@@ -660,14 +666,55 @@ class VideoPlayerController {
   }
 
   /**
+   * 列出某个视频可选的清晰度档位
+   * Query: filePath
+   * 响应: { qualities: [{key,label,width,height,bitrate,desc,available,upscale,recommended}],
+   *         source: {width,height}, preference: {quality} }
+   *
+   * 独立于 /info 是为了让播放器只为一个下拉框发一次轻量请求；
+   * /info 会顺带 ffprobe 与字幕扫描，首次调用比较重。
+   */
+  async listQualities(req, res) {
+    try {
+      const filePath = req.query && req.query.filePath ? String(req.query.filePath).trim() : '';
+      if (!filePath) {
+        return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+      }
+      const playbackSource = await videoPlayerService.resolvePlaybackSource(filePath);
+      const probe = await videoPlayerService
+        .getCachedOrProbeVideoInfo(req.dbVideo, playbackSource.playableFilePath)
+        .catch(() => null);
+      const width = Number(probe && probe.width) || 0;
+      const height = Number(probe && probe.height) || 0;
+
+      const payload = {
+        qualities: videoQualityUtil.listQualities({ width, height }),
+        source: { width, height },
+      };
+      if (req.user && req.user.id) {
+        const preference = await videoPlayerService
+          .getVideoPreference(req.dbVideo, req.user.id, filePath)
+          .catch(() => null);
+        if (preference && preference.quality) {
+          payload.preference = { quality: preference.quality };
+        }
+      }
+      return ResponseUtil.success(req, res, payload);
+    } catch (e) {
+      return ResponseUtil.error(req, res, 'videoPlayer.GET_INFO_FAILED', 500, { error: e.message });
+    }
+  }
+
+  /**
    * Start or Restart Transcoding (HLS)
-   * Query: filePath, playId, seek, quality, bitrate, audioIndex, subtitleIndex
+   * Query: filePath, playId, seek, quality, width, resolution, bitrate, audioIndex, subtitleIndex
    * Returns: m3u8 playlist content or redirect
    */
   async transcode(req, res) {
     try {
       await tableVideoTranscodeSession.deleteOlderThanMs(24 * 60 * 60 * 1000, req.dbVideo).catch(() => null);
       const { filePath, playId, seek, width, resolution, bitrate, audioIndex, subtitleIndex, subtitlePath, subtitleBurn, client, device_id, deviceId } = req.query;
+      const qualityKey = videoQualityUtil.normalizeQualityKey(req.query && req.query.quality);
 
       if (!filePath || !playId) {
         return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
@@ -717,6 +764,24 @@ class VideoPlayerController {
         subtitleBurn: effectiveSubtitleBurn,
         segmentDurationSeconds: 2,
       };
+
+      // 清晰度档位：quality 是给前端的规范入口，档位里带了宽/高/码率。
+      // 显式传的 width/resolution/bitrate 优先级更高（老客户端与调试仍可用），
+      // 但只有 quality 能顺带带上 maxrate/bufsize，所以这里合并而不是二选一。
+      if (qualityKey) {
+        const tier = videoQualityUtil.resolveQuality(qualityKey);
+        if (tier) {
+          baseOptions.quality = tier.key;
+          baseOptions.width = baseOptions.width || tier.width;
+          baseOptions.resolution = baseOptions.resolution || `${tier.width}x${tier.height}`;
+          baseOptions.bitrate = baseOptions.bitrate || tier.bitrate;
+          baseOptions.maxrate = tier.maxrate;
+          baseOptions.bufsize = tier.bufsize;
+        } else if (qualityKey === 'original') {
+          // 原画不该走到转码通道，直接告诉客户端改走 rawFile
+          return ResponseUtil.error(req, res, 'videoPlayer.QUALITY_ORIGINAL_USE_RAW', 400);
+        }
+      }
 
       const optionsJson = (() => {
         try {
@@ -972,6 +1037,23 @@ class VideoPlayerController {
         res.status(400).send('Missing filePath');
         return;
       }
+
+      // 清晰度：quality 档位优先，其次裸 width/bitrate。
+      // stream-mp4 的 mode=copy 是纯 remux，缩放必须重编码，所以带了缩放参数就
+      // 自动退到重编码分支，避免出现「选了 720p 出来还是原画」。
+      const qualityKey = videoQualityUtil.normalizeQualityKey(req.query && req.query.quality);
+      const tier = qualityKey && qualityKey !== 'original' ? videoQualityUtil.resolveQuality(qualityKey) : null;
+      const widthRaw = req.query && req.query.width !== undefined ? Number(req.query.width) : NaN;
+      const targetWidth =
+        tier && tier.width > 0
+          ? tier.width
+          : Number.isFinite(widthRaw) && widthRaw > 0
+            ? Math.floor(widthRaw)
+            : 0;
+      const targetBitrate = tier && tier.bitrate ? tier.bitrate : _normalizeText(req.query && req.query.bitrate);
+      const needsScale = targetWidth > 0;
+      const effectiveMode = needsScale ? 'transcode' : mode;
+      const scaleFilter = needsScale ? videoQualityUtil.scaleFilter(targetWidth) : null;
       const resolvedPath = path.resolve(filePath);
       if (!fs.existsSync(resolvedPath)) {
         res.status(404).send('Not Found');
@@ -1007,7 +1089,7 @@ class VideoPlayerController {
           }
         }
         cmd.outputOptions(['-movflags', 'frag_keyframe+empty_moov+delay_moov']).outputFormat('mp4');
-        if (mode === 'copy') {
+        if (effectiveMode === 'copy') {
           const fallbackMovAudio = await _shouldFallbackMovCopyAudio(req.dbVideo, resolvedPath);
           const subPlan =
             actuallyUseExternalSubtitle
@@ -1056,6 +1138,18 @@ class VideoPlayerController {
             outputOptions.push('-c:s:0', 'mov_text');
           } else if (noSubtitle) {
             outputOptions.unshift('-sn');
+          }
+          // 清晰度缩放与码率控制。滤镜放在 outputOptions 之前也没关系，
+          // fluent-ffmpeg 会按 ffmpeg 的参数顺序输出，-vf 属于输出选项。
+          if (scaleFilter) {
+            cmd.videoFilters(scaleFilter);
+          }
+          if (targetBitrate) {
+            cmd.videoBitrate(targetBitrate);
+            // 只有档位路径才算得出 maxrate/bufsize；裸 bitrate 只设 -b:v
+            if (tier && tier.maxrate) {
+              outputOptions.push('-maxrate', tier.maxrate, '-bufsize', tier.bufsize);
+            }
           }
           cmd.videoCodec('libx264').audioCodec('aac').outputOptions(outputOptions);
         }
@@ -1219,7 +1313,7 @@ class VideoPlayerController {
    */
   async saveVideoPreference(req, res) {
     try {
-      const { filePath, internalPath, playback_position, subtitle_label, audio_label } = req.body || {};
+      const { filePath, internalPath, playback_position, subtitle_label, audio_label, quality } = req.body || {};
       console.log('saveVideoPreference', filePath, playback_position);
       if (!filePath) {
         return ResponseUtil.error(req, res, 'file.INVALID_PATH');
@@ -1229,6 +1323,7 @@ class VideoPlayerController {
         playback_position,
         subtitle_label,
         audio_label,
+        quality,
         internalPath,
       });
 

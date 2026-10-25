@@ -37,6 +37,24 @@ Flutter / Android / tvOS / HarmonyOS 客户端未纳入。
 
 概览页轮询改为就地更新，不再每 3 秒把整块指标区 `innerHTML` 重建一遍。
 
+### 音乐与影视
+
+「音乐」页：库导航（全部歌曲 / 专辑 / 艺人 / 最近播放 / 我的收藏）+ 歌单 + 曲目表，
+底部是**常驻播放器栏**，切页面不中断。带播放队列抽屉（上移 / 下移 / 移除 / 点选）、
+顺序 / 随机 / 单曲三种模式、进度拖动、音量、LRC 歌词逐行高亮；队列存 `localStorage`，刷新不丢。
+
+「影视」页：海报墙 + 详情弹层 + 全屏播放器。播放器可选**五档清晰度**
+（原画 / 1080P / 720P / 480P / 360P），档位表由 `GET /api/videoPlayer/qualities` 按源分辨率算出——
+源只有 720p 时 1080p 会被禁用并标注「高于源分辨率，不推荐」。切清晰度从当前位置接着播，
+偏好写进 `video_play_preference.quality`。
+
+这两个页面修掉了上游两处残缺：
+
+| 方面 | 上游 | 本仓库 |
+|---|---|---|
+| 歌单顺序 | `play_list2index` 没有顺序字段；列表按 `m.id desc` 排；`playlist/get` 不返回曲目 | 新增 `position` 列（老库自动补列回填）+ reorder/move/clear 三个接口，列表按 `position` 排 |
+| 清晰度 | `resolution` 只认 `1920x1080`，传 `"1080p"` 被静默忽略；没有档位表；`bitrate` 不带 `-maxrate/-bufsize` | 档位收敛成 `src/utils/videoQualityUtil.js` 一份定义，`/transcode` 与 `/stream-mp4` 共用 |
+
 ### 机器控制接口 `/api/control`
 
 给脚本和 Agent 用的管理面，响应统一 `{ok, data, error}`。两个入口：

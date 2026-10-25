@@ -291,6 +291,8 @@
     download: '<svg viewBox="0 0 20 20"><path d="M10 3.5v8M6.5 8L10 11.5 13.5 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 14.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     docker: '<svg viewBox="0 0 20 20"><path d="M3 9.5h14M6.5 6.5h2v2h-2zM9.5 6.5h2v2h-2zM12.5 6.5h2v2h-2zM6.5 3.5h2v2h-2zM9.5 3.5h2v2h-2z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.6 12.4c1.6 2.2 4.3 3.3 7.6 3.3 3.6 0 6.2-1.4 7.6-3.6H2.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
     about: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v4.2M10 6.6v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    music: '<svg viewBox="0 0 20 20"><path d="M8 15.5V5.2l7-1.6v10.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="6.2" cy="15.5" r="1.9" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13.2" cy="13.9" r="1.9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+    film: '<svg viewBox="0 0 20 20"><rect x="2.6" y="4.4" width="14.8" height="11.2" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.4 4.4v11.2M13.6 4.4v11.2M2.6 10h14.8" stroke="currentColor" stroke-width="1.3"/></svg>',
   };
 
   const NAV = [
@@ -316,6 +318,12 @@
         { id: 'downloads', label: '下载器', icon: ICONS.download },
         { id: 'docker', label: '容器', icon: ICONS.docker },
         { id: 'processes', label: '进程管理', icon: ICONS.process },
+      ],
+    },
+    {
+      group: '媒体', items: [
+        { id: 'video', label: '影视', icon: ICONS.film },
+        { id: 'music', label: '音乐', icon: ICONS.music },
       ],
     },
     {

@@ -51,6 +51,8 @@ git log --oneline upstream-v1.2.5..main   # 分了几次提交、每次做了什
 | worker 进程数 | 按 CPU 核心数铺开（最少 2 个），小内存机器上两个 express worker 就占掉 1/4 以上常驻内存 | 按机器规格自动决策，默认 1 个（API 负载是 IO 密集不是 CPU 密集）；需要并发可用 `NASCAB_EXPRESS_COUNT` 显式指定，上限为核心数。实测同数据目录启动进程总 RSS 由 346.0 MB 降至 249.5 MB |
 | 界面主题 | 只有浅色一套，暗色环境与夜间运维下刺眼 | 样式设计令牌化 + 暗色主题；手动选择优先于系统 `prefers-color-scheme`，未选择时实时跟随；`Shift+D` 快捷切换 |
 | 前端轮询 | 概览页每 3 秒把整块指标区 `innerHTML` 重建一遍，日志页每 5 秒重绘 300 行 | 就地更新：骨架只建一次，之后只改文本/条宽/柱高；数据指纹未变则整块跳过；日志页不再把正在往上翻看历史的用户拽回底部 |
+| 音乐播放列表 | `play_list2index` 只有 `(list_id, index_id, create_time)` 三列，**没有顺序字段**；`/api/music/list` 带 `list_id` 时按 `m.id desc` 排序；`playlist/get` 不返回曲目；`addListIndexes` 还按 rowid 顺序分配位置 | 新增 `position` 列（老库自动补列并按加入顺序回填）+ `(list_id, position)` 索引；新增 `playlist/index/reorder`、`playlist/index/move`、`playlist/index/clear`；列表改按 `position` 排序；`playlist/get` 返回曲目；加歌按调用方传入顺序分配位置。控制台另带播放队列（抽屉、上移/下移/移除、顺序/随机/单曲、LRC 歌词、队列持久化） |
+| 影视清晰度 | `/transcode` 只接受裸 `width`/`resolution`/`bitrate`，其中 `resolution` **只认 `1920x1080` 这种 WxH 写法**，传 `"1080p"` 被 `parseResolution` 静默忽略——选了清晰度而实际没有任何变化；没有任何地方定义过「有哪些清晰度可选」，前端拿不到档位表；`bitrate` 不带 `-maxrate`/`-bufsize`；清晰度偏好不落库 | 新增 `src/utils/videoQualityUtil.js` 作为档位唯一来源（原画/1080P/720P/480P/360P → 宽/高/码率/maxrate/bufsize），`normalizeQualityKey` 兼容 `1080p`/`FHD`/`1920x1080`/`source` 等写法；新增 `GET /api/videoPlayer/qualities` 按源分辨率给出可选档位（源分辨率低于档位时禁用并标注「不推荐」，放大不增加清晰度只浪费带宽）；`/transcode` 与 `/stream-mp4` 接受 `quality`；`video_play_preference` 新增 `quality` 列持久化偏好。控制台影视页带海报墙、详情弹层、续播进度与全屏播放器（清晰度菜单、Esc/空格快捷键） |
 
 逐文件的改造清单、部署方式与实测验证结果见 [DEPLOY.md](DEPLOY.md)。
 

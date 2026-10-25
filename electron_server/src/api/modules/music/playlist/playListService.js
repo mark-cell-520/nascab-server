@@ -197,8 +197,10 @@ class PlayListService {
         )
         .orderBy([
           { column: 'm.list_id', order: 'asc' },
-          { column: 'm.create_time', order: 'desc' },
-          { column: 'm.index_id', order: 'desc' },
+          // 按播放顺序取前几张做预览，而不是按加入时间——否则预览图和
+          // 用户实际听到的顺位不一致
+          { column: 'm.position', order: 'asc' },
+          { column: 'm.index_id', order: 'asc' },
         ])
         .catch(() => []);
 
@@ -232,12 +234,56 @@ class PlayListService {
 
   async getList({ listId, user }) {
     const row = await this._ensureListAccess({ listId, user });
+    const tracks = await this._listTracks(row.id, user);
     return {
       id: row.id,
       uid: row.uid,
       name: row.name,
       create_time: row.create_time,
+      track_count: tracks.length,
+      tracks,
     };
+  }
+
+  /** 取一个播放列表的全部曲目，按 position 升序 */
+  async _listTracks(listId, user) {
+    const knex = this.knexMusic;
+    const rows = await knex(`${this.mapTableName} as m`)
+      .join('music_index as x', 'm.index_id', 'x.id')
+      .where('m.list_id', listId)
+      .whereIn('x.show_type', ['music', 'submusic'])
+      .select('x.id', 'x.path', 'x.filename', 'x.ext', 'x.size', 'x.duration', 'x.file_hash', 'x.title', 'x.artist', 'x.album', 'x.year', 'x.has_inner_cover', 'x.show_type', 'm.position as position')
+      .orderBy('m.position', 'asc')
+      .orderBy('x.id', 'asc')
+      .catch(() => []);
+
+    const musicListService = new MusicListService(this.knexMusic);
+    const validPaths = await musicListService.getValidPaths(user).catch(() => []);
+    const roots = (Array.isArray(validPaths) ? validPaths : []).map(p => path.resolve(String(p || ''))).filter(Boolean);
+    const isUnderAnyRoot = filePath => {
+      const resolved = filePath ? path.resolve(String(filePath)) : '';
+      if (!resolved) return false;
+      for (const root of roots) {
+        if (resolved === root) return true;
+        const prefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+        if (resolved.startsWith(prefix)) return true;
+      }
+      return false;
+    };
+
+    return (rows || [])
+      .map(r => _normalizeIndexRow(r))
+      .filter(r => isUnderAnyRoot(r.full_path));
+  }
+
+  /** 列表里当前最大的 position，新插入的曲目排到最后 */
+  async _maxPosition(listId) {
+    const row = await this.knexMusic(this.mapTableName)
+      .where({ list_id: listId })
+      .max('position as mx')
+      .first()
+      .catch(() => null);
+    return Math.max(0, Number(row && row.mx) || 0);
   }
 
   async createList({ name, user }) {
@@ -399,12 +445,119 @@ class PlayListService {
       const id = Number(r && r.id) || 0;
       if (id > 0) targetIds.push(id);
     }
-    const uniqueTargetIds = Array.from(new Set(targetIds));
-    const insertRows = uniqueTargetIds.map(id => ({ list_id: row.id, index_id: id }));
+    // 调用方给的顺序 → 排名；series 展开出来的 submusic 不在 ids 里，
+    // 排到最后（rankOf 返回一个大数）
+    const rankOf = id => {
+      const at = ids.indexOf(Number(id));
+      return at >= 0 ? at : Number.MAX_SAFE_INTEGER;
+    };
+    const uniqueTargetIds = Array.from(new Set(targetIds))
+      // 按调用方传入的顺序排。rows 来自 whereIn('id', ids)，SQLite 按 rowid 返回，
+      // 不重新排序的话「按顺序添加一批歌」会变成按 id 顺序入库，顺序就丢了。
+      .sort((a, b) => rankOf(a) - rankOf(b));
 
-    if (insertRows.length > 0) {
+    if (uniqueTargetIds.length > 0) {
+      let position = await this._maxPosition(row.id);
+      const insertRows = uniqueTargetIds.map(id => {
+        position += 1;
+        return { list_id: row.id, index_id: id, position };
+      });
       await this.knexMusic(this.mapTableName).insert(insertRows).onConflict(['list_id', 'index_id']).ignore();
     }
+    return true;
+  }
+
+  /**
+   * 按给定顺序重排整个播放列表
+   * @param {number[]} indexIds 完整顺序，必须覆盖列表里现有全部曲目
+   */
+  async reorderIndexes({ listId, indexIds, user }) {
+    const row = await this._ensureListAccess({ listId, user });
+    const raw = Array.isArray(indexIds) ? indexIds : [];
+    const ids = raw
+      .map(v => Number(v))
+      .filter(v => Number.isFinite(v) && v > 0)
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+    if (ids.length === 0) {
+      const err = new Error('common.PARAM_ERROR');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const existing = await this.knexMusic(this.mapTableName)
+      .where({ list_id: row.id })
+      .select('index_id')
+      .catch(() => []);
+    const existingIds = new Set((existing || []).map(r => Number(r && r.index_id) || 0).filter(v => v > 0));
+
+    // 只接受「现有曲目的一个排列」：允许提交子集（等于把没提到的移出列表），
+    // 但不接受列表里不存在的 id，避免静默丢失数据
+    const unknown = ids.filter(id => !existingIds.has(id));
+    if (unknown.length > 0) {
+      const err = new Error('common.NOT_FOUND');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const knex = this.knexMusic;
+    await knex.transaction(async trx => {
+      let position = 0;
+      for (const id of ids) {
+        position += 1;
+        await trx(this.mapTableName).where({ list_id: row.id, index_id: id }).update({ position });
+      }
+      // 没在提交顺序里的曲目：整体移到末尾，并保持它们原有的相对次序。
+      // 必须显式 orderBy position——不排序的话 SQLite 按 rowid 返回，
+      // 「保持原相对次序」就不成立了。
+      // 注意这里必须用 trx 而不是 knex：SQLite 的连接池只有 1 个连接，
+      // 事务内再用 knex 查询会去抢同一个连接，直接死锁到超时。
+      const dropped = await trx(this.mapTableName)
+        .where({ list_id: row.id })
+        .whereNotIn('index_id', ids)
+        .select('index_id')
+        .orderBy('position', 'asc');
+      for (const r of dropped || []) {
+        const id = Number(r && r.index_id) || 0;
+        if (id <= 0) continue;
+        position += 1;
+        await trx(this.mapTableName).where({ list_id: row.id, index_id: id }).update({ position });
+      }
+    });
+    return true;
+  }
+
+  /** 把一首曲目移到指定位置（0 基） */
+  async moveIndex({ listId, indexId, toPosition, user }) {
+    const row = await this._ensureListAccess({ listId, user });
+    const id = Number(indexId);
+    if (!Number.isFinite(id) || id <= 0) {
+      const err = new Error('common.PARAM_ERROR');
+      err.statusCode = 400;
+      throw err;
+    }
+    const target = Number(toPosition);
+    if (!Number.isFinite(target) || target < 0) {
+      const err = new Error('common.PARAM_ERROR');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const ids = (await this._listTracks(row.id, user)).map(t => Number(t.id));
+    if (!ids.includes(id)) {
+      const err = new Error('common.NOT_FOUND');
+      err.statusCode = 404;
+      throw err;
+    }
+    const clamped = Math.min(Math.floor(target), ids.length - 1);
+    const next = ids.filter(v => v !== id);
+    next.splice(clamped, 0, id);
+    return this.reorderIndexes({ listId, indexIds: next, user });
+  }
+
+  /** 清空播放列表（只删映射，不动歌单本身） */
+  async clearIndexes({ listId, user }) {
+    const row = await this._ensureListAccess({ listId, user });
+    await this.knexMusic(this.mapTableName).where({ list_id: row.id }).delete();
     return true;
   }
 

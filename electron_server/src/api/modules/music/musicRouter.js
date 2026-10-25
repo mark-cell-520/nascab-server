@@ -46,6 +46,9 @@ router.post('/playlist/update', authenticateJWT, playListController.update);
 router.post('/playlist/delete', authenticateJWT, playListController.delete);
 router.post('/playlist/index/add', authenticateJWT, playListController.addIndexes);
 router.post('/playlist/index/remove', authenticateJWT, playListController.removeIndexes);
+router.post('/playlist/index/reorder', authenticateJWT, playListController.reorderIndexes);
+router.post('/playlist/index/move', authenticateJWT, playListController.moveIndex);
+router.post('/playlist/index/clear', authenticateJWT, playListController.clearIndexes);
 
 router.post('/favorite/add', authenticateJWT, musicFavoriteController.add);
 router.post('/favorite/remove', authenticateJWT, musicFavoriteController.remove);

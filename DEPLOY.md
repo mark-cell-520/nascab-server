@@ -90,6 +90,31 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 | 日志查看器 5 秒轮询 | 日志文本没变就直接返回；且只在用户本来就在底部时才跟随滚动，往上翻看历史不会被拽走 |
 | 趋势数据 | `state.history` 固定上限 24 个采样点，不会无限增长 |
 
+### 媒体：音乐播放与影视清晰度
+
+控制台自带「音乐」与「影视」两个页面（`web/console/pages-media.js`，同样是纯静态无依赖）。
+
+**音乐**：左侧库导航（全部歌曲 / 专辑 / 艺人 / 最近播放 / 我的收藏）加歌单列表；主区曲目表；
+底部是**常驻播放器栏**，切页面不中断。播放器带播放队列抽屉（可上移/下移/移除/点选）、
+顺序/随机/单曲三种模式、进度拖动、音量、LRC 歌词逐行高亮。
+播放队列存在 `localStorage`，刷新页面不丢。
+
+歌单本身做了两处修漏：`play_list2index` 增加 `position` 列（老库自动补列并按加入顺序回填），
+并新增 `playlist/index/reorder`、`playlist/index/move`、`playlist/index/clear` 三个接口；
+`/api/music/list` 带 `list_id` 时改为按 `position` 排序——改造前走的是 `m.id desc`，
+用户排的顺序根本不会生效。`playlist/get` 现在也返回曲目列表。
+
+**影视**：海报墙（搜索 / 类型 / 排序 / 分页）+ 详情弹层（评分、时长、分辨率、演员、简介、续播进度）。
+播放器是全屏舞台，核心是**清晰度选择**：`原画 / 1080P / 720P / 480P / 360P` 五档，
+档位表由 `GET /api/videoPlayer/qualities` 按源分辨率算出——源只有 720p 时 1080p 一档会被禁用并标注
+「高于源分辨率，不推荐」，放大不会更清晰只会浪费带宽。切清晰度从当前播放位置接着播，不从头开始。
+
+上游的转码接口只接受 `width` / `resolution` / `bitrate` 三个裸参数，其中 `resolution` 还只认
+`1920x1080` 这种 WxH 写法——传 `"1080p"` 会被 `parseResolution` 静默忽略，结果是「选了清晰度但没有任何变化」。
+新增 `src/utils/videoQualityUtil.js` 把档位收敳成一份 canonical 定义（档位 key → 宽/高/码率/maxrate/bufsize），
+`/transcode` 与 `/stream-mp4` 都从这儿取参数，前端也只认档位 key。显式传 `width`/`bitrate` 的老调用方行为不变。
+清晰度偏好写进 `video_play_preference.quality`，下次打开同一部影片自动回到上次选的档位。
+
 服务端这边：`collectSystemInfo()` 的静态部分（`package.json`、CPU 型号、核心数）按进程缓存——
 其中 `os.cpus()` 在 Windows 上每次调用都会重新构造一份「每个逻辑核一个对象」的数组，
 概览页每 3 秒调一次，不缓存就是每分钟制造一整套纯垃圾。
@@ -101,6 +126,24 @@ NASCAB_ADMIN_USER=admin NASCAB_ADMIN_PASSWORD='换成一个强密码' node src/m
 | `GET /api/console/bootstrap` | 无 | 产品名与版本号，供登录页显示 |
 | `GET /api/console/overview` | 登录用户 | 设备信息 + 硬件指标（非管理员只返回设备信息） |
 | `GET /api/console/logs?file=combined&lines=300` | 管理员 | 日志尾部；文件名白名单（combined/error/access），最多读 1MB / 1000 行 |
+
+### 媒体相关接口（控制台「音乐」「影视」页用到）
+
+| 接口 | 鉴权 | 说明 |
+|---|---|---|
+| `GET /api/videoPlayer/qualities?filePath=...` | 登录用户 + 文件 view/download 权限 | 可选清晰度档位表 + 源分辨率 + 用户上次选择 |
+| `GET /api/videoPlayer/transcode?...&quality=720p` | 同上 | HLS 转码；`quality` 为档位 key，`original` 会 400 指引走原画直链 |
+| `GET /api/videoPlayer/stream-mp4?...&quality=480p` | 同上 | fMP4 流；带缩放参数时自动重编码 |
+| `POST /api/videoPlayer/preference` | 同上 | 续播位置 + 清晰度偏好 |
+| `POST /api/music/playlist/index/reorder` | 登录用户 | 整体重排，`index_ids` 为完整顺序（可为子集） |
+| `POST /api/music/playlist/index/move` | 登录用户 | 单曲移到 `to_position`（0 基，越界夹紧） |
+| `POST /api/music/playlist/index/clear` | 登录用户 | 清空歌单曲目，不动歌单本身 |
+| `POST /api/music/playlist/get` | 登录用户 | 歌单元信息 + 曲目列表（按 `position`） |
+| `GET /api/music/cover?file_path=...&size=300` | 登录用户 | 内嵌封面（`has_inner_cover=1` 才有） |
+| `GET /api/music/transcode?path=...` | 登录用户 + 文件权限 | 192k MP3 兜底（浏览器解不了的格式），支持 Range |
+
+> 媒体地址都要带 `accessToken` 查询参数（`<audio>`/`<video>` 的 `src` 发不出 `Authorization` 头），
+> 服务端 `extractTokenFromRequest` 认这个参数。文件管理器的缩略图与下载一直是这么做的。
 
 ### 访问与安全
 
@@ -553,7 +596,7 @@ server {
 
 ## 改造清单
 
-源码改造（相对上游基线 `upstream-v1.2.5`，共 4 次提交）：
+源码改造（相对上游基线 `upstream-v1.2.5`，共 11 次提交，第 1 次为上游基线）：
 
 | 文件 | 改造 |
 |---|---|
@@ -597,6 +640,18 @@ server {
 | `web/console/index.html` | `color-scheme` 支持深浅；用户菜单与登录页页脚各加一个主题入口 |
 | `src/api/modules/console/consoleController.js` | `package.json`/CPU 型号/核心数按进程缓存——`os.cpus()` 在 Windows 上每次调用都重新构造整个数组，概览页 3 秒一次轮询，不缓存就是持续制造垃圾 |
 | `src/api/controlServer.js` | 多 worker 抢控制端口时按 info 记录而非 error（不是故障，报了会让运维误判）。补充说明：cluster worker 的 `listen` 会经主进程共享句柄完成绑定，多个 express worker 实际是**共享**同一个控制端口，单个 worker 挂掉不影响控制接口 |
+| `src/utils/videoQualityUtil.js` | **新增**。清晰度档位的唯一来源：档位 key → 宽/高/码率/maxrate/bufsize，`normalizeQualityKey` 兼容 `1080p`/`FHD`/`1920x1080`/`source` 等写法，`listQualities` 按源分辨率收窄档位（不放大），`resolveQuality` 出 ffmpeg 参数 |
+| `src/api/modules/videoPlayer/videoPlayerController.js` | `/transcode` 新增 `quality` 参数并映射到 resolution/bitrate/maxrate/bufsize；新增 `GET /qualities` 返回可选档位表；`/info` 附带档位表；`/stream-mp4` 支持 `width`/`bitrate`/`quality`（带缩放参数时自动从 `mode=copy` 退到重编码，避免「选了 720p 出来还是原画」）；`/preference` 持久化清晰度 |
+| `src/workers/transcodeWorker.js` | 透出 `options.maxrate`/`options.bufsize` 到 `-maxrate`/`-bufsize`（只有 `-b:v` 时 x264 在复杂场景会冲到远超目标值，流式播放表现为带宽抖动） |
+| `src/db/table/tableVideoPlayPreference.js` | 新增 `quality` 列，老库自动 `ADD COLUMN` |
+| `src/api/modules/videoPlayer/videoPlayerService.js` | 偏好读写带上 `quality`，落库前过一遍 `normalizeQualityKey`，脏值落空而不是把任意字符串存进库 |
+| `src/db/table/tableMusicPlayList2Index.js` | **新增 `position` 列**（播放顺序），老库自动补列并按 `create_time` + `index_id` 回填；新增 `(list_id, position)` 索引 |
+| `src/api/modules/music/playlist/playListService.js` | 加歌按调用方传入的顺序分配 position；新增 `reorderIndexes`（整体重排，提交子集时未提到的按原相对次序移到队尾）、`moveIndex`（单曲移到指定位置，越界夹紧）、`clearIndexes`（清空曲目）；`getList` 现在返回曲目列表；歌单预览图改按播放顺序取 |
+| `src/api/modules/music/playlist/playListController.js`、`musicRouter.js` | 新增 `playlist/index/reorder`、`playlist/index/move`、`playlist/index/clear` 三个接口 |
+| `src/api/modules/music/list/musicListService.js` | 带 `list_id` 时按 `pl.position` 排序——**改造前固定 `m.id desc`，用户在歌单里排的顺序完全不会生效** |
+| `web/console/pages-media.js` | **新增**。音乐页（库导航/专辑/艺人/最近播放/收藏/歌单）+ 常驻播放器（队列抽屉、三种播放模式、进度与音量、LRC 歌词逐行高亮、队列持久化到 localStorage）+ 影视页（海报墙、详情弹层、续播进度）+ 全屏播放器（清晰度选择、断点续播、Esc/空格快捷键） |
+| `web/console/console.js`、`console.css`、`index.html` | 导航新增「媒体」分组（影视/音乐）；补足播放器栏、队列抽屉、歌词面板、海报墙、清晰度菜单、影片详情的样式（同样走设计令牌，暗色自动生效） |
+| `electron_server/language/*.json` | 新增 `videoPlayer.QUALITY_ORIGINAL_USE_RAW`（原画不走转码，应改走原画直链） |
 
 部署产物：`deploy/config.example.json`、`deploy/systemd/`、`deploy/docker/`、`deploy/windows/`、`deploy/scripts/`。
 
@@ -617,6 +672,20 @@ server {
 - `deploy/scripts/start.sh` 的 start/stop/status/重复启动保护
 - `deploy/scripts/start.ps1` 的 Start/Status/Stop 全生命周期，以及强杀后带残留锁重启自动接管
 - 两个 `.ps1` 脚本均通过 PowerShell 5.1 语法解析（文件带 UTF-8 BOM）
+
+### 媒体播放（本轮新增）
+
+以下在本机实测通过（Node 22.20.0，真实启动的服务端）：
+
+- 清晰度档位表：`GET /api/videoPlayer/qualities` 返回 5 档、原画在最前；探针拿不到分辨率时全部档位仍可选、推荐退回 720p（不 500）；缺 `filePath` 与无 token 均被拒
+- `/transcode?quality=720p` 返回 m3u8 且分片指向 `/api/videoPlayer/hls/<playId>/segment_000.ts`；`quality=original` 明确 400 指引走原画直链；无法识别的档位与不带 `quality` 的老调用方行为不变
+- 清晰度偏好落库与读回；脏值（如「垃圾值」）不落库；别名 `source` 归一为 `original`
+- 播放列表：`position` 从 1 连续递增且与加入顺序一致；整体重排、单曲移动（含越界夹紧）、提交子集时未提及项按原相对次序移到队尾、清空、增量加入排到末尾，全部实测
+- **老库补列**：造一个没有 `position` 列的旧库，`createTable` 自动补列并按 `create_time`+`index_id` 回填
+- `/api/music/list` 带 `list_id` 时按 `position` 返回，重排后接口顺序跟着变（改造前固定 `m.id desc`，排序无效）
+- 事务内误用 `knex` 而非 `trx` 导致 SQLite 单连接池死锁——已修，测试可复现
+- 页面渲染：音乐页库导航/歌单栏/播放全部、常驻播放器栏与队列抽屉创建、播放器控件齐全、队列从 `localStorage` 恢复、影视页筛选栏与海报网格，均无运行时错误
+- 用无头 Chrome 实际截图核对浅色/暗色下的音乐页、影视页与播放器舞台（含清晰度菜单）
 
 ### Web 控制台（本轮新增）
 

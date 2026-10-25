@@ -2,7 +2,8 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "This subtitle file has expired. Please download another subtitle.",
-      "SUBTITLE_DELETE_FAILED": "Failed to delete subtitle"
+      "SUBTITLE_DELETE_FAILED": "Failed to delete subtitle",
+      "QUALITY_ORIGINAL_USE_RAW": "Original quality does not use transcoding; play via the raw file link instead"
     },
     "fileMount": {
       "START_FAILED": "Mount start failed: %s",
