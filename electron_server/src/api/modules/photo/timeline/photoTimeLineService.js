@@ -253,7 +253,6 @@ class PhotoTimeLineService {
                 .replace(/["']/g, '')
                 .trim()}*`;
             if (finalQuery !== '*') {
-              console.log('finalQuery', finalQuery);
               builder.orWhereRaw('photo_index.file_hash IN (SELECT file_hash FROM photo_info_fts WHERE ocr MATCH ?)', [finalQuery]);
             }
           }
@@ -419,10 +418,14 @@ class PhotoTimeLineService {
     if (startTime && endTime) {
       const [start, end] = startTime.getTime() <= endTime.getTime() ? [startTime, endTime] : [endTime, startTime];
       query.whereBetween('photo_index.original_time', [start.getTime(), end.getTime()]);
-    } else {
-      console.log('缺少请求参数 startTime or endTime is null');
-      return [];
+    } else if (startTime) {
+      // 只给了下界：取该时刻起（含）之后的照片，而不是把整段查询丢弃成空列表
+      query.where('photo_index.original_time', '>=', startTime.getTime());
+    } else if (endTime) {
+      // 只给了上界：取该时刻止（含）之前的照片
+      query.where('photo_index.original_time', '<=', endTime.getTime());
     }
+    // 两个边界都没有时不加时间过滤，按其它条件（search/geohash/album/face/year...）查询
 
     // 排序：普通列表按拍摄时间排，收藏列表按收藏时间排（与影音库一致）
     const sortOrder = params.sort === 'asc' ? 'asc' : 'desc';
@@ -445,7 +448,6 @@ class PhotoTimeLineService {
       query.select([...selectFields, knex.raw('CASE WHEN photo_favorite.id IS NOT NULL THEN 1 ELSE 0 END as is_favorite')]);
     }
     const list = await query;
-    console.log(query.toString());
 
     // 原始文件扩展名 + 原始文件扩展名（大写）用于前端展示
     function rawShowExt(item) {
@@ -466,7 +468,6 @@ class PhotoTimeLineService {
       fullpath: path.join(item.path, item.filename), // 添加 fullpath
       raw_show_ext: rawShowExt(item),
     }));
-    console.log("photoList",photoList.length)
     return photoList;
   }
 
