@@ -571,12 +571,36 @@ function handleTerminalConnectSession(ctx) {
   }
 }
 
+/**
+ * 校验一条终端 IPC 是不是真的来自会话主人。
+ * 会话只按 sessionId 索引，而 sessionId 对客户端可见（ready 消息里就带着），
+ * 不核对归属的话，拿到别人的 sessionId 就能往别人的 shell 里灌命令。
+ * 主进程和 expressWorker 是同一次部署一起重启的，不存在新旧版本混跑窗口，
+ * 所以这里 fail-closed：带不出 userId 一律按越权拒绝。
+ */
+function assertSessionOwnership(session, data, action) {
+  if (!session) return false;
+  const claimed = sanitizeString(data && data.userId);
+  const owner = sanitizeUserId(session.userId);
+  if (!claimed || !owner || claimed !== owner) {
+    Logger.security('terminal.session_ownership_mismatch', owner || 'unknown', {
+      action,
+      sessionId: session && session.sessionId ? session.sessionId : '',
+      claimedUserId: claimed || '(missing)',
+      ownerUserId: owner || '(missing)',
+    });
+    return false;
+  }
+  return true;
+}
+
 function handleTerminalDetachSession(ctx) {
   const data = (ctx && ctx.message && ctx.message.data) || {};
   const sessionId = sanitizeString(data.sessionId);
   if (!sessionId) return;
   const session = sessionsById.get(sessionId);
   if (!session) return;
+  if (!assertSessionOwnership(session, data, 'detach')) return;
   session.detach({ workerPid: safeWorkerPid(ctx && ctx.expressWorker) });
   Logger.info('Terminal session count', {
     totalSessions: countActiveSessions(),
@@ -591,6 +615,7 @@ function handleTerminalInput(ctx) {
   const sessionId = sanitizeString(data.sessionId);
   const session = sessionId ? sessionsById.get(sessionId) : null;
   if (!session) return;
+  if (!assertSessionOwnership(session, data, 'input')) return;
   session.handleInput(data.data);
 }
 
@@ -599,6 +624,7 @@ function handleTerminalResize(ctx) {
   const sessionId = sanitizeString(data.sessionId);
   const session = sessionId ? sessionsById.get(sessionId) : null;
   if (!session) return;
+  if (!assertSessionOwnership(session, data, 'resize')) return;
   session.resize(data.cols, data.rows);
 }
 
@@ -607,6 +633,7 @@ function handleTerminalTerminateSession(ctx) {
   const sessionId = sanitizeString(data.sessionId);
   const session = sessionId ? sessionsById.get(sessionId) : null;
   if (!session) return;
+  if (!assertSessionOwnership(session, data, 'terminate')) return;
   session.sendEvent({ type: 'exit', exitCode: null, signal: 'terminated' });
   session.dispose({ reason: 'terminated_by_client' });
 }

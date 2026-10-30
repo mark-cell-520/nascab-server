@@ -145,6 +145,22 @@ function normalizeConnectErrorCode(error) {
   return 'TERMINAL_START_FAILED';
 }
 
+/**
+ * 取出这条 WS 连接对应的登录用户 id。
+ * 终端会话在 msgHandler 里只按 sessionId 索引，光有 sessionId 无法证明
+ * "这条连接就是会话的主人"，所以每条 IPC 都必须带上 userId 让主进程复核。
+ * 归一化规则和 msgHandler 的 sanitizeString 保持一致（只 trim，不截断），
+ * 否则长 id 会在两边得到不同字符串，被误判成越权。
+ */
+function connectionUserId(connection) {
+  const req = connection && connection.req;
+  const id = req && req.user ? req.user.id : '';
+  if (id === undefined || id === null) return '';
+  const text = String(id).trim();
+  if (!text || text === 'undefined' || text === 'null') return '';
+  return text;
+}
+
 function sendIpcMessage(type, data) {
   if (typeof process.send !== 'function') return false;
   try {
@@ -166,6 +182,7 @@ function detachConnection(sessionId, { notifyMain } = {}) {
   if (notifyMain) {
     sendIpcMessage('terminalDetachSession', {
       sessionId,
+      userId: connectionUserId(connection),
       workerPid: process.pid,
     });
   }
@@ -173,6 +190,9 @@ function detachConnection(sessionId, { notifyMain } = {}) {
 
 function bindConnectionSocket(sessionId, connection) {
   const { ws } = connection;
+  // 终端 IPC 只带 sessionId 时，主进程无法判断这条连接是不是会话的主人；
+  // 现在统一附上连接自身的 userId，由 msgHandler 复核，挡掉跨用户劫持。
+  const ownerId = connectionUserId(connection);
 
   ws.on('message', msg => {
     connection.lastSeenAt = Date.now();
@@ -188,20 +208,20 @@ function bindConnectionSocket(sessionId, connection) {
         const rows = Math.max(5, Math.min(200, toInt(obj.rows, connection.rows || DEFAULT_ROWS)));
         connection.cols = cols;
         connection.rows = rows;
-        return sendIpcMessage('terminalResize', { sessionId, cols, rows });
+        return sendIpcMessage('terminalResize', { sessionId, userId: ownerId, cols, rows });
       }
       if (obj.type === 'input') {
-        return sendIpcMessage('terminalInput', { sessionId, data: obj.data });
+        return sendIpcMessage('terminalInput', { sessionId, userId: ownerId, data: obj.data });
       }
       if (obj.type === 'terminate') {
         connection.suppressDetach = true;
-        return sendIpcMessage('terminalTerminateSession', { sessionId });
+        return sendIpcMessage('terminalTerminateSession', { sessionId, userId: ownerId });
       }
       if (obj.type === 'close') {
         const reason = String(obj.reason || '').trim().toLowerCase();
         if (reason === 'terminate') {
           connection.suppressDetach = true;
-          sendIpcMessage('terminalTerminateSession', { sessionId });
+          sendIpcMessage('terminalTerminateSession', { sessionId, userId: ownerId });
         }
         return safeClose(ws, 1000, 'client close');
       }
@@ -214,10 +234,10 @@ function bindConnectionSocket(sessionId, connection) {
       const cols = toInt(arr[2], connection.cols || DEFAULT_COLS);
       connection.cols = cols;
       connection.rows = rows;
-      return sendIpcMessage('terminalResize', { sessionId, cols, rows });
+      return sendIpcMessage('terminalResize', { sessionId, userId: ownerId, cols, rows });
     }
 
-    sendIpcMessage('terminalInput', { sessionId, data: raw });
+    sendIpcMessage('terminalInput', { sessionId, userId: ownerId, data: raw });
   });
 
   ws.on('pong', () => {
