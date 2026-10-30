@@ -269,10 +269,16 @@ class FaceService {
     }
     const faceId = await this.getRootFaceId(rawFaceId);
     const buf = Buffer.from(String(name), 'utf8');
-    await this.knex('photo_faces')
+    const affected = await this.knex('photo_faces')
       .where({ face_id: faceId })
-      .update({ name: buf, update_time: this.knex.fn.now() })
-      .catch(() => {});
+      .update({ name: buf, update_time: this.knex.fn.now() });
+    // 之前这里 .catch(() => {}) 之后无条件 return true，改一个不存在的人脸名也会返回
+    // 200，客户端以为改名成功。affected 为 0 就是人脸不存在。
+    if (!affected) {
+      const err = new Error('common.NOT_FOUND');
+      err.statusCode = 404;
+      throw err;
+    }
     return true;
   }
 
@@ -538,10 +544,15 @@ class FaceService {
       throw err;
     }
     const faceId = await this.getRootFaceId(rawFaceId);
-    await this.knex('photo_faces')
+    const affected = await this.knex('photo_faces')
       .where({ face_id: faceId })
-      .update({ is_hide: isHide, update_time: this.knex.fn.now() })
-      .catch(() => {});
+      .update({ is_hide: isHide, update_time: this.knex.fn.now() });
+    // 同 updateFaceName：不能再把失败吞掉返回 true，否则隐藏一个不存在的人脸也是 200。
+    if (!affected) {
+      const err = new Error('common.NOT_FOUND');
+      err.statusCode = 404;
+      throw err;
+    }
     return true;
   }
 
@@ -746,7 +757,9 @@ class FaceService {
       });
       await this.refreshFaceAggregateInTrx(trx, toFaceId, {
         keepCoverHash:
-            targetCover && targetCover.file_hash ? targetCover.file_hash : movableHashes.first,
+            targetCover && targetCover.file_hash
+                ? targetCover.file_hash
+                : (movableHashes[0] || ''),
       });
     });
 
@@ -767,6 +780,15 @@ class FaceService {
     const qualityNum = Number(params.quality);
     const quality = Number.isFinite(qualityNum) && qualityNum >= 1 && qualityNum <= 100 ? qualityNum : 85;
     const validPaths = Array.isArray(params.validPaths) ? params.validPaths.filter(Boolean) : [];
+    // 和 listFaces / listPhotoFaces 同一约定：params.validPaths 被传进来且是空数组，
+    // 表示这个用户没有任何可访问的照片来源。下面的路径过滤是 `validPaths.length > 0`
+    // 才生效的，空数组会退化成「不过滤」——等于把任意人脸截图发给无权限用户，
+    // 所以这里必须显式按 404 挡掉。管理员不传 validPaths，不受影响。
+    if (params.validPaths !== undefined && validPaths.length === 0) {
+      const err = new Error('common.NOT_FOUND');
+      err.statusCode = 404;
+      throw err;
+    }
 
     let query = this.knex('photo_face2filehash')
       .join('photo_index', 'photo_index.file_hash', 'photo_face2filehash.file_hash')
@@ -910,6 +932,18 @@ class FaceService {
     }
     const uniqueRootIds = [...new Set(rootIds)];
     if (uniqueRootIds.length === 0) {
+      const err = new Error('common.NOT_FOUND');
+      err.statusCode = 404;
+      throw err;
+    }
+    // getRootFaceId 对不存在的 face_id 会原样返回，所以上面筛不掉「人脸根本不存在」。
+    // 不补这一步的话，下载一个不存在的人脸会一路走到控制器的 filtered.length === 0，
+    // 对外报 403「权限不足」——把参数错误说成权限问题，客户端没法区分。
+    const existRows = await this.knex('photo_faces')
+      .whereIn('face_id', uniqueRootIds)
+      .select('face_id')
+      .catch(() => []);
+    if (!Array.isArray(existRows) || existRows.length === 0) {
       const err = new Error('common.NOT_FOUND');
       err.statusCode = 404;
       throw err;

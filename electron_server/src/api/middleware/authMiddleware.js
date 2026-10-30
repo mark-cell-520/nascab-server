@@ -21,6 +21,7 @@ const authenticateJWT = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: getLocalizedMessage(req, 'auth.ACCESS_DENIED_NO_TOKEN'),
+        code: 'auth.ACCESS_DENIED_NO_TOKEN',
       });
     }
 
@@ -37,10 +38,10 @@ const authenticateJWT = async (req, res, next) => {
     req.user.id = req.user.userId || req.user.id;
 
     if (!req.dbMain) {
-      console.log('req.dbMain', req.dbMain);
       return res.status(500).json({
         success: false,
         message: getLocalizedMessage(req, 'auth.AUTHENTICATION_ERROR'),
+        code: 'auth.AUTHENTICATION_ERROR',
       });
     }
 
@@ -65,6 +66,7 @@ const authenticateJWT = async (req, res, next) => {
         return res.status(403).json({
           success: false,
           message: getLocalizedMessage(req, 'auth.API_NOT_ALLOWED'),
+          code: 'auth.API_NOT_ALLOWED',
         });
       }
     }
@@ -72,7 +74,7 @@ const authenticateJWT = async (req, res, next) => {
     try {
       await req.dbMain('user_token').where({ id: tokenRecord.id }).update({ last_active_time: new Date() });
     } catch (err1) {
-      console.log('err1', err1);
+      Logger.error(`Failed to update token last_active_time: ${err1.message}`);
     }
 
     next();
@@ -98,6 +100,7 @@ const authenticateJWT = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: getLocalizedMessage(req, 'auth.AUTHENTICATION_ERROR'),
+      code: 'auth.AUTHENTICATION_ERROR',
     });
   }
 };
@@ -105,12 +108,22 @@ const authenticateJWT = async (req, res, next) => {
 /**
  * 管理员权限验证中间件
  * 要求用户必须是管理员或超级管理员
+ *
+ * 错误体和 ResponseUtil.error 保持同一约定：除 message 外必须带 `code`。客户端
+ * ApiErrorLocalizer 只认 `模块.键` 形式的 code 去查翻译表，缺 code 就只能退回服务端按
+ * Accept-Language 翻好的 message，App 内切换语言后提示会串语言。
+ *
+ * 403 的 code 统一取 'auth.PERMISSION_DENIED' 而不是 message 键
+ * 'auth.INSUFFICIENT_ADMIN_PERMISSION'：客户端对「没权限」只有一个分支
+ * （api_error_localizer 里已注册 auth.PERMISSION_DENIED），各路由自己抛的权限错误
+ * 用的也是这个键，两边对齐才能落到同一句本地化文案上。
  */
 const requireAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
       message: getLocalizedMessage(req, 'auth.AUTHENTICATION_REQUIRED'),
+      code: 'auth.AUTHENTICATION_REQUIRED',
     });
   }
 
@@ -118,6 +131,7 @@ const requireAdmin = (req, res, next) => {
     return res.status(403).json({
       success: false,
       message: getLocalizedMessage(req, 'auth.INSUFFICIENT_ADMIN_PERMISSION'),
+      code: 'auth.PERMISSION_DENIED',
     });
   }
 
@@ -133,6 +147,7 @@ const requireSuperAdmin = (req, res, next) => {
     return res.status(401).json({
       success: false,
       message: getLocalizedMessage(req, 'auth.AUTHENTICATION_REQUIRED'),
+      code: 'auth.AUTHENTICATION_REQUIRED',
     });
   }
 
@@ -140,6 +155,7 @@ const requireSuperAdmin = (req, res, next) => {
     return res.status(403).json({
       success: false,
       message: getLocalizedMessage(req, 'auth.INSUFFICIENT_ADMIN_PERMISSION'),
+      code: 'auth.PERMISSION_DENIED',
     });
   }
 

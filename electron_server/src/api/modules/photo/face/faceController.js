@@ -50,7 +50,9 @@ class FaceController {
       const result = await service.listFaces({ ...(req.body || {}), ...(validPaths !== undefined ? { validPaths } : {}) });
       return ResponseUtil.success(req, res, { faceEnable, ...result }, 'common.SUCCESS', 200);
     } catch (e) {
-      return ResponseUtil.error(req, res, 'common.ERROR', 500);
+      const msgKey = e && e.message ? e.message : 'common.ERROR';
+      const statusCode = e && e.statusCode ? Number(e.statusCode) : msgKey === 'common.NOT_FOUND' ? 404 : msgKey === 'common.PARAM_ERROR' ? 400 : 500;
+      return ResponseUtil.error(req, res, msgKey, statusCode);
     }
   }
 
@@ -240,6 +242,13 @@ class FaceController {
       const validPathsRaw = await photoTimeLineService.getValidPaths(req.user);
       const validPathsForQuery = (validPathsRaw || []).map(p => (p ? String(p) : '')).filter(Boolean);
       const validPaths = validPathsForQuery.map(p => path.resolve(String(p)));
+
+      // 和 listFaces / listPhotoFaces / getFaceImageBuffer 同一约定：validPaths 是空数组
+      // 表示该用户没有任何可访问的照片来源。下面的过滤是 `validPaths.length > 0 && ...`
+      // 才生效的，空数组会退化成「不过滤」——那等于把全部人脸照片打包送给无权限用户。
+      if (Array.isArray(validPathsRaw) && validPathsForQuery.length === 0) {
+        return ResponseUtil.error(req, res, 'auth.PERMISSION_DENIED', 403);
+      }
 
       const service = new FaceService(req.dbPhoto);
       const rows = await service.listFacePhotoIndexRows({ faceIds: raw, validPaths: validPathsForQuery });
