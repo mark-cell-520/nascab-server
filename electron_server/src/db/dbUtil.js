@@ -122,6 +122,10 @@ class DbUtil {
         connection: this.getConnectMainDb(),
       },
       {
+        fileName: 'tableMessageRead', //消息已读状态表（按用户记账）
+        connection: this.getConnectMainDb(),
+      },
+      {
         fileName: 'tableFileMount', //文件挂载配置表
         connection: this.getConnectMainDb(),
       },

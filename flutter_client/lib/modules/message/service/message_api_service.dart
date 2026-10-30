@@ -50,28 +50,29 @@ class MessageApiService extends BaseApiService {
     return response.data ?? {};
   }
 
-  Future<Map<String, dynamic>> markAsRead({int? messageId}) async {
-    final response = await apiPost<Map<String, dynamic>>(
+  // 已读/删除/清空都会改服务端状态，调用方必须知道有没有成功：
+  // 服务端现在会按属主鉴权（403）、按 level 过滤，失败时不能照旧改本地列表。
+  Future<ApiResponse<Map<String, dynamic>>> markAsRead({int? messageId}) {
+    return apiPost<Map<String, dynamic>>(
       '/api/message/markAsRead',
       body: {if (messageId != null) 'messageId': messageId},
     );
-    return response.data ?? {};
   }
 
-  Future<Map<String, dynamic>> deleteMessage({required int messageId}) async {
-    final response = await apiPost<Map<String, dynamic>>(
+  Future<ApiResponse<Map<String, dynamic>>> deleteMessage({
+    required int messageId,
+  }) {
+    return apiPost<Map<String, dynamic>>(
       '/api/message/delete',
       body: {'messageId': messageId},
     );
-    return response.data ?? {};
   }
 
-  Future<Map<String, dynamic>> clearMessages({int? level}) async {
-    final response = await apiPost<Map<String, dynamic>>(
+  Future<ApiResponse<Map<String, dynamic>>> clearMessages({int? level}) {
+    return apiPost<Map<String, dynamic>>(
       '/api/message/clear',
       body: {if (level != null) 'level': level},
     );
-    return response.data ?? {};
   }
 
   Future<Map<String, dynamic>> getUnreadCount() async {
