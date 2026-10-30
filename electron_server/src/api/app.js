@@ -310,6 +310,30 @@ app.use((req, res) => {
 
 // 错误处理中间件
 app.use((err, req, res, next) => {
+  // body-parser 的失败是客户端自己把请求体写坏了（JSON 语法错误、体量超限、
+  // 编码不支持），err.type 形如 entity.parse.failed / entity.too.large /
+  // charset.unsupported。这类错误的 message 是 "Unexpected token ..." 之类的
+  // 原文，既不像 i18n 键也谈不上是服务器内部问题，之前一律落到
+  // common.INTERNAL_SERVER_ERROR，客户端看到的是"服务器内部错误"——
+  // 一个纯前端Bug被报成后端故障，排查方向直接被带偏。这里按 type 归位到
+  // 客户端错误语义，日志也只记一行，不再打整段堆栈刷错误日志。
+  const bodyParseTypes = {
+    'entity.parse.failed': { status: 400, key: 'common.INVALID_PARAMS' },
+    'entity.too.large': { status: 413, key: 'common.INVALID_PARAMS' },
+    'encoding.unsupported': { status: 415, key: 'common.INVALID_PARAMS' },
+    'charset.unsupported': { status: 415, key: 'common.INVALID_PARAMS' },
+    'parameters.too.many': { status: 413, key: 'common.INVALID_PARAMS' },
+  };
+  const bodyParse = err && typeof err.type === 'string' ? bodyParseTypes[err.type] : null;
+  if (bodyParse) {
+    Logger.warn('请求体解析失败:', err.type, { url: req.url, method: req.method, ip: req.ip });
+    return res.status(bodyParse.status).json({
+      success: false,
+      message: _safeLocalize(req, bodyParse.key),
+      code: bodyParse.key,
+    });
+  }
+
   Logger.error('Express error:', err, {
     url: req.url,
     method: req.method,
