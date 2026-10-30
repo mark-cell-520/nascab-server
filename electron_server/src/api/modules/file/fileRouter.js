@@ -66,6 +66,12 @@ router.post('/quick/favorites/add', authenticateJWT, favoriteController.add);
 // 移除收藏
 router.post('/quick/favorites/remove', authenticateJWT, favoriteController.remove);
 
+// 收藏列表
+router.post('/quick/favorites/list', authenticateJWT, favoriteController.list);
+
+// 最近访问列表
+router.post('/quick/recent', authenticateJWT, recentController.list);
+
 // 清除最近访问记录
 router.post('/quick/recent/clear', authenticateJWT, recentController.clear);
 

@@ -150,7 +150,6 @@ async function getStoredRefreshToken(knex, tableConfig) {
 
 async function refreshNasCabTokens(knex, tableConfig, apiConfig) {
   const refreshToken = await getStoredRefreshToken(knex, tableConfig);
-  console.log('refreshToken', refreshToken);
   if (!refreshToken) return { ok: false, reason: 'missing' };
 
   const serverId = await ensureServerId(tableConfig);

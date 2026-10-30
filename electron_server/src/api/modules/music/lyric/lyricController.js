@@ -49,7 +49,6 @@ async function _trimLyricSearchLog(knex) {
 
 class LyricController {
   async search(req, res) {
-    console.log('搜索歌词接口请求', req.body);
     try {
       const raw = String(req.body?.keyword ?? req.body?.q ?? '').trim();
       const keyword = _normalizeSearchKeyword(raw);

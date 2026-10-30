@@ -242,7 +242,6 @@ class ServiceController {
     if (!userJson) {
       return ResponseUtil.error(req, res, 'service.USER_SERIALIZE_FAILED', 500);
     }
-    console.log('userJson', userJson);
     try {
       await req.dbMain.transaction(async trx => {
         await nascabAccountUtil.setEncryptedConfigValue(trx, tableConfig, nascabAccountUtil.NASCAB_KEYS.accessToken, newToken);
