@@ -4,6 +4,7 @@ const { pathToFileURL } = require('url');
 const config = require('../../../config/config');
 const tableConfig = require('../../../db/table/tableConfig');
 const { hasPermission } = require('../../../utils/permissionUtil');
+const Logger = require('../../../utils/logger');
 const {
   APP_MARK,
   DEFAULT_GROUP_ID,
@@ -39,6 +40,9 @@ const {
   isDefaultGroupFolderName,
   createNoteRecord,
 } = require('./notesFileUtil');
+
+// PDF 退化提示每个进程只打一次，避免每次导出都刷一行
+let pdfFallbackWarned = false;
 
 function cloneAttrs(attrs) {
   if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) return undefined;
@@ -1079,16 +1083,33 @@ class NotesService {
   }
 
   async selectNotebook({ knex, user, folderPath }) {
-    const targetPath = path.resolve(ensureString(folderPath).trim());
-    if (!targetPath) {
+    // path.resolve('') 会回落到 process.cwd()，空串（或全空白）就会一路走到
+    // isDirEmpty(cwd)，报出"目录非空"这种和真实原因对不上号的错。
+    // 所以先按 resolve 之前的原始字符串拦一道。
+    const rawPath = ensureString(folderPath).trim();
+    if (!rawPath) {
       throw this._toError('file.INVALID_PARAMS', 400);
     }
+    const targetPath = path.resolve(rawPath);
     const st = await fs.promises.stat(targetPath).catch(() => null);
     if (!st || !st.isDirectory()) {
       throw this._toError('common.NOT_FOUND', 404);
     }
 
-    await fs.promises.access(targetPath, fs.constants.R_OK | fs.constants.W_OK);
+    // access 抛的是裸 OS 错误，normalizeError 会把 EACCES/ENOENT 整条消息当成
+    // 非用户可见内容换成 common.ERROR，权限不足和目录消失都变成同一个 500。
+    try {
+      await fs.promises.access(targetPath, fs.constants.R_OK | fs.constants.W_OK);
+    } catch (error) {
+      const code = error && error.code;
+      if (code === 'EACCES' || code === 'EPERM') {
+        throw this._toError('auth.PERMISSION_DENIED', 403);
+      }
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        throw this._toError('common.NOT_FOUND', 404);
+      }
+      throw this._toError('common.ERROR', 500);
+    }
 
     let manifest = await readJson(getManifestPath(targetPath), null);
     let index = await readJson(getIndexPath(targetPath), null);
@@ -1372,16 +1393,35 @@ class NotesService {
     throw this._toError('file.INVALID_PARAMS', 400);
   }
 
-  async _renderPdfBufferFromHtml(html) {
+  /**
+   * 把 HTML 渲染成 PDF。Electron 桌面端走 printToPDF。
+   *
+   * NascabOS 的常驻进程是 headless 的（supervisord 起的 node，没有 Electron 主进程），
+   * require('electron') 在这里必然失败。原来直接抛 common.ERROR，用户侧只看到一个
+   * 没有说明的"发生错误"，而这个功能其实是完全可用的：
+   * buildHtmlDocument 产出的文档自带 `@page { size: A4 }`，浏览器打开后
+   * 打印/另存为 PDF 就能得到同样的版式。所以退回去交这份 HTML，而不是裸 500。
+   */
+  async _renderPdfFromHtml(html) {
     let app;
     let BrowserWindow;
     try {
       ({ app, BrowserWindow } = require('electron'));
     } catch (_) {
-      throw this._toError('common.ERROR', 500);
+      app = null;
+      BrowserWindow = null;
     }
     if (!app || !BrowserWindow) {
-      throw this._toError('common.ERROR', 500);
+      if (!pdfFallbackWarned) {
+        pdfFallbackWarned = true;
+        Logger.warn('notes: 当前进程无 Electron，PDF 导出退化为可打印 HTML', {
+          hint: '浏览器打开后打印/另存为 PDF',
+        });
+      }
+      return {
+        buffer: Buffer.from(html, 'utf8'),
+        contentType: 'text/html; charset=utf-8',
+      };
     }
     await app.whenReady();
     const win = new BrowserWindow({
@@ -1397,10 +1437,13 @@ class NotesService {
       await win.loadURL(
         `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
       );
-      return await win.webContents.printToPDF({
-        printBackground: true,
-        preferCSSPageSize: true,
-      });
+      return {
+        buffer: await win.webContents.printToPDF({
+          printBackground: true,
+          preferCSSPageSize: true,
+        }),
+        contentType: 'application/pdf',
+      };
     } finally {
       if (!win.isDestroyed()) {
         win.destroy();
@@ -1435,12 +1478,14 @@ class NotesService {
         fileName: buildExportFileName(note, 'markdown'),
       };
     }
+    const rendered = await this._renderPdfFromHtml(
+      buildHtmlDocument(note, delta, noteFolderPath),
+    );
+    const isPdf = rendered.contentType === 'application/pdf';
     return {
-      buffer: await this._renderPdfBufferFromHtml(
-        buildHtmlDocument(note, delta, noteFolderPath),
-      ),
-      contentType: 'application/pdf',
-      fileName: buildExportFileName(note, 'pdf'),
+      buffer: rendered.buffer,
+      contentType: rendered.contentType,
+      fileName: buildExportFileName(note, isPdf ? 'pdf' : 'html'),
     };
   }
 
