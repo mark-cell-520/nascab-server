@@ -1285,11 +1285,22 @@ class VideoPlayerController {
       },
     });
 
+    // destination 里 cb(new Error('模块.键')) 抛的是 i18n 键，不是 multer 的原文错误。
+    // 不区分就会把「缺 filePath」「文件不存在」这类客户端输入问题报成 500 服务端故障，
+    // 前端无法据此分流——所以先按键放行，剩下的才走兜底。
+    const multerKeyStatus = new Map([
+      ['videoPlayer.INVALID_PARAMS', 400],
+      ['file.INVALID_PATH', 400],
+      ['auth.PERMISSION_DENIED', 403],
+    ]);
+
     const uploader = multer({ storage }).single('file');
 
     return uploader(req, res, async err => {
       try {
         if (err) {
+          const status = multerKeyStatus.get(err && err.message);
+          if (status !== undefined) return ResponseUtil.error(req, res, err.message, status);
           // multer 的 message 是英文原文（"File too large"/"Unexpected field"），
           // 原样透出等于把机器话亮给用户；原文只进日志。
           Logger.error('[videoPlayer/uploadSubtitle] multer 拒绝上传:', err);
