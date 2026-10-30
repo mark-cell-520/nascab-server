@@ -7,6 +7,7 @@ const tableFileLog = require('../../../../db/table/tableFileLog');
 const { hasPermission } = require('../../../../utils/permissionUtil');
 const FileUtil = require('../../../../utils/fileUtil');
 const { getLocalizedMessage } = require('../../../../utils/i18nUtil');
+const { isUnderAnyRoot } = require('../util/bookPathQueryUtil');
 
 class BookListController {
   async list(req, res) {
@@ -55,18 +56,6 @@ class BookListController {
       if (!roots || roots.length === 0) {
         return ResponseUtil.error(req, res, 'book.BOOK_SOURCE_LIST_EMPTY', 400);
       }
-
-      const isUnderAnyRoot = (filePath, rootList) => {
-        const resolved = filePath ? path.resolve(String(filePath)) : '';
-        if (!resolved) return false;
-        const list = Array.isArray(rootList) ? rootList.map(p => path.resolve(String(p || ''))).filter(Boolean) : [];
-        for (const root of list) {
-          if (resolved === root) return true;
-          const prefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
-          if (resolved.startsWith(prefix)) return true;
-        }
-        return false;
-      };
 
       for (const p of targets) {
         if (FileUtil.isProtectedPath(p)) {

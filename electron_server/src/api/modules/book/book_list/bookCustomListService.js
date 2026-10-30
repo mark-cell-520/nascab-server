@@ -1,6 +1,7 @@
 const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
 const BookListService = require('../list/bookListService');
+const { applyBookIndexPathPrefixFilter } = require('../util/bookPathQueryUtil');
 
 function _escapeLikeValue(input) {
   return String(input || '')
@@ -24,39 +25,9 @@ function _normalizeSortOrder(input) {
   return v === 'asc' ? 'asc' : 'desc';
 }
 
-function _applyBookIndexPathPrefixFilter(query, paths) {
-  const list = Array.isArray(paths) ? paths.map(p => String(p || '').trim()).filter(Boolean) : [];
-  if (list.length === 0) {
-    query.whereRaw('1 = 0');
-    return;
-  }
-
-  const sep = path.sep;
-  const folderExactPairs = [];
-  for (const raw of list) {
-    const p = raw.endsWith(sep) ? raw.slice(0, -1) : raw;
-    if (!p) continue;
-    if (path.extname(p)) continue;
-    const parent = path.dirname(p);
-    const name = path.basename(p);
-    if (!parent || !name) continue;
-    folderExactPairs.push({ parent, name });
-  }
-
-  query.where(builder => {
-    for (const p of list) {
-      const prefix = p.endsWith(sep) ? p : `${p}${sep}`;
-      builder.orWhere(function () {
-        this.where('b.path', p).orWhere('b.path', 'like', `${prefix}%`);
-      });
-    }
-    for (const pair of folderExactPairs) {
-      builder.orWhere(function () {
-        this.where('b.is_file', 0).andWhere('b.path', pair.parent).andWhere('b.filename', pair.name);
-      });
-    }
-  });
-}
+// 原实现在本文件里抄了一份（与 bookListService / bookCollectionService / bookHistoryService
+// 三份完全相同），已抽到 ../util/bookPathQueryUtil 统一维护。
+const _applyBookIndexPathPrefixFilter = applyBookIndexPathPrefixFilter;
 
 function _normalizeIndexRow(row) {
   if (!row || typeof row !== 'object') return row;
@@ -93,8 +64,7 @@ class BookCustomListService {
     }
     const row = await this.knexBook(this.tableName)
       .where({ id })
-      .first('id', 'uid', 'name', 'create_time')
-      .catch(() => null);
+      .first('id', 'uid', 'name', 'create_time');
     if (!row || !row.id) {
       const err = new Error('common.NOT_FOUND');
       err.statusCode = 404;
@@ -136,8 +106,7 @@ class BookCustomListService {
       .clearSelect()
       .clearOrder()
       .count('* as cnt')
-      .first()
-      .catch(() => null);
+      .first();
     const total = Math.max(0, Number((countRow && (countRow.cnt ?? countRow['count(*)'])) || 0) || 0);
 
     const listRows = await base.clone().select('l.id', 'l.uid', 'l.name', 'l.create_time').orderBy(`l.${sortBy}`, sortOrder).orderBy('l.id', 'desc').offset(offset).limit(safeLimit);
@@ -316,11 +285,13 @@ class BookCustomListService {
       throw err;
     }
 
+    // 原来这里是 `.catch(() => [])`：book_index 查询一失败就变成"一本书都没查到"，
+    // 紧接着抛 common.NOT_FOUND(404)。用户往书单里加书，明明书就在，
+    // 界面只说"不存在"，而真正的数据库错误连日志都不留。现在查询失败直接往外抛。
     const rows = await this.knexBook('book_index')
       .whereIn('id', ids)
       .whereIn('show_type', ['book', 'series'])
-      .select('id', 'path', 'filename', 'show_type')
-      .catch(() => []);
+      .select('id', 'path', 'filename', 'show_type');
 
     if (!rows || rows.length === 0) {
       const err = new Error('common.NOT_FOUND');

@@ -1,5 +1,7 @@
 const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
+const Logger = require('../../../../utils/logger');
+const { applyBookIndexPathPrefixFilter, isPathInside } = require('../util/bookPathQueryUtil');
 
 function _parsePathList(pathListText) {
   if (!pathListText) return [];
@@ -11,43 +13,22 @@ function _parsePathList(pathListText) {
   }
 }
 
-function _applyBookIndexPathPrefixFilter(query, paths) {
-  const list = Array.isArray(paths) ? paths.map(p => String(p || '').trim()).filter(Boolean) : [];
-  if (list.length === 0) {
-    query.whereRaw('1 = 0');
-    return;
-  }
+// 原实现在本文件里抄了一份（与 bookListService / bookCustomListService / bookHistoryService
+// 三份完全相同），已抽到 ../util/bookPathQueryUtil 统一维护。
+const _applyBookIndexPathPrefixFilter = applyBookIndexPathPrefixFilter;
 
-  const sep = path.sep;
-  const folderExactPairs = [];
-  for (const raw of list) {
-    const p = raw.endsWith(sep) ? raw.slice(0, -1) : raw;
-    if (!p) continue;
-    if (path.extname(p)) continue;
-    const parent = path.dirname(p);
-    const name = path.basename(p);
-    if (!parent || !name) continue;
-    folderExactPairs.push({ parent, name });
-  }
-
-  query.where(builder => {
-    for (const p of list) {
-      const prefix = p.endsWith(sep) ? p : `${p}${sep}`;
-      builder.orWhere(function () {
-        this.where('b.path', p).orWhere('b.path', 'like', `${prefix}%`);
-      });
-    }
-    for (const pair of folderExactPairs) {
-      builder.orWhere(function () {
-        this.where('b.is_file', 0).andWhere('b.path', pair.parent).andWhere('b.filename', pair.name);
-      });
-    }
-  });
+function _sqlIsUniqueViolation(err) {
+  const msg = err && err.message ? String(err.message).toLowerCase() : '';
+  return msg.includes('unique') || msg.includes('constraint');
 }
 
 class BookCollectionService {
+  // 原来是 `return user.id`：JWT 中间件偶发没挂上 req.user（或内部调用漏传）时
+  // 直接 TypeError，控制器转成 500，而真正的问题是"没登录"。统一归一成 0，
+  // 由调用方按未登录处理。
   _uid(user) {
-    return user.id;
+    const uid = user && user.id ? Number(user.id) : 0;
+    return Number.isFinite(uid) && uid > 0 ? uid : 0;
   }
 
   async _getCollectionById(knexBook, collectionId) {
@@ -78,7 +59,10 @@ class BookCollectionService {
       throw err;
     }
 
-    const invalid = uniq.find(p => !sourcePaths.some(s => p.startsWith(s)));
+    // 原来是 `p.startsWith(s)`：'/data/books2' 会被判成在源目录 '/data/books' 底下，
+    // 于是"我的珍藏"能收录源目录之外的书，等于绕过了 bookSourceService 的边界校验。
+    // 必须补上分隔符边界。
+    const invalid = uniq.find(p => !sourcePaths.some(s => isPathInside(s, p)));
     if (invalid) {
       const err = new Error('book.BOOK_SOURCE_OUT_OF_RANGE');
       err.statusCode = 400;
@@ -141,7 +125,12 @@ class BookCollectionService {
       .orderBy('b.create_time', 'desc')
       .orderBy('b.id', 'desc')
       .limit(4)
-      .catch(() => []);
+      .catch(err => {
+        // 预览图查询失败不该把整个珍藏列表拖成 500，但也不能一声不吭地返回空——
+        // 那样用户看到的是"珍藏里有书但没封面"，完全看不出是数据库出了问题。
+        Logger.error('book collection previews failed:', err);
+        return [];
+      });
 
     return (rows || []).map(r => ({
       id: Number(r && r.id) || 0,
@@ -165,9 +154,14 @@ class BookCollectionService {
     const sortOrder = sortOrderInput === 'asc' ? 'asc' : 'desc';
     const sortField = sortFieldInput === 'name' || sortFieldInput === 'create_time' ? sortFieldInput : 'create_time';
 
+    // SQLite 的 LIKE 默认没有转义符，`%`/`_` 会被当通配符：珍藏名里带 "100%" 或 "a_b"
+    // 时搜索会匹配到一堆不相干的珍藏。bookCustomListService 那边早就转义了，这里漏了。
     const base = knexBook('book_collection as c')
       .modify(qb => {
-        if (keyword) qb.where('c.name', 'like', `%${keyword}%`);
+        if (keyword) {
+          const escaped = keyword.replace(/[\\%_]/g, ch => '\\' + ch);
+          qb.whereRaw("c.name LIKE ? ESCAPE '\\'", [`%${escaped}%`]);
+        }
         qb.where('c.uid', uid);
       })
       .select('c.id', 'c.uid', 'c.name', 'c.path_list', 'c.create_time')
@@ -227,14 +221,25 @@ class BookCollectionService {
       throw err;
     }
 
-    const [id] = await knexBook('book_collection').insert({
-      uid,
-      name,
-      path_list: JSON.stringify(normalizedPaths),
-      create_time: new Date(),
-    });
-
-    return this.getCollection({ knexBook }, id, user);
+    // book_collection 上有 (uid, name) 唯一索引。两个标签页同时建同名珍藏时，
+    // 上面的预查查不到冲突， insert 会直接撞约束变成 500 + common.ERROR，
+    // 用户看到的是"出错了"而不是"名字重了"。这里把唯一冲突翻成 409。
+    try {
+      const [id] = await knexBook('book_collection').insert({
+        uid,
+        name,
+        path_list: JSON.stringify(normalizedPaths),
+        create_time: new Date(),
+      });
+      return this.getCollection({ knexBook }, id, user);
+    } catch (e) {
+      if (_sqlIsUniqueViolation(e)) {
+        const err = new Error('book.BOOK_COLLECTION_NAME_EXISTS');
+        err.statusCode = 409;
+        throw err;
+      }
+      throw e;
+    }
   }
 
   async updateCollection({ knexBook }, payload, user) {
@@ -256,12 +261,28 @@ class BookCollectionService {
       throw err;
     }
 
-    await knexBook('book_collection')
-      .where({ id: collection.id })
-      .update({
-        name,
-        path_list: JSON.stringify(normalizedPaths),
-      });
+    // 和 createCollection 同一回事：预查之后、update 之前撞上唯一索引，
+    // 不接住就变成 500 + common.ERROR。
+    try {
+      const affected = await knexBook('book_collection')
+        .where({ id: collection.id })
+        .update({
+          name,
+          path_list: JSON.stringify(normalizedPaths),
+        });
+      if (!affected) {
+        const err = new Error('common.NOT_FOUND');
+        err.statusCode = 404;
+        throw err;
+      }
+    } catch (e) {
+      if (_sqlIsUniqueViolation(e)) {
+        const err = new Error('book.BOOK_COLLECTION_NAME_EXISTS');
+        err.statusCode = 409;
+        throw err;
+      }
+      throw e;
+    }
 
     return true;
   }

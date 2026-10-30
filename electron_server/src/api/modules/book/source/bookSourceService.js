@@ -2,6 +2,7 @@ const path = require('path');
 const knexUtil = require('../../../../db/knexUtil');
 const dbUtil = require('../../../../db/dbUtil');
 const userUtil = require('../../../../utils/userUtil');
+const { isPathInside } = require('../util/bookPathQueryUtil');
 
 class BookSourceService {
   constructor(knex) {
@@ -46,7 +47,11 @@ class BookSourceService {
     const validPaths = [];
     for (const pPath of permissionPaths) {
       for (const sPath of sourcePaths) {
-        if (String(pPath).startsWith(String(sPath)) || String(sPath).startsWith(String(pPath))) {
+        // 原来是裸 startsWith：权限 '/data/books' + 源目录 '/data/books2' 会被判成
+        // "源目录在权限范围内"，于是把用户够不着的 '/data/books2' 当合法根目录下发，
+        // 同时 '/data/books' 自己反而从 validPaths 里丢了（书全变不可见）。
+        // 换成带分隔符边界的 isPathInside 才不会串目录。
+        if (isPathInside(sPath, pPath) || isPathInside(pPath, sPath)) {
           validPaths.push(String(pPath).length > String(sPath).length ? pPath : sPath);
         }
       }

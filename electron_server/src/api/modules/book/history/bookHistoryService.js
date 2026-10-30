@@ -1,40 +1,7 @@
 const BookListService = require('../list/bookListService');
+const { applyBookIndexPathPrefixFilter } = require('../util/bookPathQueryUtil');
 const path = require('path');
 const fs = require('fs');
-
-function _applyBookIndexPathPrefixFilter(query, paths) {
-  const list = Array.isArray(paths) ? paths.map(p => String(p || '').trim()).filter(Boolean) : [];
-  if (list.length === 0) {
-    query.whereRaw('1 = 0');
-    return;
-  }
-
-  const sep = path.sep;
-  const folderExactPairs = [];
-  for (const raw of list) {
-    const p = raw.endsWith(sep) ? raw.slice(0, -1) : raw;
-    if (!p) continue;
-    if (path.extname(p)) continue;
-    const parent = path.dirname(p);
-    const name = path.basename(p);
-    if (!parent || !name) continue;
-    folderExactPairs.push({ parent, name });
-  }
-
-  query.where(builder => {
-    for (const p of list) {
-      const prefix = p.endsWith(sep) ? p : `${p}${sep}`;
-      builder.orWhere(function () {
-        this.where('b.path', p).orWhere('b.path', 'like', `${prefix}%`);
-      });
-    }
-    for (const pair of folderExactPairs) {
-      builder.orWhere(function () {
-        this.where('b.is_file', 0).andWhere('b.path', pair.parent).andWhere('b.filename', pair.name);
-      });
-    }
-  });
-}
 
 function _normalizeListRow(row) {
   if (!row || typeof row !== 'object') return row;
@@ -134,7 +101,7 @@ class BookHistoryService {
     if (!validPaths || validPaths.length === 0) {
       baseQuery.whereRaw('1 = 0');
     } else {
-      _applyBookIndexPathPrefixFilter(baseQuery, validPaths);
+      applyBookIndexPathPrefixFilter(baseQuery, validPaths);
     }
 
     const countRow = await baseQuery

@@ -3,6 +3,7 @@ const fs = require('fs');
 const userUtil = require('../../../../utils/userUtil');
 const BookSourceService = require('../source/bookSourceService');
 const { intersectPaths, parsePathListText } = require('../../photo/timeline/photoPathQueryUtil');
+const { applyBookIndexPathPrefixFilter, isUnderAnyRoot } = require('../util/bookPathQueryUtil');
 
 function _escapeLikeValue(input) {
   return String(input || '')
@@ -11,39 +12,9 @@ function _escapeLikeValue(input) {
     .replaceAll('_', '\\_');
 }
 
-function _applyBookIndexPathPrefixFilter(query, paths) {
-  const list = Array.isArray(paths) ? paths.map(p => String(p || '').trim()).filter(Boolean) : [];
-  if (list.length === 0) {
-    query.whereRaw('1 = 0');
-    return;
-  }
-
-  const sep = path.sep;
-  const folderExactPairs = [];
-  for (const raw of list) {
-    const p = raw.endsWith(sep) ? raw.slice(0, -1) : raw;
-    if (!p) continue;
-    if (path.extname(p)) continue;
-    const parent = path.dirname(p);
-    const name = path.basename(p);
-    if (!parent || !name) continue;
-    folderExactPairs.push({ parent, name });
-  }
-
-  query.where(builder => {
-    for (const p of list) {
-      const prefix = p.endsWith(sep) ? p : `${p}${sep}`;
-      builder.orWhere(function () {
-        this.where('b.path', p).orWhere('b.path', 'like', `${prefix}%`);
-      });
-    }
-    for (const pair of folderExactPairs) {
-      builder.orWhere(function () {
-        this.where('b.is_file', 0).andWhere('b.path', pair.parent).andWhere('b.filename', pair.name);
-      });
-    }
-  });
-}
+// 原实现在本文件里，与 bookCustomListService / bookCollectionService / bookHistoryService
+// 各抄了一份；已抽到 ../util/bookPathQueryUtil 统一维护。
+const _applyBookIndexPathPrefixFilter = applyBookIndexPathPrefixFilter;
 
 function _normalizeType(input) {
   const v = String(input || '')
@@ -97,18 +68,6 @@ function _normalizeListRow(row) {
     ...row,
     full_path: baseDir && name ? path.join(baseDir, name) : '',
   };
-}
-
-function _isUnderAnyRoot({ filePath, roots }) {
-  const resolved = filePath ? path.resolve(String(filePath)) : '';
-  if (!resolved) return false;
-  const list = Array.isArray(roots) ? roots.map(p => path.resolve(String(p || ''))).filter(Boolean) : [];
-  for (const root of list) {
-    if (resolved === root) return true;
-    const prefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
-    if (resolved.startsWith(prefix)) return true;
-  }
-  return false;
 }
 
 class BookListService {
@@ -264,7 +223,7 @@ class BookListService {
         err.statusCode = 400;
         throw err;
       }
-      if (!_isUnderAnyRoot({ filePath: full, roots: validPaths })) {
+      if (!isUnderAnyRoot(full, validPaths)) {
         const err = new Error('auth.PERMISSION_DENIED');
         err.statusCode = 403;
         throw err;
@@ -495,7 +454,7 @@ class BookListService {
     if (!indexRow || !indexRow.path || !indexRow.filename) return false;
     const roots = await this.getValidPaths(user);
     const full = path.join(String(indexRow.path), String(indexRow.filename));
-    return _isUnderAnyRoot({ filePath: full, roots });
+    return isUnderAnyRoot(full, roots);
   }
 }
 

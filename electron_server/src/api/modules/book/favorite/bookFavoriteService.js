@@ -1,3 +1,5 @@
+const Logger = require('../../../../utils/logger');
+
 class BookFavoriteService {
   constructor(knexBook) {
     this.knexBook = knexBook;
@@ -22,11 +24,19 @@ class BookFavoriteService {
 
     const q = this.knexBook(this.tableName).insert(insertRow);
     if (typeof q.onConflict === 'function') {
-      await q.onConflict(['uid', 'index_id']).ignore();
+      await q.onConflict(['uid', 'index_id']).ignore().catch(err => {
+        // onConflict 已经忽略了重复收藏，走到这里说明是真故障（库锁、磁盘满）。
+        // 原来一声不吭，用户点完"收藏"图标不亮，服务端毫无痕迹可查。
+        Logger.error('book favorite insert failed:', err);
+        throw err;
+      });
     } else {
       try {
         await q;
-      } catch (_) {}
+      } catch (err) {
+        Logger.error('book favorite insert failed:', err);
+        throw err;
+      }
     }
     return { is_favorite: true };
   }
@@ -39,7 +49,12 @@ class BookFavoriteService {
     await this.knexBook(this.tableName)
       .where({ uid, index_id: safeIndexId })
       .del()
-      .catch(() => {});
+      .catch(err => {
+        // 原来 `catch(() => {})`：取消收藏失败时接口照样返回成功，
+        // 用户以为取消了，刷新后收藏还在，且服务端无任何记录。
+        Logger.error('book favorite delete failed:', err);
+        throw err;
+      });
     return { is_favorite: false };
   }
 
@@ -62,9 +77,15 @@ class BookFavoriteService {
 
       const q = this.knexBook(this.tableName).insert(toInsert);
       if (typeof q.onConflict === 'function') {
-        await q.onConflict(['uid', 'index_id']).ignore();
+        await q.onConflict(['uid', 'index_id']).ignore().catch(err => {
+          Logger.error('book favorite batch insert failed:', err);
+          throw err;
+        });
       } else {
-        await q.catch(() => {});
+        await q.catch(err => {
+          Logger.error('book favorite batch insert failed:', err);
+          throw err;
+        });
       }
       return;
     }
@@ -73,7 +94,10 @@ class BookFavoriteService {
       .where({ uid })
       .whereIn('index_id', uniqueList)
       .del()
-      .catch(() => {});
+      .catch(err => {
+        Logger.error('book favorite batch delete failed:', err);
+        throw err;
+      });
   }
 
   async getFavoriteIndexIdSet(user, indexIds) {
@@ -85,7 +109,12 @@ class BookFavoriteService {
       .where({ uid })
       .whereIn('index_id', list)
       .select('index_id')
-      .catch(() => []);
+      .catch(err => {
+        // 读路径不往外抛（否则整个书籍列表会跟着 500），但必须留痕：
+        // 静默返回空集会让"我的收藏"显示成一本都没有，完全看不出是库出了问题。
+        Logger.error('book favorite read failed:', err);
+        return [];
+      });
 
     return new Set((rows || []).map(r => Number(r && r.index_id) || 0).filter(v => v > 0));
   }
