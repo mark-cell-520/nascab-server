@@ -9,6 +9,45 @@ const { ensureString, filterSessionSetArguments, ensureTrackersResolved, loadCon
 const { resolveTrackerInput, getTrackerFetchTimeoutMs } = require('../../../workers/transmission/transmissionTrackerResolver');
 const { enrichTorrentForClient, rememberTorrentDownloadDirsFromList, persistAddedTorrentPath } = require('./transmissionTorrentUtil');
 const { setTorrentDownloadDir, removeTorrentDownloadDir, rememberDownloadDir } = require('../../../workers/transmission/transmissionTorrentPathStore');
+const FileUtil = require('../../../utils/fileUtil');
+
+// 下载目录里的文件名完全由种子内容决定，而 transmission 守护进程和 NasCabOS
+// 同权限运行（root）。原来 download_dir / set-location 的 location 都是用户
+// 传什么就往 RPC 里塞什么：指向 /etc/cron.d 就是现成的 root 计划任务持久化，
+// 指向 /root/.ssh 能覆盖 authorized_keys，指向 / 更直接。
+// 这里统一收敛成绝对路径并挡掉系统目录（isProtectedPath 内部带 resolve +
+// realpath 还原 + 子树判断）。
+const TRANSMISSION_PATH_ARG_KEYS = ['download-dir', 'incomplete-dir', 'location', 'move', 'path'];
+
+function assertSafeDownloadDir(raw, requiredMsgKey = 'transmission.DOWNLOAD_DIR_REQUIRED') {
+  const dir = ensureString(raw).trim();
+  if (!dir) {
+    const err = new Error(requiredMsgKey);
+    err.statusCode = 400;
+    throw err;
+  }
+  const resolved = path.resolve(dir);
+  if (FileUtil.isProtectedPath(resolved)) {
+    const err = new Error('transmission.INVALID_DOWNLOAD_DIR');
+    err.statusCode = 400;
+    throw err;
+  }
+  return resolved;
+}
+
+// torrent-set / torrent-remove 的 arguments 是整包透传给 RPC 的，里面夹带
+// location/move/download-dir 就能绕过上面的校验把已下载的文件搬到系统目录
+// （move 默认就是 true）。这里把路径类参数剔掉，要改路径走已经校验过的
+// set-location 接口。
+function stripTorrentPathArguments(args) {
+  const src = args && typeof args === 'object' ? args : {};
+  const out = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (TRANSMISSION_PATH_ARG_KEYS.includes(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 function pickStatsBytes(obj) {
   if (!obj || typeof obj !== 'object') return { downloaded: undefined, uploaded: undefined };
@@ -315,7 +354,7 @@ class TransmissionController {
         .call('session-set', { 'default-trackers': getDefaultTrackersForDaemon(cfg) })
         .catch(() => {});
       const body = req.body || {};
-      const args = { ...(body.arguments || {}) };
+      const args = stripTorrentPathArguments(body.arguments);
       if (body.url) args.filename = String(body.url);
       if (body.metainfo) args.metainfo = String(body.metainfo);
       const localTorrentPath = ensureString(body.filename).trim();
@@ -331,10 +370,7 @@ class TransmissionController {
         }
         args.filename = localTorrentPath;
       }
-      const downloadDir = ensureString(body.download_dir).trim();
-      if (!downloadDir) {
-        return ResponseUtil.error(req, res, 'transmission.DOWNLOAD_DIR_REQUIRED', 400);
-      }
+      const downloadDir = assertSafeDownloadDir(body.download_dir);
       args['download-dir'] = downloadDir;
       if (body.paused !== undefined) args.paused = !!body.paused;
       const trackers = body.trackers
@@ -397,10 +433,7 @@ class TransmissionController {
       const metainfo = await this.service.readTorrentFileBase64(tempPath);
       const body = req.body || {};
       const args = { metainfo };
-      const downloadDir = ensureString(body.download_dir).trim();
-      if (!downloadDir) {
-        return ResponseUtil.error(req, res, 'transmission.DOWNLOAD_DIR_REQUIRED', 400);
-      }
+      const downloadDir = assertSafeDownloadDir(body.download_dir);
       args['download-dir'] = downloadDir;
       if (body.paused !== undefined) args.paused = body.paused === '1' || body.paused === 'true' || body.paused === true;
       const trackers = body.trackers
@@ -423,7 +456,7 @@ class TransmissionController {
     try {
       await this.service.assertDaemonRunning();
       const body = req.body || {};
-      const args = body.arguments || {};
+      const args = stripTorrentPathArguments(body.arguments);
       if (body.ids !== undefined) args.ids = body.ids;
       if (body.deleteLocalData !== undefined) args['delete-local-data'] = !!body.deleteLocalData;
       const result = await this.rpc.call(method, args);
@@ -448,7 +481,7 @@ class TransmissionController {
         ids,
         fields: ['hashString'],
       });
-      const args = { ...(body.arguments || {}), ids };
+      const args = { ...stripTorrentPathArguments(body.arguments), ids };
       if (body.deleteLocalData !== undefined) args['delete-local-data'] = !!body.deleteLocalData;
       const result = await this.rpc.call('torrent-remove', args);
       const torrents = Array.isArray(lookup.torrents) ? lookup.torrents : [];
@@ -469,8 +502,7 @@ class TransmissionController {
     try {
       await this.service.assertDaemonRunning();
       const body = req.body || {};
-      const location = ensureString(body.location).trim();
-      if (!location) return ResponseUtil.error(req, res, 'common.INVALID_PARAMS', 400);
+      const location = assertSafeDownloadDir(body.location, 'common.INVALID_PARAMS');
       let ids = body.ids;
       if (ids === undefined || ids === null) {
         return ResponseUtil.error(req, res, 'common.INVALID_PARAMS', 400);
