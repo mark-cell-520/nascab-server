@@ -56,9 +56,15 @@ class QuickShareController {
       if (!pwd) return ResponseUtil.error(req, res, 'quickShare.PASSWORD_REQUIRED', 400);
 
       const resolved = path.resolve(rawPath);
-      // if (FileUtil.isProtectedPath(resolved)) {
-      //   return ResponseUtil.error(req, res, 'quickShare.INVALID_PATH', 400);
-      // }
+      // 快速分享是把一个目录连口令一起暴露到公网（还可以配成永不过期），所以分享
+      // 根目录不能落在系统关键路径上：这里是全项目唯一一处把 isProtectedPath 注掉
+      // 的地方，其余所有涉及路径的控制器（file/book/video/music/photo/fileBackup/
+      // fileServer…）都有这道检查。hasPermission 只能证明「这个账号有权看」，
+      // 证明不了「适合公开分享」——管理员账号把 /etc、/root 设成分享根目录，
+      // 泄露面就从「登录后可见」变成「互联网上凭口令可见」。
+      if (FileUtil.isProtectedPath(resolved)) {
+        return ResponseUtil.error(req, res, 'quickShare.INVALID_PATH', 400);
+      }
       try {
         await fs.promises.stat(resolved);
       } catch (_) {
