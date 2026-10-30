@@ -1,5 +1,7 @@
 const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
+const { isPathInside, intersectPaths } = require('../../../../utils/pathBoundaryUtil');
+const MusicSourceService = require('../source/musicSourceService');
 
 function _parsePathList(pathListText) {
   if (!pathListText) return [];
@@ -61,7 +63,7 @@ class MusicCollectionService {
     return (sources || []).map(s => (s && s.path ? String(s.path).trim() : '')).filter(Boolean);
   }
 
-  async _validateAndNormalizePaths(knexMusic, pathList) {
+  async _validateAndNormalizePaths(knexMusic, pathList, user) {
     const input = Array.isArray(pathList) ? pathList : [];
     const cleaned = input.map(p => String(p || '').trim()).filter(Boolean);
     const uniq = [...new Set(cleaned)];
@@ -78,7 +80,23 @@ class MusicCollectionService {
       throw err;
     }
 
-    const invalid = uniq.find(p => !sourcePaths.some(s => p.startsWith(s)));
+    // 原来只校验"在全局源目录下"。源目录是全站共用的，普通用户的 view 权限
+    // 往往只是其中一小块，于是把收藏夹路径设成自己没权限的子目录，再打开收藏夹
+    // 就能读到越权内容。这里对非管理员再交一道 getValidPaths。
+    let allowedPrefixes = sourcePaths;
+    if (!userUtil.isAdmin(user)) {
+      const validPaths = await new MusicSourceService(knexMusic).getValidPaths(user);
+      allowedPrefixes = intersectPaths(sourcePaths, validPaths);
+    }
+    if (allowedPrefixes.length === 0) {
+      const err = new Error('auth.PERMISSION_DENIED');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // 原来是裸 startsWith，'/data/music2' 能过 '/data/music' 的校验；
+    // 换成带分隔符边界的 isPathInside。
+    const invalid = uniq.find(p => !allowedPrefixes.some(s => isPathInside(s, p)));
     if (invalid) {
       const err = new Error('music.MUSIC_SOURCE_OUT_OF_RANGE');
       err.statusCode = 400;
@@ -221,7 +239,7 @@ class MusicCollectionService {
     const name = String(payload.name || '').trim();
     if (!name) throw new Error('common.PARAM_ERROR');
 
-    const normalizedPaths = await this._validateAndNormalizePaths(knexMusic, payload.path_list);
+    const normalizedPaths = await this._validateAndNormalizePaths(knexMusic, payload.path_list, user);
 
     const dup = await knexMusic('music_collection').where({ uid, name }).first();
     if (dup) {
@@ -248,7 +266,7 @@ class MusicCollectionService {
     const name = String(payload.name || '').trim();
     if (!name) throw new Error('common.PARAM_ERROR');
 
-    const normalizedPaths = await this._validateAndNormalizePaths(knexMusic, payload.path_list);
+    const normalizedPaths = await this._validateAndNormalizePaths(knexMusic, payload.path_list, user);
 
     const uid = this._uid(user);
     const dup = await knexMusic('music_collection').where({ uid, name }).andWhereNot({ id: collection.id }).first();

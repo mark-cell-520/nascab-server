@@ -1,4 +1,5 @@
 const path = require('path');
+const { intersectPaths: _intersectPaths } = require('../../../../utils/pathBoundaryUtil');
 
 function parsePathListText(text) {
   if (!text) return [];
@@ -10,21 +11,9 @@ function parsePathListText(text) {
   }
 }
 
-function intersectPaths(validPaths, limitPaths) {
-  const base = Array.isArray(validPaths) ? validPaths : [];
-  const limit = Array.isArray(limitPaths) ? limitPaths : [];
-  const intersected = [];
-  for (const vp of base) {
-    for (const sp of limit) {
-      if (sp.startsWith(vp)) {
-        intersected.push(sp);
-      } else if (vp.startsWith(sp)) {
-        intersected.push(vp);
-      }
-    }
-  }
-  return [...new Set(intersected)];
-}
+// 原来这里两个分支都是裸 startsWith，'/data/music2' 会命中 '/data/music'，
+// 请求里塞个兄弟目录就能越权；已改到 utils/pathBoundaryUtil 统一实现。
+const intersectPaths = _intersectPaths;
 
 function applyPathPrefixFilter(query, pathColumn, paths) {
   const list = Array.isArray(paths) ? paths.map(p => String(p || '').trim()).filter(Boolean) : [];

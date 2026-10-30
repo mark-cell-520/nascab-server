@@ -1,4 +1,5 @@
 const path = require('path');
+const { isPathInside: _isPathInside, isUnderAnyRoot: _isUnderAnyRoot } = require('../../../../utils/pathBoundaryUtil');
 
 /**
  * 把"用户有权访问的根目录列表"翻译成 book_index 的查询条件。
@@ -49,41 +50,19 @@ function applyBookIndexPathPrefixFilter(query, paths) {
 }
 
 /**
- * 判断 child 是否真的在 parent 目录树下。
+ * 判断 child 是否真的在 parent 目录树下（含"恰好等于"）。
  *
  * 原来的判法到处是 `child.startsWith(parent)`：'/data/books2' 会被判成在 '/data/books'
  * 里面，于是"我的珍藏"能收录源目录之外的书、越权路径也能通过校验。
- * 必须补上分隔符边界。
+ * 已改到 utils/pathBoundaryUtil 统一实现，这里只做转发，保持既有调用方不变。
  */
-function isPathInside(parent, child) {
-  const p = String(parent === undefined || parent === null ? '' : parent).trim();
-  const c = String(child === undefined || child === null ? '' : child).trim();
-  if (!p || !c) return false;
-  if (p === c) return true;
-  const sep = path.sep;
-  const pWithSep = p.endsWith(sep) ? p : `${p}${sep}`;
-  return c.startsWith(pWithSep);
-}
+const isPathInside = _isPathInside;
 
 /**
  * 判断 filePath 是否落在 roots 里任意一个根目录之下（含"恰好等于某个根"）。
- *
- * bookListService 和 bookListController 里各有一份逐字相同的实现，改一处漏一处；
- * 两处都已经补了分隔符边界，这里只是把它搬到公共位置，语义不变。
- * 两边都会先 path.resolve，所以比较前也统一 resolve 一次，避免相对路径/多余斜杠误判。
+ * 同样已收敛到 utils/pathBoundaryUtil。
  */
-function isUnderAnyRoot(filePath, roots) {
-  const resolved = filePath ? path.resolve(String(filePath)) : '';
-  if (!resolved) return false;
-  const list = Array.isArray(roots) ? roots.map(p => path.resolve(String(p || ''))).filter(Boolean) : [];
-  const sep = path.sep;
-  for (const root of list) {
-    if (resolved === root) return true;
-    const prefix = root.endsWith(sep) ? root : `${root}${sep}`;
-    if (resolved.startsWith(prefix)) return true;
-  }
-  return false;
-}
+const isUnderAnyRoot = _isUnderAnyRoot;
 
 module.exports = {
   applyBookIndexPathPrefixFilter,

@@ -2,6 +2,7 @@ const path = require('path');
 const knexUtil = require('../../../../db/knexUtil');
 const dbUtil = require('../../../../db/dbUtil');
 const userUtil = require('../../../../utils/userUtil');
+const { isPathInside } = require('../../../../utils/pathBoundaryUtil');
 
 class VideoSourceService {
   constructor(knex) {
@@ -58,7 +59,10 @@ class VideoSourceService {
     const validPaths = [];
     for (const pPath of permissionPaths) {
       for (const sPath of sourcePaths) {
-        if (String(pPath).startsWith(String(sPath)) || String(sPath).startsWith(String(pPath))) {
+        // 原来是裸 startsWith：权限 '/data/video' + 源目录 '/data/video2' 会被判成
+        // "源目录在权限范围内"，把用户够不着的兄弟目录当合法根目录下发。
+        // 换成带分隔符边界的 isPathInside。
+        if (isPathInside(sPath, pPath) || isPathInside(pPath, sPath)) {
           validPaths.push(String(pPath).length > String(sPath).length ? pPath : sPath);
         }
       }
