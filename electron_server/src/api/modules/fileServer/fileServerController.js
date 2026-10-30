@@ -192,11 +192,10 @@ class FileServerController {
       const service = new FileServerService(req.dbMain);
       const { server_type, http_port, https_port } = req.body || {};
       const serverTypeStr = String(server_type);
-      const runningRow = await req
-        .dbMain('file_server')
-        .where({ server_type: serverTypeStr, status: 'running' })
-        .first()
-        .catch(() => null);
+      // 这里原来吞掉异常当成「没在跑」：端口改完、接口返回 200，但运行中的
+      // 文件服务仍在旧端口上监听，用户以为改成功了。读不到状态就不该声称成功，
+      // 让异常冒到外层 catch 返回 500，改动也不会落库。
+      const runningRow = await req.dbMain('file_server').where({ server_type: serverTypeStr, status: 'running' }).first();
       const wasRunning = !!runningRow;
       const data = await service.setGlobalPorts({
         serverType: serverTypeStr,
@@ -281,11 +280,9 @@ class FileServerController {
       const { uid, server_type, root_path, http_port, https_port, config } = req.body || {};
       const serverTypeStr = String(server_type);
 
-      const runningRow = await req
-        .dbMain('file_server')
-        .where({ server_type: serverTypeStr, status: 'running' })
-        .first()
-        .catch(() => null);
+      // 同 setPorts：读不到运行状态就让请求失败，不能吞掉异常后跳过重启，
+      // 否则改动落库了、接口也返回 200，实际服务还是旧状态。
+      const runningRow = await req.dbMain('file_server').where({ server_type: serverTypeStr, status: 'running' }).first();
       const wasRunning = !!runningRow;
 
       const normalizedConfig = encryptSensitiveConfig(config);
@@ -328,20 +325,16 @@ class FileServerController {
       const { uid, server_type } = req.body || {};
 
       const serverTypeStr = String(server_type);
-      const runningRow = await req
-        .dbMain('file_server')
-        .where({ server_type: serverTypeStr, status: 'running' })
-        .first()
-        .catch(() => null);
+      // 同 setPorts：读不到运行状态就让请求失败，不能吞掉异常后跳过重启，
+      // 否则改动落库了、接口也返回 200，实际服务还是旧状态。
+      const runningRow = await req.dbMain('file_server').where({ server_type: serverTypeStr, status: 'running' }).first();
       const wasRunning = !!runningRow;
 
       const ok = await service.delete({ uid: String(uid), serverType: serverTypeStr });
       if (wasRunning) {
-        const remaining = await req
-          .dbMain('file_server')
-          .where({ server_type: serverTypeStr })
-          .first()
-          .catch(() => null);
+        // 这一处吞掉异常的后果比前面几处更糟：remaining 变成 null 会走到
+        // stop 分支，把还有其他用户配置在用的服务给停掉。读不到就失败。
+        const remaining = await req.dbMain('file_server').where({ server_type: serverTypeStr }).first();
         if (remaining) {
           await this._startFileServerByIpc({ serverType: serverTypeStr, restart: true });
         } else {

@@ -375,7 +375,11 @@ function logStep(step, msg, data = {}) {
 
 function buildLegacyClientDeviceId(req, userId) {
   const uid = String(userId || '').trim() || 'unknown';
-  const forwarded = String(req?.headers?.['x-forwarded-for'] || '').trim();
+  // 用 req.ip 而不是自己读 x-forwarded-for：app.js 设了 trust proxy ['loopback']，
+  // Express 只在反代来自回环时才认 XFF。老客户端不带 clientDeviceId，这个哈希是
+  // 它们唯一的设备标识（决定终端槽位归属），种子被客户端可控就意味着能顶着别人的
+  // 槽位连进来。
+  const forwarded = String(req?.ip || req?.socket?.remoteAddress || '').trim();
   const remoteAddress = String(req?.socket?.remoteAddress || '').trim();
   const ua = String(req?.headers?.['user-agent'] || '').trim();
   const seed = `${uid}|${forwarded}|${remoteAddress}|${ua}`;

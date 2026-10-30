@@ -332,6 +332,26 @@ function _maybeConvertTmdbPosterImageUrlToSize(thumbUrl, size) {
   return u.toString();
 }
 
+// 调用方传进来的 thumbUrl 会被原样交给 downloadUrlToFile，由主进程去真正发一次
+// HTTP 请求（见 downloadUrlToFileWorker.downloadToFile：没有主机白名单，还会跟最多
+// 3 跳重定向）。所以只要这里放行任意 URL，就等于任意登录用户可以指挥服务器去抓
+// 内网、云元数据地址（169.254.169.254）或本机服务，而且抓回来的内容还会以
+// image/jpeg 回给请求方 —— 等于开了一个匿名图片代理 + SSRF 探针。
+// _maybeConvertTmdbImageUrlToSize 对非 image.tmdb.org 的输入是「原样返回」的，
+// 这里补一道前置校验：只认 https + image.tmdb.org，其余一律当作没传，
+// 退回走带鉴权的 TMDB API 去查 profile_path / poster_path。
+function _isTmdbImageUrl(input) {
+  const s = String(input || '').trim();
+  if (!s) return false;
+  let u;
+  try {
+    u = new URL(s);
+  } catch (_) {
+    return false;
+  }
+  return u.protocol === 'https:' && u.hostname === 'image.tmdb.org';
+}
+
 function _sanitizeTmdbIdForPath(tmdbId) {
   const id = String(tmdbId || '').trim();
   if (!id) return '';
@@ -1012,7 +1032,7 @@ class VideoDetailService {
 
     let url = '';
     const thumb = String(thumbUrl || '').trim();
-    if (thumb) {
+    if (thumb && _isTmdbImageUrl(thumb)) {
       url = _maybeConvertTmdbImageUrlToSize(thumb, safeSize) || thumb;
     } else {
       const tmdb = await _getTmdbClient();
@@ -1048,7 +1068,7 @@ class VideoDetailService {
 
     let url = '';
     const thumb = String(thumbUrl || '').trim();
-    if (thumb) {
+    if (thumb && _isTmdbImageUrl(thumb)) {
       url = _maybeConvertTmdbPosterImageUrlToSize(thumb, safeSize) || thumb;
     } else {
       const tmdb = await _getTmdbClient();

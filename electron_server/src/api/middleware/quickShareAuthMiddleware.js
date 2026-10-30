@@ -12,14 +12,23 @@ const BRUTE_LOCKOUT_MS = 1 * 60 * 1000; // 1分钟
 const BRUTE_WINDOW_MS = 1 * 60 * 1000; // 失败计数窗口 1 分钟
 const _bruteStore = new Map();
 
+// 暴力破解的锁定键按 IP 聚合，所以这里取到的 IP 必须不可被客户端伪造：
+// 原来无条件读 x-forwarded-for / x-real-ip，而分享链接是公开可达的，任何人
+// 都能自己带一个 X-Forwarded-For 头，每次失败换一个假 IP，5 次锁定形同虚设。
+// app.js 已经设了 app.set('trust proxy', ['loopback'])：Express 只在
+// req.socket.remoteAddress 是回环地址（nginx 反代从 127.0.0.1:6789 过来）时才认
+// XFF，外部直连时 req.ip 就是真实连接 IP。直接用 req.ip 即复用这套策略，
+// 不再自己解头部。
 function _getClientIp(req) {
-  const h = req.headers || {};
+  if (req && typeof req.ip === 'string' && req.ip) return req.ip;
+  const h = (req && req.headers) || {};
   const forwarded = h['x-forwarded-for'] || h['x-real-ip'];
-  if (forwarded) {
+  if (forwarded && req && req.socket && (req.socket.remoteAddress === '127.0.0.1' || req.socket.remoteAddress === '::1' || req.socket.remoteAddress === '::ffff:127.0.0.1')) {
     const first = typeof forwarded === 'string' ? forwarded.split(',')[0] : forwarded[0];
-    return (first || '').trim();
+    const v = (first || '').trim();
+    if (v) return v;
   }
-  return (req.socket && req.socket.remoteAddress) || req.connection?.remoteAddress || '';
+  return (req && req.socket && req.socket.remoteAddress) || (req && req.connection && req.connection.remoteAddress) || '';
 }
 
 function getQuickShareBruteKey(req, token) {
