@@ -94,7 +94,7 @@ async function download(req, res) {
             if (err) {
               const code = err && err.code != null ? String(err.code) : '';
               if (code === 'EPIPE' || code === 'ECONNRESET' || code === 'ECONNABORTED') return;
-              console.log('Download error:', err);
+              Logger.error('文件下载失败', err, { path: p });
               if (res.headersSent) {
               } else {
                 return ResponseUtil.error(req, res, 'file.DOWNLOAD_ERROR', 500);
@@ -203,7 +203,7 @@ async function handleFileOperation(req, res, type) {
 
     for (const p of paths) {
       if (type === tableFileLog.TYPE_MOVE && FileUtil.isProtectedPath(p)) {
-        console.log('系统保护路径 无法操作');
+        Logger.warn('系统保护路径 无法操作', { path: p });
         return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
       }
 
@@ -236,7 +236,7 @@ async function handleFileOperation(req, res, type) {
 
     return ResponseUtil.success(req, res, { ok: true }, 'file.OPERATION_QUEUED', 200);
   } catch (err) {
-    console.log(err);
+    Logger.error('文件操作入队失败', err, { type, paths, targetPath });
     return ResponseUtil.error(req, res, 'file.OPERATION_FAILED', 400, { error: err.message });
   }
 }
