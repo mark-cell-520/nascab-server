@@ -224,6 +224,36 @@ function sanitizePortBindings(input) {
   });
 }
 
+// Binds 是一条用 ':' 分隔的字符串（见下面 buildVolumeMap 的拼接），source / target
+// 里只要带换行或 NUL，就能在 docker 侧拼出额外一段、或者让整条绑定解析错位。
+// 这里按「命名卷 / POSIX 路径 / Windows 驱动器路径」三种合法形态收口，
+// 其余（含 ':' 出现在路径中段的写法）一律拒绝。
+const _NAMED_VOLUME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const _WINDOWS_PATH_RE = /^[A-Za-z]:[\\/]/;
+
+function _hasControlChars(value) {
+  return /[\r\n\t\0]/.test(value);
+}
+
+function isValidVolumeSource(value) {
+  const raw = trimText(value);
+  if (!raw || _hasControlChars(raw)) return false;
+  if (_NAMED_VOLUME_RE.test(raw)) return true;
+  // Windows 驱动器路径先判：它自己带一个 ':'，放在 POSIX 分支前面才不会被误拒。
+  if (_WINDOWS_PATH_RE.test(raw)) return true;
+  // POSIX 路径里不允许再出现 ':'：Binds 是 ':' 分隔的，'/a:/etc' 会被 docker
+  // 解析成 src=/a、dst=/etc、mode=/b，等于借一个合法绑定挂到别处去。
+  if (raw.startsWith('/')) return !raw.includes(':');
+  return false;
+}
+
+function isValidVolumeTarget(value) {
+  const raw = trimText(value);
+  if (!raw || _hasControlChars(raw)) return false;
+  // 容器内路径永远是 POSIX 形态，不可能是 Windows 路径或命名卷。
+  return raw.startsWith('/') && !raw.includes('//') && !raw.includes(':');
+}
+
 function sanitizeVolumeBindings(input) {
   const list = Array.isArray(input) ? input : [];
   return list.map(item => {
@@ -231,6 +261,9 @@ function sanitizeVolumeBindings(input) {
     const target = trimText(item && (item.target || item.containerPath));
     const readOnly = parseBool(item && (item.readOnly || item.read_only), false);
     if (!source || !target) {
+      throw new DockerApiError('docker.INVALID_VOLUME_BINDING', 400);
+    }
+    if (!isValidVolumeSource(source) || !isValidVolumeTarget(target)) {
       throw new DockerApiError('docker.INVALID_VOLUME_BINDING', 400);
     }
     return {
@@ -1386,7 +1419,11 @@ class DockerService {
     await this.ensureDockerReady();
     const containerId = trimText(payload.containerId || payload.id);
     if (!containerId) throw new DockerApiError('docker.CONTAINER_NOT_FOUND', 404);
-    const tail = parsePositiveInt(payload.tail, 200);
+    // tail 是直接透给 docker 的「取最后 N 行」，客户端传多大就要多少行回来：
+    // 原来 parsePositiveInt(payload.tail, 200) 不设上限，一个 tail=100000000
+    // 就能让 API 进程把整个日志读进内存再序列化成 JSON 响应。
+    // 这里按日志查看的实际需要夹到 [1, 20000]。
+    const tail = Math.min(20000, Math.max(1, parsePositiveInt(payload.tail, 200)));
     const since = trimText(payload.since);
     const until = trimText(payload.until);
     const follow = parseBool(payload.streamOutput || payload.follow, false);
