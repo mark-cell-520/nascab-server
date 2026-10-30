@@ -88,10 +88,8 @@ class IpSecurityManager {
 
   recordFailure(rawIp, { description = '' } = {}) {
     const ip = normalizeIp(rawIp);
-    console.log('认证失败', ip, description);
     if (!ip) return { ok: false, ignored: true };
     if (!this.shouldEnforceForIp(ip)) {
-      console.log('内网请求 认证失败忽略', ip, description);
       return { ok: true, ignored: true };
     }
     this.cleanupExpired();
