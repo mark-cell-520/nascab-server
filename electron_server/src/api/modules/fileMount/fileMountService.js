@@ -1,5 +1,7 @@
 const fs = require('fs');
+const path = require('path');
 const jwtUtil = require('../../../utils/jwtUtil');
+const FileUtil = require('../../../utils/fileUtil');
 const { assertMountSupportedOnPlatform } = require('../../../utils/mountPlatformUtil');
 
 function safeJsonParse(text) {
@@ -227,6 +229,16 @@ class FileMountService {
       err.statusCode = 400;
       throw err;
     }
+    // mount_path 是真实挂载点：进程以 root 跑，把挂载点指到 /etc、/var 这类
+    // 系统目录，等于把宿主配置/密钥目录盖在远程文件系统下面，而且卸载时可能
+    // 连带影响系统服务。/home、/mnt、/media、/srv 这些 NAS 数据挂载点不在
+    // 保护名单里（见 fileUtil.isProtectedPath），所以正常用法不受影响。
+    const resolvedMountPath = path.resolve(mountPathStr);
+    if (FileUtil.isProtectedPath(resolvedMountPath)) {
+      const err = new Error('fileMount.PROTECTED_MOUNT_PATH');
+      err.statusCode = 400;
+      throw err;
+    }
     await ensureDirReadableWritable(mountPathStr);
 
     const normalizedConfig = config && typeof config === 'object' ? normalizeProtocolConfig(config) : null;
@@ -296,20 +308,24 @@ class FileMountService {
     return { id: newId };
   }
 
-  async remove({ id }) {
+  async remove({ id, uid }) {
     const idNum = Number(id);
     if (!Number.isFinite(idNum) || idNum <= 0) {
       const err = new Error('validation.ID_INVALID');
       err.statusCode = 400;
       throw err;
     }
-    const existed = await this.knexMain(this.tableName).where({ id: idNum }).first();
+    // uid 一起进 where：行是按 uid 归属的（upsert/list 都带），删除却只按 id
+    // 查，等于拿着别人的挂载 id 就能把别人的配置行删掉。路由上是 requireAdmin，
+    // 但服务层不该默认调用方已经收敛过归属。
+    const uidStr = String(uid);
+    const existed = await this.knexMain(this.tableName).where({ id: idNum, uid: uidStr }).first();
     if (!existed) {
       const err = new Error('common.NOT_FOUND');
       err.statusCode = 404;
       throw err;
     }
-    await this.knexMain(this.tableName).where({ id: idNum }).del();
+    await this.knexMain(this.tableName).where({ id: idNum, uid: uidStr }).del();
     return { ok: true };
   }
 }

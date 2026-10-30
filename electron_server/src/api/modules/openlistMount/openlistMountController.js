@@ -100,6 +100,7 @@ class OpenlistMountController {
     try {
       const service = new OpenlistMountService(req.dbMain);
       const { id } = req.body || {};
+      const uid = req.user && req.user.id;
       try {
         await sendIpc('stopOpenlistMount', { id }, 'openlistMountStopResponse', 15000);
       } catch (_) {}
@@ -108,7 +109,7 @@ class OpenlistMountController {
       } catch (e) {
         Logger.warn('openlistMount delete storage ipc failed', e);
       }
-      await service.remove({ id });
+      await service.remove({ id, uid });
       return ResponseUtil.success(req, res, { ok: true }, 'common.SUCCESS', 200);
     } catch (e) {
       const msgKey = e && e.message ? String(e.message) : 'common.ERROR';

@@ -249,8 +249,9 @@ class FileMountController {
     try {
       const service = new FileMountService(req.dbMain);
       const { id } = req.body || {};
+      const uid = req.user && req.user.id;
       await this._stopByIpc({ id });
-      const data = await service.remove({ id });
+      const data = await service.remove({ id, uid });
       return ResponseUtil.success(req, res, data, 'common.SUCCESS', 200);
     } catch (e) {
       const msgKey = e && e.message ? String(e.message) : 'common.ERROR';

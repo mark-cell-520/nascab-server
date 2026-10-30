@@ -1,5 +1,7 @@
 const fs = require('fs');
+const path = require('path');
 const jwtUtil = require('../../../utils/jwtUtil');
+const FileUtil = require('../../../utils/fileUtil');
 const { assertMountSupportedOnPlatform } = require('../../../utils/mountPlatformUtil');
 const { normalizeOpenlistMountPath } = require('../../../utils/mountPathUtil');
 const { isAllowedOpenlistDriver } = require('../../../workers/openlist/openlistDriverCatalog');
@@ -145,6 +147,13 @@ class OpenlistMountService {
       err.statusCode = 400;
       throw err;
     }
+    // 和 fileMount 同一套理由：mount_path 是真实挂载点，进程以 root 跑，
+    // 指向 /etc、/var 等于把系统目录盖在远程文件系统下面。
+    if (FileUtil.isProtectedPath(path.resolve(mountPathStr))) {
+      const err = new Error('openlistMount.PROTECTED_MOUNT_PATH');
+      err.statusCode = 400;
+      throw err;
+    }
     await ensureDirReadableWritable(mountPathStr);
 
     const normalizedConfig = config && typeof config === 'object' ? deepEncryptSensitive(config) : null;
@@ -219,20 +228,23 @@ class OpenlistMountService {
     return { id: newId, openlist_mount_path: olPath };
   }
 
-  async remove({ id }) {
+  async remove({ id, uid }) {
     const idNum = Number(id);
     if (!Number.isFinite(idNum) || idNum <= 0) {
       const err = new Error('validation.ID_INVALID');
       err.statusCode = 400;
       throw err;
     }
-    const existed = await this.knexMain(this.tableName).where({ id: idNum }).first();
+    // uid 一起进 where：行按 uid 归属（upsert/list 都带），删除只按 id 查
+    // 等于拿别人的 id 就能删掉别人的挂载配置。
+    const uidStr = String(uid);
+    const existed = await this.knexMain(this.tableName).where({ id: idNum, uid: uidStr }).first();
     if (!existed) {
       const err = new Error('common.NOT_FOUND');
       err.statusCode = 404;
       throw err;
     }
-    await this.knexMain(this.tableName).where({ id: idNum }).del();
+    await this.knexMain(this.tableName).where({ id: idNum, uid: uidStr }).del();
     return { ok: true, openlist_storage_id: existed.openlist_storage_id };
   }
 }
