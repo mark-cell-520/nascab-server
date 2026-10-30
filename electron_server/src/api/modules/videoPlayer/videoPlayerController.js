@@ -683,8 +683,10 @@ class VideoPlayerController {
       const subtitleTrackIndex = subtitleIndex !== undefined ? Number(subtitleIndex) : undefined;
 
       const w = width !== undefined ? Number(width) : undefined;
-      // 转码请求到达日志：用于确认客户端（mpv/HLS）是否真的发起了请求
-      console.log(`[transcode] request playId=${playIdStr} seek=${seekSeconds} device=${deviceIdStr} at=${Date.now()}`);
+      // 转码请求到达日志：用于确认客户端（mpv/HLS）是否真的发起了请求。
+      // 走 Logger.debug 而不是裸 console.log：转码入口在一次播放里可能被重入多次，
+      // 且 Logger 会带时间戳并进入统一日志流，便于和 worker 侧日志对齐排查。
+      Logger.debug('[transcode] request', { playId: playIdStr, seek: seekSeconds, device: deviceIdStr });
       const playbackSource = await videoPlayerService.resolvePlaybackSource(filePath);
       const transcodeInputPath = playbackSource.playableFilePath;
 
@@ -783,7 +785,7 @@ class VideoPlayerController {
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).send(m3u8);
     } catch (e) {
-      console.log(e);
+      Logger.error('startTranscode failed', e);
       return ResponseUtil.error(req, res, 'videoPlayer.TRANSCODE_FAILED', 500, {
         error: e.message,
       });
@@ -859,7 +861,6 @@ class VideoPlayerController {
             await tableVideoTranscodeSession.setRunning(playId, 1, req.dbVideo).catch(() => null);
 
             if (process.send) {
-              console.log('重新开启转码', playId, resumeOptions);
               process.send({
                 type: 'startTranscode',
                 data: {
@@ -888,7 +889,7 @@ class VideoPlayerController {
       if (!ok) {
         const maxWaitMs = isM3u8 ? 20000 : 60000;
         const waitStartAt = Date.now();
-        console.log(`[hls] segment missing, waiting playId=${playId} file=${filename} maxWait=${maxWaitMs}ms at=${waitStartAt}`);
+        Logger.warn('[hls] segment missing, waiting', { playId, filename, maxWaitMs });
         const deadline = waitStartAt + maxWaitMs;
         while (Date.now() < deadline) {
           if (fs.existsSync(filePath)) {
@@ -900,7 +901,12 @@ class VideoPlayerController {
           }
           await new Promise(r => setTimeout(r, 200));
         }
-        console.log(`[hls] segment ${ok ? 'ready' : 'timeout'} playId=${playId} file=${filename} waited=${Date.now() - waitStartAt}ms`);
+        Logger.info('[hls] segment wait finished', {
+          playId,
+          filename,
+          ok,
+          waited: Date.now() - waitStartAt,
+        });
       }
 
       if (!ok) return res.status(404).send('Not Found');
@@ -1063,7 +1069,9 @@ class VideoPlayerController {
         }
 
         cmd.on('start', cmdline => {
-          console.log(cmdline);
+          // ffmpeg 命令行只在 debug 级别输出：一次播放可能多次重连，
+          // 且命令行本身很长，生产环境默认不落盘。
+          Logger.debug('[transcode] ffmpeg start', { filePath, cmdline });
         });
         cmd.on('stderr', line => {
           pushStderr(line);
@@ -1141,7 +1149,6 @@ class VideoPlayerController {
         }
       });
       first.cmd.on('end', () => {
-        console.log('ffmpeg stream end!!!');
         try {
           if (!res.writableEnded) res.end();
         } catch (_) {}
@@ -1163,7 +1170,6 @@ class VideoPlayerController {
    */
   async stopTranscode(req, res) {
     const playId = req.query.playId || req.body?.playId;
-    console.log('暂停转码', playId);
     if (playId) {
       const outDir = await videoPlayerService.getTranscodeOutDir(playId);
       const waitStopped = new Promise(resolve => {
@@ -1199,8 +1205,7 @@ class VideoPlayerController {
       setImmediate(async () => {
         const stopped = await waitStopped;
         if (stopped) {
-          let deleteResult = await tableVideoTranscodeSession.deleteByPlayId(playId, req.dbVideo).catch(() => null);
-          console.log('删除转码session', playId, deleteResult);
+          await tableVideoTranscodeSession.deleteByPlayId(playId, req.dbVideo).catch(() => null);
         }
         for (let i = 0; i < 30; i++) {
           try {
@@ -1235,7 +1240,7 @@ class VideoPlayerController {
 
       return ResponseUtil.success(req, res);
     } catch (e) {
-      console.log(e);
+      Logger.error('saveVideoPreference failed', e);
       return ResponseUtil.error(req, res, 'videoPlayer.SAVE_PREFERENCE_FAILED', 500, {
         error: e.message,
       });

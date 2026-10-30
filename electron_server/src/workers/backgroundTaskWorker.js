@@ -136,7 +136,7 @@ class BackgroundTaskWorker {
   startHwMonitor() {
     if (this.hwMonitorRunning) return;
     this.hwMonitorRunning = true;
-    console.log("开始采集CPU,内存信息")
+    Logger.info('🧮 开始采集 CPU、内存信息');
     try {
       this.hwMonitor.start();
     } catch (e) {
@@ -145,7 +145,7 @@ class BackgroundTaskWorker {
   }
 
   stopHwMonitor() {
-    console.log("停止采集CPU,内存信息")
+    Logger.info('🧮 停止采集 CPU、内存信息');
     if (!this.hwMonitorRunning) return;
     this.hwMonitorRunning = false;
     try {
