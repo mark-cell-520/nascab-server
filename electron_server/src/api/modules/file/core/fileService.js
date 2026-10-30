@@ -7,6 +7,7 @@ const dbUtil = require('../../../../db/dbUtil');
 const knexUtil = require('../../../../db/knexUtil');
 const tableFileLog = require('../../../../db/table/tableFileLog');
 const { isSlowIoPathForTiny } = require('../../../../utils/slowIoPathUtil');
+const { escapeLikeValue } = require('../../../../utils/sqlLikeUtil');
 
 class FileService {
   _buildListPayload(base, items) {
@@ -480,11 +481,21 @@ class FileService {
     }
 
     if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
-      const k = `%${keyword.trim()}%`;
+      // 关键字里的 % / _ 在 SQLite LIKE 里是通配符：搜 "50%" 等于匹配所有日志，
+      // 搜 "a_b" 还会额外命中 "axb"。这里转义后配 ESCAPE '\' 用。
+      const k = `%${escapeLikeValue(keyword.trim())}%`;
       query = query.andWhere(function () {
-        this.where('source_path', 'like', k).orWhere('target_path', 'like', k).orWhere('message', 'like', k);
+        this.whereRaw("source_path LIKE ? ESCAPE '\\'", [k])
+          .orWhereRaw("target_path LIKE ? ESCAPE '\\'", [k])
+          .orWhereRaw("message LIKE ? ESCAPE '\\'", [k]);
       });
     }
+
+    // page / pageSize 直接来自 req.body（该接口仅超级管理员可见，但参数仍然不可信）：
+    // page_size=100000 能把整张 file_log 拉进内存，page 传负数会让 offset 变负、
+    // SQLite 直接抛错。夹到合理区间，回包也返回夹过之后的值。
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const safePageSize = Math.min(200, Math.max(1, Math.floor(Number(pageSize) || 20)));
 
     const countQuery = query.clone().count('id as total');
     const totalResult = await countQuery;
@@ -492,14 +503,14 @@ class FileService {
 
     const rows = await query
       .orderBy('create_time', 'desc')
-      .limit(pageSize)
-      .offset((page - 1) * pageSize);
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize);
 
     return {
       list: rows,
       total,
-      page,
-      pageSize,
+      page: safePage,
+      pageSize: safePageSize,
     };
   }
 

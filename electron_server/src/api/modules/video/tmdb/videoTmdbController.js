@@ -200,7 +200,9 @@ class VideoTmdbController {
       const searchMode = String(body.search_mode ?? body.searchMode ?? 'keyword').trim();
       const query = String(body.query ?? body.keyword ?? '').trim();
       const tmdbId = String(body.tmdb_id ?? body.tmdbId ?? '').trim();
-      const page = Math.max(1, Number(body.page ?? 1) || 1);
+      // TMDB 的分页上限是 500，超出它只会拿到空结果，但会把无意义的请求
+      // 透传到外站；这里夹一下，负数/NaN 一并归到 1。
+      const page = Math.min(500, Math.max(1, Math.floor(Number(body.page ?? 1) || 1)));
 
       if (mediaType !== 'movie' && mediaType !== 'tv') {
         return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);

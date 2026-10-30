@@ -28,8 +28,10 @@ class VideoDetailController {
 
       const q = req.query || {};
       const indexId = Number(q.index_id ?? q.indexId ?? 0) || 0;
-      const page = Number(q.page ?? 1) || 1;
-      const pageSize = Number(q.page_size ?? q.pageSize ?? 50) || 50;
+      const page = Math.max(1, Math.floor(Number(q.page ?? 1) || 1));
+      // page_size 原来原样透传给 service：page_size=100000 能把整张 episode 表
+      // 拉进内存再序列化。上限与其他列表接口保持一致（200）。
+      const pageSize = Math.min(200, Math.max(1, Math.floor(Number(q.page_size ?? q.pageSize ?? 50) || 50)));
       const sortOrder = String(q.sort_order ?? q.sortOrder ?? 'asc');
 
       const service = new VideoDetailService(req.dbVideo);

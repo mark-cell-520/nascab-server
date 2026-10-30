@@ -75,6 +75,47 @@ if (config.logging.file.enabled) {
   );
 }
 
+// 请求 URL 会原样进日志（combined.log + UI 的「最近日志」面板）。WebSocket 握手
+// 没法带 Authorization header，只能用 ?accessToken=xxx，于是一条 HTTP 日志就等于
+// 把一枚有效令牌抄在磁盘上、并推送到所有能看到日志面板的客户端。这里把敏感查询
+// 参数的值抹掉，路径部分保留（排查问题要看的是路径）。
+const SENSITIVE_QUERY_KEYS = new Set([
+  'accesstoken',
+  'refreshtoken',
+  'token',
+  'password',
+  'code',
+  'secret',
+  'api_key',
+  'apikey',
+  'authorization',
+  'auth',
+]);
+
+function sanitizeLogUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || rawUrl === '') return rawUrl;
+  const qIndex = rawUrl.indexOf('?');
+  if (qIndex === -1) return rawUrl;
+  const base = rawUrl.slice(0, qIndex);
+  const search = rawUrl.slice(qIndex + 1);
+  if (!search) return rawUrl;
+
+  const parts = [];
+  for (const pair of search.split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const rawKey = eq === -1 ? pair : pair.slice(0, eq);
+    let key = rawKey;
+    try {
+      key = decodeURIComponent(rawKey).toLowerCase();
+    } catch (_) {
+      key = rawKey.toLowerCase();
+    }
+    parts.push(SENSITIVE_QUERY_KEYS.has(key) ? `${rawKey}=***` : pair);
+  }
+  return `${base}?${parts.join('&')}`;
+}
+
 // 自定义日志方法
 class Logger {
   /**
@@ -83,7 +124,7 @@ class Logger {
   static http(req, res, responseTime) {
     const logData = {
       method: req.method,
-      url: req.url,
+      url: sanitizeLogUrl(req.url),
       statusCode: res.statusCode,
       userAgent: req.get('User-Agent'),
       ip: req.ip || req.connection.remoteAddress,
