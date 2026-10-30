@@ -186,7 +186,15 @@ async function save(req, res) {
     if (!canWriteByFs) {
       return ResponseUtil.error(req, res, 'file.NO_WRITE_PERMISSION', 403);
     }
-    await fs.promises.writeFile(resolved, text, 'utf8');
+    // 内存 doc 必须跟着磁盘走：否则在线客户端下一条 op 仍基于旧文本计算，
+    // 随后 scheduleSave 会把旧文本整篇写回磁盘，这次保存的内容就丢了。
+    // 有 doc 时交给 docManager 加锁写盘 + 整篇同步；没有 doc 才直接写文件。
+    const docInfo = docManager.getByPath(resolved);
+    if (docInfo) {
+      await docManager.overwriteFromExternal(docInfo, text);
+    } else {
+      await fs.promises.writeFile(resolved, text, 'utf8');
+    }
     return ResponseUtil.success(req, res, { ok: true }, 'common.SUCCESS', 200);
   } catch (e) {
     return ResponseUtil.error(req, res, 'common.ERROR', 500, {
