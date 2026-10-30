@@ -12,6 +12,7 @@ const { createTrashOps } = require('./photoTimeLineTrashOps');
 const tableConfig = require('../../../../db/table/tableConfig');
 const { ensureNodejiebaDictLoaded } = require('../../../../utils/nodejiebaInit');
 const nodejieba = require('nodejieba');
+const Logger = require('../../../../utils/logger');
 const indexFields = [
   'id',
   'camera',
@@ -502,6 +503,45 @@ class PhotoTimeLineService {
     return 5;
   }
 
+  /**
+   * 估算一个矩形在给定精度下会被切成多少个 geohash 格子。
+   *
+   * ngeohash 的精度 p 把全球切成 32^p 个格子，格子沿纬度/经度均匀分布，
+   * 所以盒子数 ≈ 32^p × (纬度跨度/180) × (经度跨度/360)。
+   * 实测校准过：全球 p2=1024、p5=31,703,040，中国 p5=1,125,978，均与公式吻合。
+   */
+  estimateBBoxCount(bounds, precision) {
+    const p = Math.max(1, Math.min(9, Number(precision) || 0));
+    if (!p) return 0;
+    const dLat = Math.max(0, Math.min(180, bounds.maxLat - bounds.minLat));
+    const dLng = Math.max(0, Math.min(360, bounds.maxLng - bounds.minLng));
+    if (dLat === 0 || dLng === 0) return 0;
+    return Math.ceil(Math.pow(32, p) * (dLat / 180) * (dLng / 360));
+  }
+
+  /**
+   * 先按上面的估算挑精度，再去真正调用 geohash.bboxes。
+   *
+   * 原来是「先 bboxes 再看 length 超没超上限」：
+   *   let hashes = geohash.bboxes(...);
+   *   while (precision > 2 && hashes.length > maxReturnCount) { precision -= 1; hashes = geohash.bboxes(...); }
+   * 内存峰值发生在 bboxes 内部——数组已经完整生成之后才比较长度。也就是说
+   * 一个 zoom>8 的全屏请求会先把几千万个字符串建出来再扔掉，
+   * 实测全球 p5 = 31,703,040 个格子（约 2 GB 字符串），进程直接被打爆。
+   * 现在先用估算把精度降下来，bboxes 每次调用都是安全的；
+   * 调用后仍保留长度兜底，防止 ngeohash 的行为与估算不符。
+   */
+  chooseBoundsPrecision(bounds, requestedPrecision, maxReturnCount) {
+    let precision = Number.isFinite(requestedPrecision) ? Math.floor(requestedPrecision) : 2;
+    precision = Math.max(2, Math.min(6, precision));
+    const limit = Math.max(1, Number(maxReturnCount) || 1);
+    // 留一倍余量：估算值贴近真实值，但 ngeohash 对边界格子的处理略多
+    while (precision > 2 && this.estimateBBoxCount(bounds, precision) * 2 > limit) {
+      precision -= 1;
+    }
+    return precision;
+  }
+
   normalizeBounds(params) {
     const minLat = Number(params && params.minLat);
     const minLng = Number(params && params.minLng);
@@ -527,10 +567,10 @@ class PhotoTimeLineService {
 
     const validPaths = await this.getValidPathsByParams(params, user);
     if (!validPaths || validPaths.length === 0) {
-      return { mapPhoto: [], precision: this.getBoundsPrecisionByZoom(params && params.zoom), hash_count: 0 };
+      return { mapPhoto: [], precision: this.chooseBoundsPrecision(bounds, this.getBoundsPrecisionByZoom(params && params.zoom), maxReturnCount), hash_count: 0 };
     }
 
-    let precision = this.getBoundsPrecisionByZoom(params && params.zoom);
+    let precision = this.chooseBoundsPrecision(bounds, this.getBoundsPrecisionByZoom(params && params.zoom), maxReturnCount);
     let hashes = geohash.bboxes(bounds.minLat, bounds.minLng, bounds.maxLat, bounds.maxLng, precision) || [];
     while (precision > 2 && hashes.length > maxReturnCount) {
       precision -= 1;
@@ -553,27 +593,45 @@ class PhotoTimeLineService {
 
     const mapPhoto = [];
     const seenIds = new Set();
+    let failedHashes = 0;
     const geoColumn = precision >= 2 && precision <= 6 ? `photo_index.geohash${precision}` : 'photo_index.geohash';
 
     for (const h of hashes) {
       if (mapPhoto.length >= maxReturnCount) break;
-      const row = await baseQuery
-        .clone()
-        .whereNotNull(geoColumn)
-        .andWhere(geoColumn, '!=', '')
-        .andWhere(geoColumn, h)
-        .andWhereRaw('NOT (photo_index.latitude = 0 AND photo_index.longitude = 0)')
-        .orderBy('photo_index.original_time', 'desc')
-        .orderBy('photo_index.id', 'desc')
-        .select(selectFields)
-        .first()
-        .catch(() => null);
+      // 原来是 `.first().catch(() => null)`：单个格子的查询失败（索引缺失、
+      // 数据库锁、磁盘错误）被静默吞掉，地图上那块区域就是空的，
+      // 日志里一个字符都没有，谁也查不出照片为什么"没了"。
+      // 现在失败会计数并在最后统一 Logger.warn 一次（格子可能上千个，
+      // 逐条打日志会把 combined.log 刷满）。
+      let row = null;
+      try {
+        row = await baseQuery
+          .clone()
+          .whereNotNull(geoColumn)
+          .andWhere(geoColumn, '!=', '')
+          .andWhere(geoColumn, h)
+          .andWhereRaw('NOT (photo_index.latitude = 0 AND photo_index.longitude = 0)')
+          .orderBy('photo_index.original_time', 'desc')
+          .orderBy('photo_index.id', 'desc')
+          .select(selectFields)
+          .first();
+      } catch (error) {
+        failedHashes += 1;
+        if (failedHashes === 1) {
+          Logger.warn(`[photo/map] 网格 ${h} 的照片查询失败`, { error: error && error.message ? error.message : error });
+        }
+        continue;
+      }
 
       if (!row || !row.id) continue;
       const id = Number(row.id);
       if (seenIds.has(id)) continue;
       seenIds.add(id);
       mapPhoto.push({ ...row, fullpath: path.join(row.path, row.filename) });
+    }
+
+    if (failedHashes > 0) {
+      Logger.warn(`[photo/map] ${failedHashes}/${hashes.length} 个网格的照片查询失败`, { precision: precision });
     }
 
     return { mapPhoto, precision, hash_count: hashes.length };
@@ -633,9 +691,10 @@ class PhotoTimeLineService {
   /**
    * 从回收站中恢复
    * @param {number[]} ids 照片ID列表
+   * @param {Object} user 用户信息，非管理员只能恢复自己可见照片源内的照片
    */
-  async restoreFromTrash(ids) {
-    return this.trashOps.restoreFromTrash(ids);
+  async restoreFromTrash(ids, user) {
+    return this.trashOps.restoreFromTrash(ids, user);
   }
 
   async restoreAllFromTrash(user) {

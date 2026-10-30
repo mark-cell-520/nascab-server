@@ -16,11 +16,22 @@ const TOKEN_LIKE = /^[A-Za-z][A-Za-z0-9_.\-]*$/;
 const KEY_WITH_DETAIL = /^[A-Za-z][A-Za-z0-9]*\.[A-Z][A-Z0-9_]+:[\s\S]+$/;
 const CJK = /[㐀-䶿一-鿿豈-﫿]/;
 
+// 上面第 4 条原来只看“含不含中文字符”，而中文字符出现在哪一概不管——这等于把闸门
+// 交给了数据：照片源叫 /boot/照片 时，SQLite 的报错原文
+//   select count(*) ... where (`photo_index`.`path` = '/boot/照片' or ...) - no such column
+// 因为含中文，整条 SQL（连宿主机绝对路径）被判定成人话原样回给了前端。
+// 现在中文消息还必须同时满足：够短（人话不会长到 200 字），且不带 SQL / 堆栈 /
+// 系统错误的签名。
+const CJK_MAX_LEN = 200;
+const RAW_LEAK_SIGNATURE =
+  /`|;|SQLITE|no such|SyntaxError|TypeError|ReferenceError|RangeError|ENOENT|EACCES|EPERM|EISDIR|EAI_AGAIN|ECONN|ERR_|at\s+\S+:\d+|\.js:\d+|node:internal|knex|better-sqlite3|stack/i;
+
 function isUserFacingMessage(raw) {
   if (!raw) return false;
-  if (CJK.test(raw)) return true;
+  if (TOKEN_LIKE.test(raw)) return true;
   if (KEY_WITH_DETAIL.test(raw)) return true;
-  return TOKEN_LIKE.test(raw);
+  if (raw.length > CJK_MAX_LEN) return false;
+  return CJK.test(raw) && !RAW_LEAK_SIGNATURE.test(raw);
 }
 
 // 同一句原文只记一次日志：出错接口被轮询时不会把 combined.log 刷满

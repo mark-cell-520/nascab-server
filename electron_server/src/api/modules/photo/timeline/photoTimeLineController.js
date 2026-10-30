@@ -3,6 +3,23 @@ const Logger = require('../../../../utils/logger');
 const ResponseUtil = require('../../../apiUtils/responseUtil');
 const photoMapService = require('../map/photoMapService');
 
+// 时间轴/回收站这些接口原来一律 `ResponseUtil.error(req, res, error.message, statusCode)`。
+// error.message 绝大多数不是 message key，ResponseUtil 的 isUserFacingMessage 会把它
+// 静默换成 common.ERROR 并只写一次日志——看起来"安全"，但只要消息里带一个中文字符
+// （照片源叫 /boot/照片 就够了），整段原文就被判定成人话原样回给前端。
+// 这里显式只放行已知 key，别的统一走 common.ERROR；细节靠 Logger.error 落盘排查。
+const TRASH_MSG_KEYS = ['common.PARAM_ERROR', 'common.NOT_FOUND', 'auth.PERMISSION_DENIED', 'common.ERROR'];
+
+function safeMsgKey(error) {
+  const raw = error && error.message ? String(error.message) : '';
+  return TRASH_MSG_KEYS.includes(raw) ? raw : 'common.ERROR';
+}
+
+function safeStatus(error) {
+  const code = error && error.statusCode ? Number(error.statusCode) : 0;
+  return Number.isFinite(code) && code >= 400 && code <= 599 ? code : 500;
+}
+
 class PhotoTimeLineController {
   async getPhotoTotalCount(req, res) {
     try {
@@ -17,8 +34,7 @@ class PhotoTimeLineController {
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
     } catch (error) {
       Logger.error('getPhotoTotalCount error:', error);
-      const statusCode = error.statusCode || 500;
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', statusCode);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -28,8 +44,7 @@ class PhotoTimeLineController {
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
     } catch (error) {
       Logger.error('getTimelineYearList error:', error);
-      const statusCode = error.statusCode || 500;
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', statusCode);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -60,8 +75,7 @@ class PhotoTimeLineController {
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
     } catch (error) {
       Logger.error('getTimelineDateList error:', error);
-      const statusCode = error.statusCode || 500;
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', statusCode);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -179,8 +193,7 @@ class PhotoTimeLineController {
       return ResponseUtil.success(req, res, { photoList, dateInfoList }, 'common.SUCCESS', 200);
     } catch (error) {
       Logger.error('getTimelinePhotoList error:', error);
-      const statusCode = error.statusCode || 500;
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', statusCode);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -196,8 +209,8 @@ class PhotoTimeLineController {
       await photoTimeLineService.batchFavorite(req.user, file_hashes, is_favorite);
       return ResponseUtil.success(req, res, null, 'common.SUCCESS');
     } catch (error) {
-      Logger.error('batchFavorite error:', error);
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', 500);
+      Logger.error(`[photo/favorite/batch] failed: ${error && error.stack ? error.stack : error}`);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -213,8 +226,8 @@ class PhotoTimeLineController {
       const result = await photoTimeLineService.toggleFavorite(req.user, file_hash);
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
     } catch (error) {
-      Logger.error('toggleFavorite error:', error);
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', 500);
+      Logger.error(`[photo/favorite/toggle] failed: ${error && error.stack ? error.stack : error}`);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -230,10 +243,8 @@ class PhotoTimeLineController {
       await photoTimeLineService.batchTrash(ids, true, req.user);
       return ResponseUtil.success(req, res, null, 'photo.TRASH_ADD_SUCCESS', 200);
     } catch (error) {
-      Logger.error('batchTrash error:', error);
-      const statusCode = error.statusCode || 500;
-      const message = statusCode === 403 ? 'auth.PERMISSION_DENIED' : (error.message || 'common.ERROR');
-      return ResponseUtil.error(req, res, message, statusCode);
+      Logger.error(`[photo/trash/add] failed: ${error && error.stack ? error.stack : error}`);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -256,8 +267,11 @@ class PhotoTimeLineController {
       );
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
     } catch (error) {
-      Logger.error('getTrashPhotoList error:', error);
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', 500);
+      // 原来是 `ResponseUtil.error(req, res, error.message || 'common.ERROR', 500)`：
+      // 排序字段/分页参数能炸出 SQLite 报错，这里把整条 SQL 连宿主机绝对路径一起
+      // 回给了前端。现在只放行已知的 message key。
+      Logger.error(`[photo/trash/list] failed: ${error && error.stack ? error.stack : error}`);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -272,11 +286,11 @@ class PhotoTimeLineController {
         return ResponseUtil.success(req, res, null, 'photo.TRASH_RESTORE_SUCCESS', 200);
       }
       if (!Array.isArray(ids)) return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
-      await photoTimeLineService.restoreFromTrash(ids);
+      await photoTimeLineService.restoreFromTrash(ids, req.user);
       return ResponseUtil.success(req, res, null, 'photo.TRASH_RESTORE_SUCCESS', 200);
     } catch (error) {
-      Logger.error('restoreFromTrash error:', error);
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', 500);
+      Logger.error(`[photo/trash/restore] failed: ${error && error.stack ? error.stack : error}`);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -295,10 +309,8 @@ class PhotoTimeLineController {
       });
       return ResponseUtil.success(req, res, null, 'photo.TRASH_DELETE_SUCCESS', 200);
     } catch (error) {
-      Logger.error('deleteFromTrash error:', error);
-      const statusCode = error.statusCode || 500;
-      const message = statusCode === 403 ? 'auth.PERMISSION_DENIED' : (error.message || 'common.ERROR');
-      return ResponseUtil.error(req, res, message, statusCode);
+      Logger.error(`[photo/trash/delete] failed: ${error && error.stack ? error.stack : error}`);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -314,10 +326,8 @@ class PhotoTimeLineController {
       });
       return ResponseUtil.success(req, res, null, 'photo.TRASH_EMPTY_SUCCESS', 200);
     } catch (error) {
-      Logger.error('emptyTrash error:', error);
-      const statusCode = error.statusCode || 500;
-      const message = statusCode === 403 ? 'auth.PERMISSION_DENIED' : (error.message || 'common.ERROR');
-      return ResponseUtil.error(req, res, message, statusCode);
+      Logger.error(`[photo/trash/empty] failed: ${error && error.stack ? error.stack : error}`);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 
@@ -346,8 +356,7 @@ class PhotoTimeLineController {
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
     } catch (error) {
       Logger.error('getBoundsPhoto error:', error);
-      const statusCode = error.statusCode || 500;
-      return ResponseUtil.error(req, res, error.message || 'common.ERROR', statusCode);
+      return ResponseUtil.error(req, res, safeMsgKey(error), safeStatus(error));
     }
   }
 }
