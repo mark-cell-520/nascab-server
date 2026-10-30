@@ -267,7 +267,7 @@ class GpsSupplementService {
   }
 
   async resetAll() {
-    return this.knex.transaction(async trx => {
+    const result = await this.knex.transaction(async trx => {
       const resetResult = await trx('photo_index')
         .whereNot('gen_gps_add', 0)
         .update({ gen_gps_add: 0 });
@@ -277,15 +277,25 @@ class GpsSupplementService {
         clearedBatchCount: Number(clearedBatches) || 0,
       };
     });
+    // 必须把扫描中标记一起清掉：这个 flag 是 worker 自己维护的（启动置 1、跑完置 0），
+    // 进程被 kill 或机器重启就会永久停在 '1'，getStatus().running 一直返回 true，
+    // 前端显示「扫描中」且再也不结束。重置按钮就是用户唯一的自救入口。
+    await this._setConfig('ai_gps_add_scan_running', '0');
+    return result;
   }
 
   async applyBatchGps(batchId, latitude, longitude, selectedIds = []) {
-    const normalized = normalizeLatLon(latitude, longitude);
-    if (!normalized) {
+    // normalizeLatLon 对越界/非有限值一律返回 {0,0}，它自己从不返回 null，
+    // 所以原来那句 `if (!normalized) throw PARAM_ERROR` 是死代码：用户传 latitude=999
+    // 会被静默变成赤道/本初子道交点，然后盖进每一张照片的 EXIF。这里必须自己校验范围。
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
       const err = new Error('common.PARAM_ERROR');
       err.statusCode = 400;
       throw err;
     }
+    const normalized = { latitude: lat, longitude: lon };
 
     const batch = await this.knex('gps_add')
       .where({ id: Number(batchId) || 0, status: GPS_ADD_STATUS.PENDING })
@@ -323,6 +333,25 @@ class GpsSupplementService {
       const err = new Error('common.NOT_FOUND');
       err.statusCode = 404;
       throw err;
+    }
+
+    // 先全量预检再动手写文件：writeGpsToJpeg 是边循环边落盘的，原来一旦第 3 张
+    // 不支持/文件缺失就抛错，前 2 张的 EXIF 已经写进去了，而 photo_index 那次更新
+    // 根本没执行 —— 数据库里这些照片仍然是 latitude=0，下一轮扫描还会把它们当成
+    // 「待补 GPS」再推给用户，反复盖同一批文件。预检失败就整体 400，一个字节都不写。
+    for (const row of rows) {
+      const ext = row && row.ext ? String(row.ext).toLowerCase() : '';
+      if (!this.isSupportedExt(ext)) {
+        const err = new Error('common.PARAM_ERROR');
+        err.statusCode = 400;
+        throw err;
+      }
+      const fullPath = buildPhotoFullPath(row);
+      if (!fullPath || !fs.existsSync(fullPath)) {
+        const err = new Error('common.NOT_FOUND');
+        err.statusCode = 404;
+        throw err;
+      }
     }
 
     for (const row of rows) {
@@ -444,6 +473,14 @@ class GpsSupplementService {
       return value == null ? fallback : String(value);
     } catch (_) {
       return fallback;
+    }
+  }
+
+  async _setConfig(key, value) {
+    try {
+      return await tableConfig.setConfigByKey(key, value);
+    } catch (_) {
+      return false;
     }
   }
 }

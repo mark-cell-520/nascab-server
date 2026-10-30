@@ -1,4 +1,5 @@
 const ResponseUtil = require('../../../apiUtils/responseUtil');
+const Logger = require('../../../../utils/logger');
 const GpsSupplementService = require('./gpsSupplementService');
 
 class GpsSupplementController {
@@ -7,7 +8,8 @@ class GpsSupplementController {
       const service = new GpsSupplementService(req.dbPhoto);
       const result = await service.getStatus();
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
-    } catch (_) {
+    } catch (e) {
+      Logger.error(`[gps_add/status] failed: ${e && e.message ? e.message : e}`);
       return ResponseUtil.error(req, res, 'common.ERROR', 500);
     }
   }
@@ -22,7 +24,8 @@ class GpsSupplementController {
       const service = new GpsSupplementService(req.dbPhoto);
       const result = await service.getStatus();
       return ResponseUtil.success(req, res, { ok: true, ...result }, 'common.SUCCESS', 200);
-    } catch (_) {
+    } catch (e) {
+      Logger.error(`[gps_add/start_scan] failed: ${e && e.message ? e.message : e}`);
       return ResponseUtil.error(req, res, 'common.ERROR', 500);
     }
   }
@@ -51,6 +54,10 @@ class GpsSupplementController {
     } catch (e) {
       const statusCode = Number(e && e.statusCode) || 500;
       const errorKey = e && e.message ? String(e.message) : 'common.ERROR';
+      // 500 一定是意外（数据库、写 EXIF 失败），必须留日志；400/404 是预检/参数类的预期返回，不打
+      if (statusCode >= 500) {
+        Logger.error(`[gps_add/apply] failed: ${e && e.stack ? e.stack : e}`);
+      }
       return ResponseUtil.error(req, res, errorKey, statusCode);
     }
   }
@@ -69,7 +76,8 @@ class GpsSupplementController {
         return ResponseUtil.error(req, res, 'common.NOT_FOUND', 404);
       }
       return ResponseUtil.success(req, res, { ok: true }, 'common.SUCCESS', 200);
-    } catch (_) {
+    } catch (e) {
+      Logger.error(`[gps_add/skip] failed: ${e && e.message ? e.message : e}`);
       return ResponseUtil.error(req, res, 'common.ERROR', 500);
     }
   }
@@ -86,7 +94,8 @@ class GpsSupplementController {
         'common.SUCCESS',
         200
       );
-    } catch (_) {
+    } catch (e) {
+      Logger.error(`[gps_add/reset] failed: ${e && e.message ? e.message : e}`);
       return ResponseUtil.error(req, res, 'common.ERROR', 500);
     }
   }

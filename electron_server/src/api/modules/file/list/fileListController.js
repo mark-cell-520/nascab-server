@@ -12,6 +12,7 @@ const userUtil = require('../../../../utils/userUtil');
 const FileUtil = require('../../../../utils/fileUtil');
 const userShareFolderUtil = require('../../../../utils/userShareFolderUtil');
 const userCustomPathUtil = require('../../../../utils/userCustomPathUtil');
+const Logger = require('../../../../utils/logger');
 const {
   getAppSpecifiedRoots,
   intersectRootLists,
@@ -443,7 +444,6 @@ async function list(req, res) {
       }
       return ResponseUtil.success(req, res, payload, 'file.DIRECTORY_LIST_FETCH_SUCCESS', 200);
     }
-    // console.log("获取文件列表",dirPath)
 
     if (!dirPath || dirPath === '') {
       return await returnRoot();
@@ -469,7 +469,7 @@ async function list(req, res) {
     });
     return ResponseUtil.success(req, res, result, 'file.DIRECTORY_LIST_FETCH_SUCCESS', 200);
   } catch (err) {
-    console.log(err);
+    Logger.error(`[file/list] list failed: ${err && err.message ? err.message : err}`);
     return ResponseUtil.error(req, res, 'file.DIRECTORY_LIST_FETCH_FAILED', 400, {
       error: err.message,
     });
@@ -824,20 +824,17 @@ function _normalizeSuffixes(rawList) {
   return out;
 }
 
-function _normalizeKeyword(raw) {
-  const s = raw === null || raw === undefined ? '' : String(raw).trim();
-  if (!s) return '';
-  const parts = s
-    .toLowerCase()
-    .replace(/["'`]/g, ' ')
-    .split(/[\s\\/]+/)
-    .map(t => t.trim())
-    .filter(Boolean)
-    .slice(0, 12);
-  if (parts.length === 0) return '';
-  return parts.map(t => `${t}*`).join(' ');
-}
-
+/**
+ * 把用户输入的文件名关键词转成 FTS5 MATCH 表达式。
+ *
+ * 每个分词必须用双引号包起来再拼 `*`：FTS5 里未加引号的裸 token 只要含
+ * ( ) ^ * : % { } ? 就会抛 `fts5: syntax error`，裸的 OR / NOT / AND 会被当成
+ * 布尔运算符，连字符也会被 unicode61 分词器按 separators '/\.' 切开（"a-b" 会
+ * 变成「没有 b 这一列」的报错）。globalSearch 里那次查询是
+ * `await req.dbFile.raw(...).catch(() => [])` 包着的，任何语法错误都会被吞成
+ * 空结果集，表现成「搜索什么都没搜到」，用户完全看不出是关键词写法的问题。
+ * 加引号后 FTS5 按字面字符串处理，`filename:"a-b"*` 既保留前缀匹配语义又不会炸。
+ */
 function _normalizeFilenameKeyword(raw) {
   const s = raw === null || raw === undefined ? '' : String(raw).trim();
   if (!s) return '';
@@ -851,7 +848,7 @@ function _normalizeFilenameKeyword(raw) {
     .map(t => t.replace(/:/g, '').trim())
     .filter(Boolean);
   if (parts.length === 0) return '';
-  return parts.map(t => `filename:${t}*`).join(' ');
+  return parts.map(t => `filename:"${t}"*`).join(' ');
 }
 
 function _clampInt(v, { min, max, def }) {
@@ -1127,7 +1124,12 @@ async function globalSearch(req, res) {
     const sql = `SELECT path, filename, ext FROM ${tableName} WHERE ${whereSql} ${orderSql} LIMIT ? OFFSET ?`;
     binds.push(limit, offset);
 
-    const raw = await req.dbFile.raw(sql, binds).catch(() => []);
+    const raw = await req.dbFile.raw(sql, binds).catch(err => {
+      // 不能继续静默返回空数组：上一次这里把 FTS 语法错误吞掉，导致关键词一遇到
+      // 特殊字符就「搜不到任何东西」却查不到原因。至少要把 SQL 和错误留在日志里。
+      Logger.error(`[globalSearch] FTS query failed: ${err && err.message ? err.message : err} | sql=${sql}`);
+      return [];
+    });
     const rows = _toRows(raw);
 
     let items = await _fillItemStatsAndCleanupMissingIndexRows(
@@ -1150,7 +1152,11 @@ async function globalSearch(req, res) {
             mtimeMs: null,
             ext,
           };
-        })
+        }),
+      // 第二个参数必须把 dbFile 传进去：helper 里 `if (!dbFile || typeof dbFile.raw !== 'function') return`
+      // 会直接跳过删除，于是「文件已不存在」的行永远清不掉，每次全局搜索都要重新 stat 一遍
+      // 这些死路径，索引里的幽灵行只增不减。
+      req.dbFile
     );
 
     if (!userUtil.isAdmin(req.user)) {
