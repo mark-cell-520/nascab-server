@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('../../../../config/config');
+const Logger = require('../../../../utils/logger');
 
 class AppearanceService {
   constructor() {
@@ -80,7 +81,7 @@ class AppearanceService {
 
       return items;
     } catch (error) {
-      console.error('List wallpapers failed:', error);
+      Logger.error('遍历墙纸目录失败', error, { dir: dirPath });
       return [];
     }
   }
@@ -98,7 +99,7 @@ class AppearanceService {
       const randomIndex = Math.floor(Math.random() * wallpapers.length);
       return wallpapers[randomIndex];
     } catch (error) {
-      console.error('Random wallpaper failed:', error);
+      Logger.error('获取随机墙纸失败', error);
       return null;
     }
   }
@@ -128,7 +129,7 @@ class AppearanceService {
 
       return wallpapers;
     } catch (error) {
-      console.error('List wallpapers failed:', error);
+      Logger.error('获取墙纸列表失败', error);
       return [];
     }
   }

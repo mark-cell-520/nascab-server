@@ -6,6 +6,7 @@ const sharp = require('../../../../utils/sharpConfigured');
 const sharpUtils = require('../../../../utils/sharpUtils');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../../../../config/config');
+const Logger = require('../../../../utils/logger');
 
 class AppearanceController {
   constructor() {
@@ -31,7 +32,7 @@ class AppearanceController {
         count: merged.length,
       });
     } catch (error) {
-      console.error('List wallpapers failed:', error);
+      Logger.error('获取墙纸列表失败', error);
       res.status(500).json({
         success: false,
         message: '获取墙纸列表失败',
@@ -73,7 +74,7 @@ class AppearanceController {
       res.type('image/webp');
       return res.send(buffer);
     } catch (error) {
-      console.error('Get wallpaper preview failed:', error);
+      Logger.error('获取墙纸预览失败', error);
       return res.status(500).json({
         success: false,
         message: '获取墙纸预览失败',
@@ -112,7 +113,7 @@ class AppearanceController {
       await tableConfig.setConfigByKey('user_wallpaper', value, userId);
       return res.json({ success: true, data: found, message: '墙纸设置成功' });
     } catch (error) {
-      console.error('Set wallpaper failed:', error);
+      Logger.error('设置墙纸失败', error);
       res.status(500).json({ success: false, message: '设置墙纸失败', error: error.message });
     }
   }
@@ -160,7 +161,7 @@ class AppearanceController {
 
       return res.json({ success: true, data: item, message: '上传成功' });
     } catch (error) {
-      console.error('Upload wallpaper failed:', error);
+      Logger.error('上传墙纸失败', error);
       if (stagePath) {
         await fs.remove(stagePath).catch(() => {});
       }
@@ -188,7 +189,7 @@ class AppearanceController {
       }
       return res.json({ success: true, data: { customHostname: trimmed }, message: '保存成功' });
     } catch (error) {
-      console.error('Set custom hostname failed:', error);
+      Logger.error('设置自定义主机名失败', error);
       return res.status(500).json({ success: false, message: '保存失败', error: error.message });
     }
   }
@@ -237,7 +238,7 @@ class AppearanceController {
 
       return res.json({ success: true, data: { deleted: true, fallback }, message: '删除成功' });
     } catch (error) {
-      console.error('Delete wallpaper failed:', error);
+      Logger.error('删除墙纸失败', error);
       return res.status(500).json({ success: false, message: '删除墙纸失败', error: error.message });
     }
   }

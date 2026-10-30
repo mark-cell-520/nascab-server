@@ -326,7 +326,16 @@ app.use((err, req, res, next) => {
   };
   const bodyParse = err && typeof err.type === 'string' ? bodyParseTypes[err.type] : null;
   if (bodyParse) {
-    Logger.warn('请求体解析失败:', err.type, { url: req.url, method: req.method, ip: req.ip });
+    // Logger.warn(message, meta) 只收两个参数：之前把 err.type 当 meta 传、
+    // 第三组的 url/method/ip 被整个丢掉，日志里只剩一句没上下文的
+    // "请求体解析失败:"，既看不到是哪种解析失败也看不到打的是哪个接口。
+    Logger.warn('请求体解析失败', {
+      type: err.type,
+      status: bodyParse.status,
+      url: req.url,
+      method: req.method,
+      ip: req.ip,
+    });
     return res.status(bodyParse.status).json({
       success: false,
       message: _safeLocalize(req, bodyParse.key),
