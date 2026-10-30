@@ -80,7 +80,10 @@ class QuickShareController {
       });
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const shareUrl = `${baseUrl}/web/quickshare/index.html?qt=${encodeURIComponent(created.token)}`;
+      // 静态挂载点是 /quickshare（见 app.js），不是 /web/quickshare。
+      // 走反代子路径部署时 nginx 不转发 X-Forwarded-Prefix，服务端拿不到前缀，
+      // 故这里只给根路径形态；客户端另用 webBasePathPrefix() 自行拼接子路径。
+      const shareUrl = `${baseUrl}/quickshare/index.html?qt=${encodeURIComponent(created.token)}`;
 
       return ResponseUtil.success(
         req,

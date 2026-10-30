@@ -51,7 +51,6 @@ class BookHistoryController {
   }
 
   async upsert(req, res) {
-    console.log('图书历史设置', req.body);
     try {
       const user = req.user;
       const uid = user && user.id ? Number(user.id) : 0;
