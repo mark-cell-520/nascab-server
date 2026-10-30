@@ -160,15 +160,14 @@ class PhotoSmartAlbumService {
     if (!name) throw new Error('common.PARAM_ERROR');
 
     const type = this._normalizeType(payload.type);
-    const filterContent = smartAlbumFilterUtil.parseFilterContentText(
-      typeof payload.filter_content === 'string'
-        ? payload.filter_content
-        : JSON.stringify(payload.filter_content || {})
-    );
+    // 走和 updateSmartAlbum 同一套 _stringifyFilterContent：filter_content 是坏 JSON
+    // 字符串或非对象时报 400，而不是被 parseFilterContentText 悄悄吞成 {}——
+    // 空筛选意味着「匹配全部照片」，客户端传坏参数时会静默得到一个全量相册。
+    const filterContentText = this._stringifyFilterContent(payload.filter_content);
+    const filterContent = smartAlbumFilterUtil.parseFilterContentText(filterContentText);
     if (!smartAlbumFilterUtil.isValidSmartAlbumFilter(type, filterContent)) {
       throw new Error('common.PARAM_ERROR');
     }
-    const filterContentText = JSON.stringify(filterContent);
 
     const dup = await knexPhoto('photo_smart_album').where({ uid, name }).first();
     if (dup) {

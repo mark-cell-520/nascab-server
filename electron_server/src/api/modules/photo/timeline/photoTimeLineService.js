@@ -145,6 +145,15 @@ class PhotoTimeLineService {
 
   async getValidPathsByParams(params, user) {
     const validPaths = await this.getValidPaths(user);
+
+    // 智能相册筛选：存在性/归属必须在这里校验。各入口都是先拿 validPaths、为空就提前
+    // 返回空结果，之后才进 buildBaseQuery；若只放在 buildBaseQuery 里，那些没有任何
+    // 可见路径的用户会拿到 200 空列表而不是 404/403，与下面的合集筛选不对称。
+    const smartAlbumId = Number(params && params.smart_album_id);
+    if (Number.isFinite(smartAlbumId) && smartAlbumId > 0) {
+      await this._ensureSmartAlbumAccess(params, user);
+    }
+
     // 合集筛选 没有合集就返回有效路径
     const collectionId = Number(params && params.collection_id);
     if (!Number.isFinite(collectionId) || collectionId <= 0) return validPaths;
@@ -165,6 +174,27 @@ class PhotoTimeLineService {
 
     const collectionPaths = photoPathQueryUtil.parsePathListText(collection.path_list);
     return photoPathQueryUtil.intersectPaths(validPaths, collectionPaths);
+  }
+
+  /**
+   * 校验智能相册的存在性与归属，返回相册行
+   */
+  async _ensureSmartAlbumAccess(params, user) {
+    const smartAlbumId = Number(params && params.smart_album_id);
+    const knex = this.getKnex();
+    const smartAlbum = await knex('photo_smart_album').where({ id: smartAlbumId }).first();
+    if (!smartAlbum) {
+      const err = new Error('common.NOT_FOUND');
+      err.statusCode = 404;
+      throw err;
+    }
+    const uid = user && user.id;
+    if (user && !userUtil.isAdmin(user) && uid && Number(smartAlbum.uid) !== Number(uid)) {
+      const err = new Error('auth.PERMISSION_DENIED');
+      err.statusCode = 403;
+      throw err;
+    }
+    return smartAlbum;
   }
 
   /**
@@ -296,17 +326,9 @@ class PhotoTimeLineService {
     // 智能相册筛选
     const smartAlbumId = Number(params.smart_album_id);
     if (Number.isFinite(smartAlbumId) && smartAlbumId > 0) {
-      const smartAlbum = await knex('photo_smart_album').where({ id: smartAlbumId }).first();
-      if (!smartAlbum) {
-        const err = new Error('common.NOT_FOUND');
-        err.statusCode = 404;
-        throw err;
-      }
-      if (user && !userUtil.isAdmin(user) && uid && Number(smartAlbum.uid) !== Number(uid)) {
-        const err = new Error('auth.PERMISSION_DENIED');
-        err.statusCode = 403;
-        throw err;
-      }
+      // 存在性/归属校验在 getValidPathsByParams 里已经做过（那里的提前返回会早于本函数），
+      // 这里再兜底一次，避免绕过 getValidPathsByParams 直接调 buildBaseQuery 时漏掉权限检查。
+      const smartAlbum = await this._ensureSmartAlbumAccess(params, user);
 
       const filterContent = smartAlbumFilterUtil.parseFilterContentText(smartAlbum.filter_content);
       smartAlbumFilterUtil.applySmartAlbumFilter(query, smartAlbum.type, filterContent, 'photo_index');
