@@ -127,6 +127,12 @@ class EncryptedSpaceService {
         err.statusCode = 409;
         throw err;
       }
+      if (e && e.code === 'ENOENT') {
+        // 目录不存在时 ENOENT 直接外抛，message 会当成 i18n key 查不到而落成 500「发生错误」
+        const err = new Error('encryptedSpace.SPACE_FOLDER_MISSING');
+        err.statusCode = 404;
+        throw err;
+      }
       if (e && (e.code === 'EACCES' || e.code === 'EPERM')) {
         const err = new Error('auth.PERMISSION_DENIED');
         err.statusCode = 403;

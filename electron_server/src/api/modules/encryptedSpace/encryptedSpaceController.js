@@ -89,19 +89,29 @@ async function readFileBytes(filePath, position, length) {
   }
 }
 
+function firstNonEmptyValue(...vals) {
+  for (const v of vals) {
+    if (v === undefined || v === null) continue;
+    const s = ensureString(v).trim();
+    if (s) return s;
+  }
+  return '';
+}
+
 function getTokenFromReq(req) {
-  const fromHeader = req.headers && (req.headers.token || req.headers.space_token || req.headers.spaceToken);
-  const fromQuery = req.query && (req.query.token || req.query.spaceToken || req.query.space_token);
-  const fromBody = req.body && (req.body.token || req.body.spaceToken || req.body.space_token);
-  const raw = fromBody ?? fromQuery ?? fromHeader;
-  return ensureString(raw).trim();
+  return firstNonEmptyValue(
+    req.body && (req.body.token || req.body.spaceToken || req.body.space_token),
+    req.query && (req.query.token || req.query.spaceToken || req.query.space_token),
+    req.headers && (req.headers.token || req.headers.space_token || req.headers.spaceToken),
+  );
 }
 
 function getSpaceIdFromReq(req) {
-  const fromHeader = req.headers && (req.headers.space_id || req.headers.spaceId);
-  const fromQuery = req.query && (req.query.spaceId || req.query.space_id);
-  const fromBody = req.body && (req.body.spaceId || req.body.space_id);
-  const raw = fromBody ?? fromQuery ?? fromHeader;
+  const raw = firstNonEmptyValue(
+    req.body && (req.body.spaceId || req.body.space_id),
+    req.query && (req.query.spaceId || req.query.space_id),
+    req.headers && (req.headers.space_id || req.headers.spaceId),
+  );
   const n = Number(raw);
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
@@ -734,10 +744,8 @@ class EncryptedSpaceController {
       const uid = req.user && req.user.id;
       if (!uid) return ResponseUtil.error(req, res, 'auth.AUTHENTICATION_REQUIRED', 401);
 
-      const spaceId = getSpaceIdFromReq(req);
-      const token = getTokenFromReq(req);
-      if (!spaceId || !token) return ResponseUtil.error(req, res, 'file.INVALID_PARAMS', 400);
-
+      // 注意：spaceId/token 允许随 multipart 表单字段一起提交，必须等 multer 解析完 req.body 再取。
+      // 原先在 runMulter 之前取，multipart 下 req.body 尚未被填充，必然落到 file.INVALID_PARAMS。
       const stageDir = path.join(config.getUploadTempDir(), 'encrypted_space_uploads_stage');
       await safeEnsureDir(stageDir);
 
@@ -755,7 +763,14 @@ class EncryptedSpaceController {
 
       await runMulter(uploader, req, res);
 
+      const spaceId = getSpaceIdFromReq(req);
+      const token = getTokenFromReq(req);
       stagePath = req.file && req.file.path ? ensureString(req.file.path).trim() : '';
+      if (!spaceId || !token) {
+        await safeRemovePath(stagePath);
+        stagePath = '';
+        return ResponseUtil.error(req, res, 'file.INVALID_PARAMS', 400);
+      }
       if (!stagePath) return ResponseUtil.error(req, res, 'file.INVALID_PARAMS', 400);
 
       const { hash, index, chunkSize, fileName, totalChunks } = req.body || {};
