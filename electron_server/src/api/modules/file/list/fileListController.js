@@ -715,13 +715,11 @@ async function canWriteDirByTestFile(dirPath) {
 async function getFsAccess(req, res) {
   try {
     const { path: rawPath } = req.query || {};
-    console.log('getFsAccess', rawPath);
     const raw = typeof rawPath === 'string' ? rawPath.trim() : '';
     if (!raw) return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
 
     const resolvedPath = path.resolve(raw);
     const isDriveRoot = isWindowsDriveRoot(resolvedPath);
-    console.log('isDriveRoot', isDriveRoot);
     // Windows 盘符根目录不做“受保护”提前返回，而是继续做实际可访问性检查
     if (!isDriveRoot && FileUtil.isProtectedPath(resolvedPath)) {
       return ResponseUtil.success(req, res, {

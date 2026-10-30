@@ -483,7 +483,6 @@ class VideoPlayerController {
   async getVideoInfo(req, res) {
     try {
       const { filePath } = req.query;
-      console.log('获取视频信息请求参数', filePath);
       if (!filePath) {
         return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
       }
@@ -496,7 +495,6 @@ class VideoPlayerController {
         uid: req.user && req.user.id ? req.user.id : undefined,
         ignoreFindSub: req.query && req.query.ignoreFindSub != null ? req.query.ignoreFindSub : undefined,
       });
-      console.log('获取视频信息', info);
       // Get user preference if user is logged in
       if (req.user && req.user.id) {
         const preference = await videoPlayerService.getVideoPreference(req.dbVideo, req.user.id, filePath);
@@ -1224,7 +1222,6 @@ class VideoPlayerController {
   async saveVideoPreference(req, res) {
     try {
       const { filePath, internalPath, playback_position, subtitle_label, audio_label } = req.body || {};
-      console.log('saveVideoPreference', filePath, playback_position);
       if (!filePath) {
         return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
       }

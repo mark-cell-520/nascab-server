@@ -90,7 +90,6 @@ function sendRawFileWithObservability(req, res, fullPath) {
 async function getRawFile(req, res) {
   try {
     const { path: pathUrl, download, size, quality, raw, code } = req.query;
-    console.log("raw file request", req.query);
     if (!pathUrl) return res.status(400).send('Missing path');
 
     const fullPath = path.resolve(pathUrl);
@@ -120,13 +119,11 @@ async function getRawFile(req, res) {
         if (uid) {
           const configured = await tableConfig.getConfigByKey('photo_preview_size', uid);
           const s = configured == null ? '' : String(configured).trim();
-          console.log("configured",s)
           if (s && s !== 'origin') {
             const n = Math.floor(Number(s));
             if (Number.isFinite(n) && n > 0) finalSize = String(n);
           }
         }
-        console.log("finalSize",finalSize)
       } catch (err) {
         console.log(err);
       }
