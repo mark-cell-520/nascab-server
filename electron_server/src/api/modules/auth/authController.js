@@ -398,7 +398,7 @@ class AuthController {
     try {
       // 检查请求IP是否为局域网IP
       const clientIp = NetUtil.getClientIP(req);
-      console.log('clientIp', clientIp);
+      Logger.debug('createSuperAdmin 请求来源 IP', { clientIp });
 
       // 检查IP是否为局域网IP
       const isPrivateIP = NetUtil.isPrivateIP(clientIp);

@@ -142,7 +142,7 @@ async function resolvePhotoPreviewSharpParams(uid, querySize, queryQuality) {
       }
     }
   } catch (err) {
-    console.log(err);
+    Logger.warn('解析图片尺寸/质量参数失败', { error: err && err.message ? err.message : String(err) });
   }
   return { finalSize, quality: queryQuality };
 }
@@ -435,7 +435,11 @@ class EncryptedSpaceController {
       if (!folderStat || !folderStat.isDirectory()) {
         return ResponseUtil.error(req, res, 'encryptedSpace.SPACE_FOLDER_MISSING', 404);
       }
-      console.log(spaceFolderPath,folderStat)
+      Logger.debug('[encryptedSpace getFileList] 空间目录', {
+        spaceId,
+        spaceFolderPath,
+        isDirectory: folderStat.isDirectory(),
+      });
       // getIndexDb 内部会 realpath，保证同一目录始终用同一缓存、不会有时打开空库有时打开真实库
       const indexDbPath = path.join(spaceFolderPath, configFolderName, indexDbFileName);
       const dbFileExists = await fs.promises

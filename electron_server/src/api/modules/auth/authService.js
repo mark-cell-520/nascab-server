@@ -528,7 +528,7 @@ class AuthService {
           await this.trimUserDevices({ knexMain, userId: user.id, keep: 500 });
         }
       }
-      console.log('answer', answer);
+      Logger.info('密保找回密码：校验答案', { userId: user.id });
       const answerMatch = await bcrypt.compare(answer, user.answer);
       if (!answerMatch) {
         throw new Error('auth.SECURITY_ANSWER_INCORRECT');
@@ -540,7 +540,7 @@ class AuthService {
       });
       return { userId: user.id, username: user.username };
     } catch (error) {
-      console.log(error);
+      Logger.error('密保找回密码失败', error);
       if (error && error.message && (error.message.startsWith('auth.') || error.message.startsWith('twofa.'))) throw error;
       throw new Error('auth.PASSWORD_RESET_FAILED');
     }
@@ -701,7 +701,7 @@ class AuthService {
       }
       return await this.appearanceService.getRandomWallpaper();
     } catch (error) {
-      console.error('Get user wallpaper failed:', error);
+      Logger.error('获取用户墙纸失败', error);
       return await this.appearanceService.getRandomWallpaper();
     }
   }
