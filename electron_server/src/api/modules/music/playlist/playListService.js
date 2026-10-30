@@ -2,6 +2,7 @@ const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
 const MusicListService = require('../list/musicListService');
 const { escapeLikeValue } = require('../../../../utils/sqlLikeUtil');
+const { isUniqueViolation } = require('../../../../utils/sqlErrorUtil');
 
 function _normalizeSortBy(input) {
   const v = String(input || '')
@@ -60,11 +61,6 @@ function _normalizeIndexRow(row) {
     ...row,
     full_path: baseDir && name ? path.join(baseDir, name) : '',
   };
-}
-
-function _sqlIsUniqueViolation(err) {
-  const msg = err && err.message ? String(err.message) : '';
-  return msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('constraint');
 }
 
 class PlayListService {
@@ -260,7 +256,7 @@ class PlayListService {
         create_time: createdRow && createdRow.create_time ? createdRow.create_time : '',
       };
     } catch (e) {
-      if (_sqlIsUniqueViolation(e)) {
+      if (isUniqueViolation(e)) {
         const err = new Error('common.DUPLICATE');
         err.statusCode = 409;
         throw err;
@@ -286,7 +282,7 @@ class PlayListService {
       }
       return { id: row.id, uid: row.uid, name: n, create_time: row.create_time };
     } catch (e) {
-      if (_sqlIsUniqueViolation(e)) {
+      if (isUniqueViolation(e)) {
         const err = new Error('common.DUPLICATE');
         err.statusCode = 409;
         throw err;

@@ -48,11 +48,15 @@ class IpSecurityManager {
     return this.getConfig();
   }
 
-  shouldEnforceForIp(rawIp) {
+  shouldEnforceForIp(rawIp, { ignoreLanBypass = false } = {}) {
     const ip = normalizeIp(rawIp);
     if (!ip) return false;
     if (!this._config.banEnabled) return false;
-    if (this._config.bypassLanAuth && NetUtil.isPrivateIP(ip)) return false;
+    // bypassLanAuth 默认开着（不想因为几次手误把整个家用网络锁在门外），
+    // 但它对「仅限局域网才能用」的功能是致命的：密保找回密码只允许内网访问，
+    // 于是它的失败计数永远走不到这里，等于无限次试密保答案。
+    // 这类功能通过 ignoreLanBypass 显式关掉豁免。
+    if (this._config.bypassLanAuth && !ignoreLanBypass && NetUtil.isPrivateIP(ip)) return false;
     return true;
   }
 
@@ -76,20 +80,20 @@ class IpSecurityManager {
     }
   }
 
-  isBlacklisted(rawIp) {
+  isBlacklisted(rawIp, options = {}) {
     const ip = normalizeIp(rawIp);
     if (!ip) return { blacklisted: false, ip: '' };
-    if (!this.shouldEnforceForIp(ip)) return { blacklisted: false, ip, ignored: true };
+    if (!this.shouldEnforceForIp(ip, options)) return { blacklisted: false, ip, ignored: true };
     this.cleanupExpired();
     const entry = this._blacklist.get(ip);
     if (!entry) return { blacklisted: false, ip };
     return { blacklisted: true, ip, entry: { ...entry } };
   }
 
-  recordFailure(rawIp, { description = '' } = {}) {
+  recordFailure(rawIp, { description = '', ignoreLanBypass = false } = {}) {
     const ip = normalizeIp(rawIp);
     if (!ip) return { ok: false, ignored: true };
-    if (!this.shouldEnforceForIp(ip)) {
+    if (!this.shouldEnforceForIp(ip, { ignoreLanBypass })) {
       return { ok: true, ignored: true };
     }
     this.cleanupExpired();
@@ -119,10 +123,10 @@ class IpSecurityManager {
     return { ok: true, ip, blacklisted: false, count };
   }
 
-  banIp(rawIp, { minutes = 1, description = '' } = {}) {
+  banIp(rawIp, { minutes = 1, description = '', ignoreLanBypass = false } = {}) {
     const ip = normalizeIp(rawIp);
     if (!ip) return { ok: false, ignored: true };
-    if (!this.shouldEnforceForIp(ip)) {
+    if (!this.shouldEnforceForIp(ip, { ignoreLanBypass })) {
       return { ok: true, ignored: true };
     }
     const now = Date.now();

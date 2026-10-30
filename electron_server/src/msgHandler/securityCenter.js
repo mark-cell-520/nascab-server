@@ -19,6 +19,15 @@ function safeJsonParse(text) {
   }
 }
 
+// 「仅限局域网才能用」的功能（目前只有密保找回密码）必须显式关掉
+// bypassLanAuth 豁免，否则它的失败计数永远不生效——见 ipSecurityManager
+// shouldEnforceForIp 里的说明。这里按 action 推导，调用方不用重复知道这套规则。
+function resolveLanBypass(data, fallbackAction) {
+  if (data && typeof data.ignoreLanBypass === 'boolean') return data.ignoreLanBypass;
+  const action = (data && data.action) || fallbackAction;
+  return action === 'recover';
+}
+
 let _loadedOnce = false;
 let _loading = null;
 
@@ -98,7 +107,7 @@ async function handleSecurityCheckIp(ctx) {
   const ip = data.ip;
   try {
     await ensureConfigLoaded();
-    const res = ipSecurityManager.isBlacklisted(ip);
+    const res = ipSecurityManager.isBlacklisted(ip, { ignoreLanBypass: resolveLanBypass(data) });
     if (requestId) {
       sendResponse(ctx, 'securityCheckIpResponse', { requestId, ok: true, ...res });
     }
@@ -118,7 +127,10 @@ async function handleSecurityAuthFail(ctx) {
   const desc = action === 'recover' ? 'recover_password_failed' : 'login_failed';
   try {
     await ensureConfigLoaded();
-    const res = ipSecurityManager.recordFailure(ip, { description: desc });
+    const res = ipSecurityManager.recordFailure(ip, {
+      description: desc,
+      ignoreLanBypass: resolveLanBypass(data),
+    });
     if (requestId) {
       sendResponse(ctx, 'securityAuthFailResponse', { requestId, ok: true, ...res });
     }
@@ -144,7 +156,11 @@ async function handleSecurityBanIp(ctx) {
   const description = data.description;
   try {
     await ensureConfigLoaded();
-    const res = ipSecurityManager.banIp(ip, { minutes, description });
+    const res = ipSecurityManager.banIp(ip, {
+      minutes,
+      description,
+      ignoreLanBypass: resolveLanBypass(data),
+    });
     if (requestId) {
       sendResponse(ctx, 'securityBanIpResponse', { requestId, ok: true, ...res });
     }

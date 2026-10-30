@@ -107,7 +107,7 @@ function waitForIpcResponse({ requestId, responseType, timeoutMs }) {
   });
 }
 
-async function checkIpBlacklisted(ip) {
+async function checkIpBlacklisted(ip, options = {}) {
   if (typeof process.send !== 'function') return { blacklisted: true };
   const requestId = `securityCheckIp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const wait = waitForIpcResponse({
@@ -115,9 +115,16 @@ async function checkIpBlacklisted(ip) {
     responseType: 'securityCheckIpResponse',
     timeoutMs: 4000,
   });
-  process.send({ type: 'securityCheckIp', data: { requestId, ip }, timestamp: Date.now() });
+  process.send({ type: 'securityCheckIp', data: { requestId, ip, action: options.action || null }, timestamp: Date.now() });
   const data = await wait.catch(() => null);
-  if (!data || data.ok !== true) return { blacklisted: false };
+  // 主进程 4 秒没应答时按「没被封」放行，没有改成 fail-closed：主进程同时还管着
+  // 挂载/转码/备份，忙起来把登录整体拒掉等于自己把自己锁在门外，代价比放过一次
+  // 黑名单查询大得多。但原来这里 .catch(() => null) 一声不响，被封的 IP 也能
+  // 静默穿过，所以至少留一条 warn 让运维能看见。
+  if (!data || data.ok !== true) {
+    Logger.warn('checkIpBlacklisted: no response from main process; blacklist check skipped', { ip });
+    return { blacklisted: false };
+  }
   return { blacklisted: data.blacklisted === true, ip: data.ip, entry: data.entry || null };
 }
 
@@ -134,7 +141,10 @@ async function recordAuthFailure(ip, action) {
   });
   process.send({ type: 'securityAuthFail', data: { requestId, ip, action }, timestamp: Date.now() });
   const data = await wait.catch(() => null);
-  if (!data || data.ok !== true) return { ok: false };
+  if (!data || data.ok !== true) {
+    Logger.warn('recordAuthFailure: no response from main process; failure not counted', { ip, action });
+    return { ok: false };
+  }
   return {
     ok: true,
     blacklisted: data.blacklisted === true,
@@ -149,7 +159,7 @@ function recordAuthSuccess(ip) {
   process.send({ type: 'securityAuthSuccess', data: { ip }, timestamp: Date.now() });
 }
 
-async function banIpForMinutes(ip, minutes, description) {
+async function banIpForMinutes(ip, minutes, description, options = {}) {
   if (typeof process.send !== 'function') return { ok: false };
   const requestId = `securityBanIp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const wait = waitForIpcResponse({
@@ -157,9 +167,12 @@ async function banIpForMinutes(ip, minutes, description) {
     responseType: 'securityBanIpResponse',
     timeoutMs: 4000,
   });
-  process.send({ type: 'securityBanIp', data: { requestId, ip, minutes, description }, timestamp: Date.now() });
+  process.send({ type: 'securityBanIp', data: { requestId, ip, minutes, description, action: options.action || null }, timestamp: Date.now() });
   const data = await wait.catch(() => null);
-  if (!data || data.ok !== true) return { ok: false };
+  if (!data || data.ok !== true) {
+    Logger.warn('banIpForMinutes: no response from main process; ban not applied', { ip, description });
+    return { ok: false };
+  }
   return { ok: true, blacklisted: data.blacklisted === true, entry: data.entry || null };
 }
 
@@ -340,6 +353,10 @@ class AuthController {
     const since = new Date(Date.now() - windowMs);
     const rows = await knexMain('user_2fa_verify_log')
       .where({ user_id: userId, action: action || 'login' })
+      // 只数失败。原来把所有行都算进来，等于「1 分钟内成功登录 3 次」之后
+      // 第 4 次正常登录也会被判 TOO_MANY_ATTEMPTS 并顺手封 IP 一分钟——
+      // 成功次数吃掉了本该留给暴力破解的预算，限流对象整个搞反了。
+      .andWhere('ok', false)
       .andWhere('create_time', '>=', since)
       .count('id as count');
     const count = rows && rows[0] ? Number(rows[0].count) || 0 : 0;
@@ -678,7 +695,7 @@ class AuthController {
           ok: false,
           reasonCode: 'twofa.TOO_MANY_ATTEMPTS',
         });
-        await banIpForMinutes(clientIp, 1, '2fa_rate_limit');
+        await banIpForMinutes(clientIp, 1, '2fa_rate_limit', { action: '2fa_login' });
         return ResponseUtil.error(req, res, 'twofa.TOO_MANY_ATTEMPTS', 429);
       }
 
@@ -993,7 +1010,10 @@ class AuthController {
         return ResponseUtil.error(req, res, 'auth.PRIVATE_NETWORK_ONLY_OPERATION', 403);
       }
 
-      const blackRes = await checkIpBlacklisted(clientIp);
+      // 密保找回密码是「仅限局域网」的功能，而 bypassLanAuth 对内网 IP 一律豁免，
+      // 于是这里预查黑名单永远返回没封、失败也永远计不上数，等于可以无限次试密保答案。
+      // 传 action: 'recover' 让主进程关掉 LAN 豁免，见 securityCenter.resolveLanBypass。
+      const blackRes = await checkIpBlacklisted(clientIp, { action: 'recover' });
       if (blackRes && blackRes.blacklisted) {
         return await respondIpBlacklisted(req, res, blackRes);
       }
