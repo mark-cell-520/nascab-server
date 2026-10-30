@@ -2,6 +2,7 @@ const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
 const Logger = require('../../../../utils/logger');
 const { applyBookIndexPathPrefixFilter, isPathInside } = require('../util/bookPathQueryUtil');
+const { isUniqueViolation } = require('../../../../utils/sqlErrorUtil');
 
 function _parsePathList(pathListText) {
   if (!pathListText) return [];
@@ -16,11 +17,6 @@ function _parsePathList(pathListText) {
 // 原实现在本文件里抄了一份（与 bookListService / bookCustomListService / bookHistoryService
 // 三份完全相同），已抽到 ../util/bookPathQueryUtil 统一维护。
 const _applyBookIndexPathPrefixFilter = applyBookIndexPathPrefixFilter;
-
-function _sqlIsUniqueViolation(err) {
-  const msg = err && err.message ? String(err.message).toLowerCase() : '';
-  return msg.includes('unique') || msg.includes('constraint');
-}
 
 class BookCollectionService {
   // 原来是 `return user.id`：JWT 中间件偶发没挂上 req.user（或内部调用漏传）时
@@ -233,7 +229,7 @@ class BookCollectionService {
       });
       return this.getCollection({ knexBook }, id, user);
     } catch (e) {
-      if (_sqlIsUniqueViolation(e)) {
+      if (isUniqueViolation(e)) {
         const err = new Error('book.BOOK_COLLECTION_NAME_EXISTS');
         err.statusCode = 409;
         throw err;
@@ -276,7 +272,7 @@ class BookCollectionService {
         throw err;
       }
     } catch (e) {
-      if (_sqlIsUniqueViolation(e)) {
+      if (isUniqueViolation(e)) {
         const err = new Error('book.BOOK_COLLECTION_NAME_EXISTS');
         err.statusCode = 409;
         throw err;

@@ -4,13 +4,7 @@ const userUtil = require('../../../../utils/userUtil');
 const BookSourceService = require('../source/bookSourceService');
 const { intersectPaths, parsePathListText } = require('../../photo/timeline/photoPathQueryUtil');
 const { applyBookIndexPathPrefixFilter, isUnderAnyRoot } = require('../util/bookPathQueryUtil');
-
-function _escapeLikeValue(input) {
-  return String(input || '')
-    .replaceAll('\\', '\\\\')
-    .replaceAll('%', '\\%')
-    .replaceAll('_', '\\_');
-}
+const { escapeLikeValue } = require('../../../../utils/sqlLikeUtil');
 
 // 原实现在本文件里，与 bookCustomListService / bookCollectionService / bookHistoryService
 // 各抄了一份；已抽到 ../util/bookPathQueryUtil 统一维护。
@@ -271,7 +265,7 @@ class BookListService {
           builder.where('b.title_fl', fl).orWhere('b.filename_fl', fl);
         });
       } else {
-        const escaped = _escapeLikeValue(search);
+        const escaped = escapeLikeValue(search);
         baseQuery.andWhere(builder => {
           builder.whereRaw("b.title LIKE ? ESCAPE '\\'", [`%${escaped}%`]).orWhereRaw("b.filename LIKE ? ESCAPE '\\'", [`%${escaped}%`]);
         });

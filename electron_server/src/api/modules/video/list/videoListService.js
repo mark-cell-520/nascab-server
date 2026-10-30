@@ -4,6 +4,7 @@ const VideoSourceService = require('../source/videoSourceService');
 const userUtil = require('../../../../utils/userUtil');
 const { intersectPaths, parsePathListText } = require('../../photo/timeline/photoPathQueryUtil');
 const smartAlbumFilterUtil = require('../smartAlbum/videoSmartAlbumFilterUtil');
+const { escapeLikeValue } = require('../../../../utils/sqlLikeUtil');
 
 function _applyVideoIndexPathPrefixFilter(query, paths) {
   const list = Array.isArray(paths) ? paths.map(p => String(p || '').trim()).filter(Boolean) : [];
@@ -131,17 +132,10 @@ function _normalizeKeyList(input) {
     .filter(Boolean);
 }
 
-function _escapeLikeValue(input) {
-  return String(input || '')
-    .replaceAll('\\', '\\\\')
-    .replaceAll('%', '\\%')
-    .replaceAll('_', '\\_');
-}
-
 function _applyCommaSeparatedFieldExactContains(query, columnName, value) {
   const v = String(value || '').trim();
   if (!v) return;
-  const escaped = _escapeLikeValue(v);
+  const escaped = escapeLikeValue(v);
   const pattern = `%,${escaped},%`;
   query.andWhereRaw(`(',' || replace(replace(replace(${columnName}, '，', ','), ', ', ','), ' ,', ',') || ',') LIKE ? ESCAPE '\\'`, [pattern]);
 }

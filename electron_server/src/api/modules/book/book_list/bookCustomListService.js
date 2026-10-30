@@ -2,13 +2,7 @@ const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
 const BookListService = require('../list/bookListService');
 const { applyBookIndexPathPrefixFilter } = require('../util/bookPathQueryUtil');
-
-function _escapeLikeValue(input) {
-  return String(input || '')
-    .replaceAll('\\', '\\\\')
-    .replaceAll('%', '\\%')
-    .replaceAll('_', '\\_');
-}
+const { escapeLikeValue } = require('../../../../utils/sqlLikeUtil');
 
 function _normalizeSortBy(input) {
   const v = String(input || '')
@@ -97,7 +91,7 @@ class BookCustomListService {
 
     const base = this.knexBook(`${this.tableName} as l`).where('l.uid', uid);
     if (search) {
-      const escaped = _escapeLikeValue(search);
+      const escaped = escapeLikeValue(search);
       base.andWhereRaw("l.name LIKE ? ESCAPE '\\'", [`%${escaped}%`]);
     }
 

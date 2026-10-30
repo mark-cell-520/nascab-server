@@ -12,6 +12,7 @@ const userUtil = require('../../../../utils/userUtil');
 const FileUtil = require('../../../../utils/fileUtil');
 const userShareFolderUtil = require('../../../../utils/userShareFolderUtil');
 const userCustomPathUtil = require('../../../../utils/userCustomPathUtil');
+const { escapeLikeValue } = require('../../../../utils/sqlLikeUtil');
 const Logger = require('../../../../utils/logger');
 const {
   getAppSpecifiedRoots,
@@ -1017,8 +1018,8 @@ function _pushPathUnderAnyRootsCondition(whereParts, binds, rootPaths) {
     const resolved = normalizePathItem(String(r));
     const base =
       resolved.endsWith(path.sep) && resolved.length > 1 ? resolved.slice(0, -1) : resolved;
-    const likePrefix = `${base}${path.sep}`;
-    orParts.push(`(path = ? OR path LIKE ?)`);
+    const likePrefix = `${escapeLikeValue(base)}${path.sep}`;
+    orParts.push(`(path = ? OR path LIKE ? ESCAPE '\\')`);
     binds.push(base, `${likePrefix}%`);
   }
   whereParts.push(`(${orParts.join(' OR ')})`);
@@ -1086,8 +1087,8 @@ async function globalSearch(req, res) {
 
     if (dirResolved) {
       const base = dirResolved.endsWith(path.sep) && dirResolved.length > 1 ? dirResolved.slice(0, -1) : dirResolved;
-      const likePrefix = `${base}${path.sep}`;
-      whereParts.push(`(path = ? OR path LIKE ?)`);
+      const likePrefix = `${escapeLikeValue(base)}${path.sep}`;
+      whereParts.push(`(path = ? OR path LIKE ? ESCAPE '\\')`);
       binds.push(base, `${likePrefix}%`);
     } else {
       const accessibleRoots = sourceRoots !== null ? sourceRoots : await getUserFileAccessibleRoots(req);

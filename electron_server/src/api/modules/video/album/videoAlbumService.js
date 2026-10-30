@@ -1,6 +1,7 @@
 const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
 const VideoSourceService = require('../source/videoSourceService');
+const { isUniqueViolation } = require('../../../../utils/sqlErrorUtil');
 
 function _resolveArtworkAbsolute({ baseDir, maybeRelative }) {
   const p = maybeRelative === undefined || maybeRelative === null ? '' : String(maybeRelative).trim();
@@ -272,12 +273,24 @@ class VideoAlbumService {
       throw err;
     }
 
-    const [id] = await knexVideo('video_album').insert({
-      uid,
-      name,
-      is_public: isPublic,
-      create_time: new Date(),
-    });
+    // 上面的重名预查是「先查后插」，并发或漏判时由唯一索引兜底；
+    // 不接住的话 raw SQLITE_CONSTRAINT_UNIQUE 会冒到全局错误处理器变成 500。
+    let id;
+    try {
+      [id] = await knexVideo('video_album').insert({
+        uid,
+        name,
+        is_public: isPublic,
+        create_time: new Date(),
+      });
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        const err = new Error('video.VIDEO_ALBUM_NAME_EXISTS');
+        err.statusCode = 409;
+        throw err;
+      }
+      throw e;
+    }
     return { id };
   }
 

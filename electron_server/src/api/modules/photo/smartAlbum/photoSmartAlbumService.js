@@ -3,6 +3,7 @@ const path = require('path');
 const photoTimeLineService = require('../timeline/photoTimeLineService');
 const smartAlbumFilterUtil = require('./photoSmartAlbumFilterUtil');
 const { applyPathPrefixFilter } = require('../timeline/photoPathQueryUtil');
+const { isUniqueViolation } = require('../../../../utils/sqlErrorUtil');
 
 class PhotoSmartAlbumService {
   _uid(user) {
@@ -176,13 +177,25 @@ class PhotoSmartAlbumService {
       throw err;
     }
 
-    const [id] = await knexPhoto('photo_smart_album').insert({
-      uid,
-      name,
-      type,
-      filter_content: filterContentText,
-      create_time: new Date(),
-    });
+    // 上面的重名预查是「先查后插」，并发或漏判时由唯一索引兜底；
+    // 不接住的话 raw SQLITE_CONSTRAINT_UNIQUE 会冒到全局错误处理器变成 500。
+    let id;
+    try {
+      [id] = await knexPhoto('photo_smart_album').insert({
+        uid,
+        name,
+        type,
+        filter_content: filterContentText,
+        create_time: new Date(),
+      });
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        const err = new Error('photo.ALBUM_NAME_EXISTS');
+        err.statusCode = 409;
+        throw err;
+      }
+      throw e;
+    }
     return { id };
   }
 

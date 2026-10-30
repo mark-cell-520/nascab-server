@@ -3,13 +3,7 @@ const fs = require('fs');
 const MusicSourceService = require('../source/musicSourceService');
 const { intersectPaths, parsePathListText } = require('../../photo/timeline/photoPathQueryUtil');
 const userUtil = require('../../../../utils/userUtil');
-
-function _escapeLikeValue(input) {
-  return String(input || '')
-    .replaceAll('\\', '\\\\')
-    .replaceAll('%', '\\%')
-    .replaceAll('_', '\\_');
-}
+const { escapeLikeValue } = require('../../../../utils/sqlLikeUtil');
 
 function _applyMusicIndexPathPrefixFilter(query, paths) {
   const list = Array.isArray(paths) ? paths.map(p => String(p || '').trim()).filter(Boolean) : [];
@@ -309,7 +303,7 @@ class MusicListService {
           builder.where('m.title_fl', fl).orWhere('m.artist_fl', fl);
         });
       } else {
-        const escaped = _escapeLikeValue(search);
+        const escaped = escapeLikeValue(search);
         baseQuery.andWhere(builder => {
           builder
             .whereRaw("m.title LIKE ? ESCAPE '\\'", [`%${escaped}%`])
@@ -554,7 +548,7 @@ class MusicListService {
         const fl = isHash ? '#' : search.toUpperCase();
         baseQuery.andWhere('k.key_fl', fl);
       } else {
-        const escaped = _escapeLikeValue(search);
+        const escaped = escapeLikeValue(search);
         baseQuery.andWhereRaw("k.key LIKE ? ESCAPE '\\'", [`%${escaped}%`]);
       }
     }

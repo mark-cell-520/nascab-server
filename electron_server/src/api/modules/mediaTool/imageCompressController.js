@@ -27,8 +27,14 @@ function createSharpFromConverted(converted) {
   return sharp(converted, { failOnError: false });
 }
 
+// 临时 zip 目录按用户名分桶。原来用户名取不到时兜底成字面量 'user'，
+// 于是所有"没有 username 的令牌"共用一个目录：A 上传的待压缩图片，
+// B 用 downloadFile 就能按路径拿走。现在兜底用 uid（JWT 里一定有），
+// 取不到才退到 anonymous；用户名同时做一次路径字符清洗，
+// 避免带 / 或 .. 的用户名跳出自己的桶。
 function getUserZipRoot(req) {
-  const username = (req.user && req.user.username) || 'user';
+  const rawName = (req.user && (req.user.username || req.user.id)) != null ? String(req.user.username || req.user.id) : 'anonymous';
+  const username = rawName.replace(/[\\/\u0000]/g, '_').replace(/\.\./g, '__') || 'anonymous';
   return path.join(config.getZipImgTempPath(), username);
 }
 

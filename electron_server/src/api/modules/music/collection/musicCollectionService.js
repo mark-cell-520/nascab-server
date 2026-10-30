@@ -1,6 +1,7 @@
 const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
 const { isPathInside, intersectPaths } = require('../../../../utils/pathBoundaryUtil');
+const { isUniqueViolation } = require('../../../../utils/sqlErrorUtil');
 const MusicSourceService = require('../source/musicSourceService');
 
 function _parsePathList(pathListText) {
@@ -248,11 +249,23 @@ class MusicCollectionService {
       throw err;
     }
 
-    const [id] = await knexMusic('music_collection').insert({
-      uid,
-      name,
-      path_list: JSON.stringify(normalizedPaths),
-    });
+    // 上面的重名预查是「先查后插」，并发或漏判时由唯一索引兜底；
+    // 不接住的话 raw SQLITE_CONSTRAINT_UNIQUE 会冒到全局错误处理器变成 500。
+    let id;
+    try {
+      [id] = await knexMusic('music_collection').insert({
+        uid,
+        name,
+        path_list: JSON.stringify(normalizedPaths),
+      });
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        const err = new Error('music.MUSIC_COLLECTION_NAME_EXISTS');
+        err.statusCode = 409;
+        throw err;
+      }
+      throw e;
+    }
 
     return { id };
   }

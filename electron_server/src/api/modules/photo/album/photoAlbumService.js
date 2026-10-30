@@ -2,6 +2,7 @@ const path = require('path');
 const userUtil = require('../../../../utils/userUtil');
 const { applyPathPrefixFilter } = require('../timeline/photoPathQueryUtil');
 const photoTimeLineService = require('../timeline/photoTimeLineService');
+const { isUniqueViolation } = require('../../../../utils/sqlErrorUtil');
 class PhotoAlbumService {
   _uid(user) {
     return user.id;
@@ -279,12 +280,25 @@ class PhotoAlbumService {
     }
 
     return knexPhoto.transaction(async trx => {
-      const [albumId] = await trx('photo_album').insert({
-        uid,
-        name,
-        is_public: isPublic,
-        create_time: new Date(),
-      });
+      // photo_album 上有 (uid, name) 唯一索引。上面的重名预查是「先查后插」，
+      // 并发或漏判时 insert 会直接撞约束，raw SQLITE_CONSTRAINT_UNIQUE 冒到全局
+      // 错误处理器变成 500。事务里接住翻成 409，trx 会自动回滚。
+      let albumId;
+      try {
+        [albumId] = await trx('photo_album').insert({
+          uid,
+          name,
+          is_public: isPublic,
+          create_time: new Date(),
+        });
+      } catch (e) {
+        if (isUniqueViolation(e)) {
+          const err = new Error('photo.ALBUM_NAME_EXISTS');
+          err.statusCode = 409;
+          throw err;
+        }
+        throw e;
+      }
 
       if (!isPublic) {
         const rows = shares
