@@ -1,6 +1,8 @@
 const tableFileBackup = require('../../../db/table/tableFileBackup');
 const tableFileBackupRecord = require('../../../db/table/tableFileBackupRecord');
+const path = require('path');
 const PathUtil = require('../../../utils/pathUtil');
+const FileUtil = require('../../../utils/fileUtil');
 
 function safeJsonParse(text) {
   if (!text) return null;
@@ -14,6 +16,18 @@ function safeJsonParse(text) {
 function normalizeString(v) {
   if (v === undefined || v === null) return '';
   return String(v).trim();
+}
+
+/**
+ * 把入参收敛成绝对路径。
+ * 原来入库的是用户原始字符串，path.resolve 只在"互相冲突检查"里做过一次，
+ * 落库的仍是原文；而 worker 拿到原文后是按自己 cwd 解释相对路径的，
+ * 校验过的路径和真正执行的路径不是同一条。这里在入口就定死成绝对路径。
+ */
+function resolveAbsPath(v) {
+  const raw = normalizeString(v);
+  if (!raw) return '';
+  return path.resolve(raw);
 }
 
 function normalizeStringArray(v) {
@@ -119,6 +133,25 @@ class FileBackupService {
     const targetNormalized = PathUtil.normalizeFsPathForCompare(target);
     const sourcesNormalized = sourcePaths.map(p => PathUtil.normalizeFsPathForCompare(p)).filter(Boolean);
 
+    // 备份任务是 root 常驻的周期性作业，而 type=sync 的引擎会在目标端
+    // removeExtraEntries（fs.promises.rm recursive+force）删掉源里没有的一切。
+    // 这里原来只查了"源和目标互相冲突"，完全没有系统目录保护：
+    // 建一个 target_path=/ 的同步任务，下一次触发就把整个文件系统删干净；
+    // target_path=/etc/cron.d 则是现成的 root 计划任务持久化入口。
+    // 所以源和目标都要先过 isProtectedPath（它内部带 resolve + realpath 还原）。
+    if (FileUtil.isProtectedPath(targetNormalized)) {
+      throw buildHttpError('fileBackup.PROTECTED_PATH', 400);
+    }
+    for (const src of sourcesNormalized) {
+      if (FileUtil.isProtectedPath(src)) {
+        throw buildHttpError('fileBackup.PROTECTED_PATH', 400);
+      }
+    }
+
+    // 落库用收敛后的绝对路径，保证校验过的就是将来执行的
+    const targetStored = resolveAbsPath(target);
+    const sourcesStored = sourcePaths.map(resolveAbsPath).filter(Boolean);
+
     for (const src of sourcesNormalized) {
       if (PathUtil.isMutualConflictPath(src, targetNormalized)) {
         throw buildHttpError('fileBackup.SOURCE_TARGET_PATH_CONFLICT', 400);
@@ -143,9 +176,9 @@ class FileBackupService {
       if (!existed) throw buildHttpError('common.NOT_FOUND', 404);
 
       const updateData = {
-        source_path: JSON.stringify(sourcePaths),
+        source_path: JSON.stringify(sourcesStored),
         type: t,
-        target_path: target,
+        target_path: targetStored,
         task_config: cfgText,
         frenquence: freqNum,
         exclude_list: JSON.stringify(exclude),
@@ -156,9 +189,9 @@ class FileBackupService {
     }
 
     const insertData = {
-      source_path: JSON.stringify(sourcePaths),
+      source_path: JSON.stringify(sourcesStored),
       type: t,
-      target_path: target,
+      target_path: targetStored,
       task_config: cfgText,
       create_time: new Date(),
       status: tableFileBackup.STATUS_STOPPED,

@@ -5,6 +5,7 @@ const dbUtil = require('../../db/dbUtil');
 const knexUtil = require('../../db/knexUtil');
 const tableFileBackup = require('../../db/table/tableFileBackup');
 const tableFileBackupRecord = require('../../db/table/tableFileBackupRecord');
+const FileUtil = require('../../utils/fileUtil');
 const { NodeFileBackupEngine, summarizeProgress } = require('./nodeFileBackupEngine');
 
 const MAX_ERROR_FILES_TOTAL = 100;
@@ -431,6 +432,22 @@ class FileBackupTaskWorker {
       });
       this._reply('fileBackupRunResponse', { requestId, ok: false, error: 'invalid_config' });
       this._notifyStarted({ ok: false, error: 'invalid_config' });
+      this._scheduleExit(0);
+      return;
+    }
+
+    // 兜底：fileBackupService 侧已经拦了系统目录，但那是新写入才生效的，
+    // 修复之前建的任务（或绕开 API 直接改库的行）仍可能带着 target_path=/ 跑起来。
+    // type=sync 会在目标端 removeExtraEntries（rm recursive+force）删东西，
+    // 所以这里在执行前再判一次，命中就把任务标记为 error 并放弃本次运行。
+    if (FileUtil.isProtectedPath(targetRoot) || sourceList.some(src => FileUtil.isProtectedPath(src))) {
+      const msg = 'protected_path';
+      await withTimeout(this._updateTask({ status: tableFileBackup.STATUS_ERROR, last_error: msg, progress: '' }), 5000, 'update_task_protected_path');
+      await this._insertFinishedBackupRecord({
+        status: tableFileBackupRecord.STATUS_FAILED,
+      });
+      this._reply('fileBackupRunResponse', { requestId, ok: false, error: msg });
+      this._notifyStarted({ ok: false, error: msg });
       this._scheduleExit(0);
       return;
     }
