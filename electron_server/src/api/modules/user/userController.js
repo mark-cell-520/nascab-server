@@ -43,6 +43,26 @@ function encodeAnyOrArray(value) {
   return JSON.stringify(value);
 }
 
+/**
+ * 把 service 抛出的 i18n key 归一到 { key, status }。
+ * 只白名单这几类前缀：其余 message 多半是 knex/node 的原始错误文本，
+ * 当 key 去查会落成 fallback。auth./file. 这类参数/权限错误要能透出真实 key，
+ * 否则用户只会看到笼统的「操作失败」，排查不到原因。
+ */
+function resolveUserErrorKey(err, fallbackKey) {
+  const msg = err && err.message ? String(err.message) : '';
+  if (msg.startsWith('twofa.')) {
+    return { key: msg, status: msg === 'twofa.TWO_FACTOR_REQUIRED' ? 401 : 400 };
+  }
+  if (msg.startsWith('common.')) {
+    return { key: msg, status: msg === 'common.UNAUTHORIZED' ? 401 : 400 };
+  }
+  if (msg.startsWith('user.') || msg.startsWith('auth.') || msg.startsWith('file.')) {
+    return { key: msg, status: 400 };
+  }
+  return { key: fallbackKey, status: 400 };
+}
+
 class UserController {
   constructor() {
     this.listUsers = this.listUsers.bind(this);
@@ -173,16 +193,8 @@ class UserController {
         method: 'createUser',
         operatorId: req.user && req.user.id,
       });
-      if (err && err.message && String(err.message).startsWith('twofa.')) {
-        const status = err.message === 'twofa.TWO_FACTOR_REQUIRED' ? 401 : 400;
-        return ResponseUtil.error(req, res, err.message, status);
-      }
-      if (err && err.message && String(err.message).startsWith('common.')) {
-        const status = err.message === 'common.UNAUTHORIZED' ? 401 : 400;
-        return ResponseUtil.error(req, res, err.message, status);
-      }
-      const msgKey = err.message && err.message.startsWith('user.') ? err.message : 'user.USER_CREATE_FAILED';
-      return ResponseUtil.error(req, res, msgKey, 400);
+      const { key, status } = resolveUserErrorKey(err, 'user.USER_CREATE_FAILED');
+      return ResponseUtil.error(req, res, key, status);
     }
   }
 
@@ -208,16 +220,8 @@ class UserController {
         operatorId: req.user && req.user.id,
         targetUserId: req.params && req.params.id,
       });
-      if (err && err.message && String(err.message).startsWith('twofa.')) {
-        const status = err.message === 'twofa.TWO_FACTOR_REQUIRED' ? 401 : 400;
-        return ResponseUtil.error(req, res, err.message, status);
-      }
-      if (err && err.message && String(err.message).startsWith('common.')) {
-        const status = err.message === 'common.UNAUTHORIZED' ? 401 : 400;
-        return ResponseUtil.error(req, res, err.message, status);
-      }
-      const msgKey = err.message && err.message.startsWith('user.') ? err.message : 'user.USER_UPDATE_FAILED';
-      return ResponseUtil.error(req, res, msgKey, 400);
+      const { key, status } = resolveUserErrorKey(err, 'user.USER_UPDATE_FAILED');
+      return ResponseUtil.error(req, res, key, status);
     }
   }
 
@@ -241,16 +245,8 @@ class UserController {
         method: 'deleteUsers',
         operatorId: req.user && req.user.id,
       });
-      if (err && err.message && String(err.message).startsWith('twofa.')) {
-        const status = err.message === 'twofa.TWO_FACTOR_REQUIRED' ? 401 : 400;
-        return ResponseUtil.error(req, res, err.message, status);
-      }
-      if (err && err.message && String(err.message).startsWith('common.')) {
-        const status = err.message === 'common.UNAUTHORIZED' ? 401 : 400;
-        return ResponseUtil.error(req, res, err.message, status);
-      }
-      const msgKey = err.message && err.message.startsWith('user.') ? err.message : 'user.USER_DELETE_FAILED';
-      return ResponseUtil.error(req, res, msgKey, 400);
+      const { key, status } = resolveUserErrorKey(err, 'user.USER_DELETE_FAILED');
+      return ResponseUtil.error(req, res, key, status);
     }
   }
 
@@ -472,7 +468,14 @@ class UserController {
         201
       );
     } catch (err) {
-      return ResponseUtil.error(req, res, 'user.SCOPED_TOKEN_CREATE_FAILED', 500);
+      Logger.error('scoped_token_create_failed', err, {
+        method: 'createScopedToken',
+        operatorId: req.user && req.user.id,
+      });
+      // 请求的 allow_path 超出操作者自身权限时 service 抛 auth.PERMISSION_DENIED，
+      // 那是 403 的入参问题，不能一律当 500 报「创建失败」
+      const { key, status } = resolveUserErrorKey(err, 'user.SCOPED_TOKEN_CREATE_FAILED');
+      return ResponseUtil.error(req, res, key, status);
     }
   }
 }

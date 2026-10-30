@@ -13,6 +13,19 @@ function _normalizeIdList(ids) {
   return Array.from(new Set(nums));
 }
 
+/**
+ * 路径感知的前缀判断：child 是否就是 parent 或位于 parent 之下。
+ * 不能用裸 startsWith —— '/tmpxyz'.startsWith('/tmp') 为真，但它并不是 /tmp 的子路径，
+ * 会被误当成冗余权限静默丢掉（或误报 PATH_PARENT_EXISTS）。
+ */
+function _isSameOrSubPath(parent, child) {
+  const p = String(parent || '').trim();
+  const c = String(child || '').trim();
+  if (!p || !c) return false;
+  if (p === c) return true;
+  return c.startsWith(p.endsWith(path.sep) ? p : p + path.sep);
+}
+
 function _toRows(rawResult) {
   if (Array.isArray(rawResult)) return rawResult;
   const rows = rawResult && rawResult.rows ? rawResult.rows : rawResult;
@@ -151,9 +164,17 @@ class UserService {
       const t = payload.phone === null ? '' : String(payload.phone).trim();
       data.phone = t || null;
     }
+    if (Object.keys(data).length === 0) {
+      // 空 body 会让 knex 抛 "Empty .update() call detected"，message 不带 user. 前缀，
+      // 最终只能落成笼统的 user.USER_UPDATE_FAILED
+      throw new Error('file.INVALID_PARAMS');
+    }
+    const row = await this.knex('user').where({ id }).first();
+    if (!row) throw new Error('user.USER_NOT_FOUND');
     try {
-      const affected = await this.knex('user').where({ id }).update(data);
-      if (!affected) throw new Error('user.USER_NOT_FOUND');
+      // 不用 affected 判断存在性：sqlite 对「值未变化」的更新 changes 也是 0，
+      // 上面已经先查过行，这里只管落库
+      await this.knex('user').where({ id }).update(data);
     } catch (e) {
       const msg = e && e.message ? String(e.message) : '';
       const isUsernameConstraint = e && (e.code === 'SQLITE_CONSTRAINT' || e.code === 'SQLITE_CONSTRAINT_UNIQUE') && msg.includes('user.username');
@@ -243,7 +264,7 @@ class UserService {
       for (const p of compact) {
         let covered = false;
         for (const k of kept) {
-          if (p.startsWith(k)) {
+          if (_isSameOrSubPath(k, p)) {
             covered = true;
             break;
           }
@@ -253,7 +274,7 @@ class UserService {
       const existingParents = existingMap.get(key) || [];
       for (const p of kept) {
         for (const ep of existingParents) {
-          if (p !== ep && p.startsWith(ep)) {
+          if (p !== ep && _isSameOrSubPath(ep, p)) {
             const err = new Error('permission.PATH_PARENT_EXISTS');
             err.args = [ep, p];
             throw err;
@@ -287,13 +308,16 @@ class UserService {
 
   async getLoginRecords(uid, page = 1, limit = 20) {
     const offset = (page - 1) * limit;
-    const items = await this.knex('user_token')
-      .where({ user_id: uid, type: 'login' })
+    const base = this.knex('user_token').where({ user_id: uid, type: 'login' });
+    const items = await base
+      .clone()
       .orderBy('create_time', 'desc')
       .offset(offset)
       .limit(limit)
       .select('id', 'client_ip', 'device_info', 'browser', 'os', 'create_time', 'last_active_time', 'is_valid');
-    const [{ count }] = await this.knex('user_token').where({ user_id: uid }).count('* as count');
+    // total 必须与 items 同条件：原先只按 user_id 统计，把 access/scoped token 也算进来，
+    // 前端分页会按虚高的 total 显示页数，往后翻全是空列表。
+    const [{ count }] = await base.clone().count('* as count');
     return { items, total: Number(count || 0), page, limit };
   }
 
