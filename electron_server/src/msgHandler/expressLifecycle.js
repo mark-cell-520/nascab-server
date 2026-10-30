@@ -149,6 +149,32 @@ function handleRequestAppRestart({ initUtil, Logger, message }) {
       }
     } catch (_) {}
 
+    // 无界面模式（Docker）下没有 electron，只能自行退出、交给 supervisord 拉活。
+    // 这里绝不能直接 process.exit(0)：singletonWorkerManager 用不带 detached 的
+    // child_process.fork 拉起 worker，主进程一退它们就被 init(1) 收养并继续常驻，
+    // 每代泄漏 4~5 个进程（photoWatch / videoWatch / musicWatch / backgroundTask /
+    // expressBroadcast，实测 5 代合计约 1.2 GB）。残留进程各自持有 chokidar 监听和
+    // SQLite 连接，媒体目录被重复监听、索引写入互相覆盖、广播状态陈旧，
+    // 最终表现为"功能基本都用不了"——而用户点一次「重启服务」就多泄一代。
+    //
+    // 因此改走 SIGTERM：main_nascab_os.js 的无界面分支已注册 SIGTERM 处理器，
+    // 会先 singletonWorkerManager.gracefulShutdown() 再退出，复用同一条清理链路。
+    // 万一处理器没注册上（模块加载顺序变化），SIGTERM 的默认终止语义也与旧行为一致，
+    // 不会更糟。
+    try {
+      process.kill(process.pid, 'SIGTERM');
+      // 兜底：gracefulShutdown 对每个 worker 有 5~12s 的停止超时，若 SIGTERM 处理器
+      // 本身抛异常或被吞掉，进程会一直不退出，supervisord 等满 stopwaitsecs 后
+      // SIGKILL 整组，这一代 worker 照样泄。所以再挂一个足够长的强退定时器。
+      const forceExit = setTimeout(() => {
+        try {
+          process.exit(0);
+        } catch (_) {}
+      }, 20000);
+      if (typeof forceExit.unref === 'function') forceExit.unref();
+      return;
+    } catch (_) {}
+
     try {
       process.exit(0);
     } catch (_) {}

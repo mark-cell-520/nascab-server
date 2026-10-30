@@ -7,6 +7,7 @@ const initUtil = require('./initUtil');
 const Logger = require('./utils/logger');
 const tableConfig = require('./db/table/tableConfig');
 const { getVfsCacheRoot } = require('./utils/rcloneMountPerf');
+const { scheduleStaleWorkerReaper } = require('./utils/staleWorkerReaper');
 const { getSingletonWorkerManager } = require('./workers/singletonWorkerManager');
 // 单例Worker管理器
 const singletonWorkerManager = getSingletonWorkerManager();
@@ -33,7 +34,6 @@ try {
   // Docker/无界面模式：未安装 electron，仅运行后端服务
   Logger.info('Clientless service mode (Docker / no Electron)');
 }
-console.log('process.env.NODE_ENV', process.env.NODE_ENV);
 /** 是否为 Electron 环境（桌面应用）；false 表示 Docker/无界面模式，不做窗口、托盘、检查更新等 */
 const isElectronAvailable = !!(app && shell && ipcMain);
 // 无界面模式下没有 electron.shell，worker 里 `process.send` 却依然存在，
@@ -244,8 +244,19 @@ function main() {
     }
   });
 
-  initUtil.init().catch(err => {
+  // 上一代主进程若非经 SIGTERM 死亡（未捕获异常 / 被 SIGKILL / 下面 init 失败后
+  // process.exit(1)），它 fork 出的 singleton worker 会被 init 收养并继续常驻，
+  // 每代泄漏 4~5 个进程：重复的文件监听、SQLite 连接和广播状态会让各项功能失灵。
+  // 这里在拉起本代 worker 之前先把残留清掉。
+  scheduleStaleWorkerReaper({ logger: Logger, delayMs: 60000 });
+
+  initUtil.init().catch(async err => {
     Logger.error('Docker mode init failed', err);
+    // init 可能已经拉起了一部分 singleton worker 才失败，直接 exit 会把它们遗弃。
+    // 走一遍优雅关闭，失败也不要阻塞退出。
+    try {
+      await singletonWorkerManager.gracefulShutdown();
+    } catch (_) {}
     process.exit(1);
   });
 }

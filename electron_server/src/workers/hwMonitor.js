@@ -2,6 +2,38 @@ const si = require('systeminformation');
 const Logger = require('../utils/logger');
 const os = require('os');
 const hwUtil = require('../utils/hardwareUtil');
+
+/**
+ * 安装进程级 IPC 错误兜底。
+ *
+ * 主进程退出/重载后 IPC 通道关闭，此时 process.send 会在内部以**异步**方式
+ * 在 process 上抛出 'error' 事件（ERR_IPC_CHANNEL_CLOSED）。Node 对
+ * process 的 'error' 事件沿用 EventEmitter 语义：没有监听器就直接把异常
+ * 重新抛出，终结整个后台任务进程。这会在日志里留下固定的致命栈：
+ *
+ *   at HardwareMonitor.collectFastMetrics (src/workers/hwMonitor.js:...)
+ *   Emitted 'error' event on process instance at:
+ *
+ * 因此光在调用点 try/catch 是不够的，必须在这里补一个监听器。
+ * 幂等：重复调用只会注册一次。
+ */
+let ipcErrorGuardInstalled = false;
+function installIpcErrorGuard() {
+  if (ipcErrorGuardInstalled) return;
+  ipcErrorGuardInstalled = true;
+  process.on('error', err => {
+    if (err && (err.code === 'ERR_IPC_CHANNEL_CLOSED' || /Channel closed/i.test(err.message || ''))) {
+      // 父进程已经不在了，硬件监控没必要继续，安静退出即可。
+      Logger.warn && Logger.warn('⚠️ 与主进程的 IPC 通道已关闭，后台任务 Worker 即将退出');
+      try {
+        process.exit(0);
+      } catch (_) {}
+      return;
+    }
+    Logger.error('❌ process error', err);
+  });
+}
+
 class HardwareMonitor {
   constructor() {
     this.sampleIntervalMs = 3000;
@@ -224,9 +256,27 @@ class HardwareMonitor {
         network: networkSpeed,
         disks: this.lastDiskStats,
       };
-      process.send({ type: 'hwMetrics', data: payload });
+      // IPC 通道已断开时 process.send 会以异步 'error' 事件的形式抛出
+      // ERR_IPC_CHANNEL_CLOSED，而 process 上没有 'error' 监听器，Node 会把它
+      // 当作未捕获异常直接终结整个后台任务进程（见 installIpcErrorGuard）
+      this._sendToParent({ type: 'hwMetrics', data: payload });
     } catch (error) {
       Logger.error('❌ Quick hardware metrics failed', error);
+    }
+  }
+
+  /**
+   * 向主进程发送消息。
+   * 主进程退出/重载后通道会关闭，此时 process.send 返回 false 或抛错；
+   * 这里统一兜住，避免把一次“父进程已经不在了”升级成 worker 崩溃。
+   */
+  _sendToParent(message) {
+    try {
+      if (process.connected === false) return false;
+      if (typeof process.send !== 'function') return false;
+      return process.send(message) !== false;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -270,3 +320,6 @@ class HardwareMonitor {
 }
 
 module.exports = HardwareMonitor;
+// 该模块由 backgroundTaskWorker 在入口处 require，模块加载即装上进程级兜底，
+// 这样即使 HardwareMonitor 尚未实例化也不会漏掉早期的异步 'error' 事件。
+installIpcErrorGuard();
