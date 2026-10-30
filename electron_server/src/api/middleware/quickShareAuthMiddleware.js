@@ -103,13 +103,57 @@ function _getRelPath(req) {
   return typeof v === 'string' ? v : v == null ? '' : String(v);
 }
 
+/**
+ * 纯词法包含判定。
+ * 注意 rel 的 '..' 判定必须精确到 '..' 或 '../…'：原来写成 rel.startsWith('..')，
+ * 会把名字以 '..' 开头的正常文件（'..foo.txt'、未解码的 '..%2f…'）误判成逃逸，
+ * 这些文件明明就在分享目录里，却永远打不开。
+ */
+function _lexicallyInside(rootResolved, targetResolved) {
+  if (rootResolved === targetResolved) return true;
+  const rel = path.relative(rootResolved, targetResolved);
+  if (!rel || path.isAbsolute(rel)) return false;
+  return rel !== '..' && !rel.startsWith(`..${path.sep}`);
+}
+
+/**
+ * 逐个目录向上找第一个真实存在的祖先，取其 realpath。
+ * 分享里的目标路径常常还没建出来（待下载、待上传），直接 realpathSync 会 ENOENT；
+ * 只还原存在的部分也能挡住 '/share/link/etc' 这种中间跳板。
+ * 根目录一定存在，所以这个函数不会失败，返回值必定非空。
+ */
+function _realpathOrNearestExisting(p) {
+  let current = p;
+  while (current && current !== path.parse(current).root) {
+    try {
+      const real = fs.realpathSync(current);
+      return real && real !== current ? real : current;
+    } catch (_) {
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+  return current;
+}
+
+/**
+ * 判断 targetPath 是否落在分享根目录内。
+ * 原来是纯词法判定：分享目录里放一个指向 /etc 的软链接，一个 '..' 都没有，
+ * 词法检查照样放行，公开分享就能读到 /etc/shadow。
+ * 现在补一道 realpath 还原后再判包含。
+ */
 function _isInsideRoot(rootPath, targetPath) {
   const rootResolved = path.resolve(String(rootPath || ''));
   const targetResolved = path.resolve(String(targetPath || ''));
   if (!rootResolved || !targetResolved) return false;
-  if (rootResolved === targetResolved) return true;
-  const rel = path.relative(rootResolved, targetResolved);
-  return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+
+  if (!_lexicallyInside(rootResolved, targetResolved)) return false;
+
+  const realRoot = _realpathOrNearestExisting(rootResolved);
+  const realTarget = _realpathOrNearestExisting(targetResolved);
+  if (!realRoot || !realTarget) return false;
+  return _lexicallyInside(realRoot, realTarget);
 }
 
 function _parsePwdHash(stored) {
@@ -141,11 +185,14 @@ function _sha256Hex(text) {
 function verifyQuickSharePwd(stored, provided) {
   const parsed = _parsePwdHash(stored);
   if (parsed.mode === 'empty') return false;
+  // 入参也 trim：建分享时口令是被 trim 后才落库的（见 quickShareService._hashPwd），
+  // 校验侧不 trim 的话，用户在输入框多打一个空格就永远对不上。
   const pwd = typeof provided === 'string' ? provided : provided == null ? '' : String(provided);
-  if (!pwd) return false;
-  if (parsed.mode === 'plain') return pwd === parsed.value;
+  const trimmedPwd = pwd.trim();
+  if (!trimmedPwd) return false;
+  if (parsed.mode === 'plain') return trimmedPwd === parsed.value;
   const crypto = require('crypto');
-  const actual = _hashPwdPbkdf2(crypto, pwd, parsed.iter, parsed.salt);
+  const actual = _hashPwdPbkdf2(crypto, trimmedPwd, parsed.iter, parsed.salt);
   return actual === parsed.hash;
 }
 

@@ -347,10 +347,18 @@ class QuickSharePublicController {
         res.download(fullPath, filename);
         return;
       }
-      return res.sendFile(fullPath, { dotfiles: 'allow' }, err => {
+      // dotfiles 原来是 'allow'：公开分享会把 .env / .htpasswd / .git/config
+      // 这类藏着口令和密钥的点文件一起吐出去。分享的用途是给别人看媒体，
+      // 没有理由放开点文件，这里收回 send 的默认 'ignore'（即 404）。
+      return res.sendFile(fullPath, err => {
         if (!err) return;
         if (err.code === 'ECONNABORTED' || err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
-        if (!res.headersSent) res.status(500).send(err.message);
+        if (res.headersSent) return;
+        // send 对点文件（默认 'ignore'）和不存在路径都会自带 status。
+        // 回调原来是硬编码 500 再把 err.message 原文回给公开分享的访问者：
+        // 一次正常的 404 会被报成服务端故障，还顺带吐出 send 的内部错误文本。
+        const status = Number(err.status || err.statusCode) || 500;
+        res.status(status).end();
       });
     } catch (e) {
       if (!res.headersSent) res.status(500).send(e && e.message ? String(e.message) : String(e));

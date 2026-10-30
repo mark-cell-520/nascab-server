@@ -6,11 +6,29 @@ function _toInt(v) {
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
 
+// 分享口令的 pbkdf2 参数。中间件 quickShareAuthMiddleware._parsePwdHash
+// 早就认 'pbkdf2$iter$salt$hex' 这个格式，verifyQuickSharePwd 也能校验，
+// 只是 service 侧从来没写进去过。迭代次数取 15 万：实测单次约 35ms，
+// 公开接口上撞库成本可控，也不会让正常的分享访问明显变慢。
+const PWD_HASH_ITERATIONS = 150000;
+const PWD_HASH_SALT_BYTES = 16;
+const PWD_HASH_KEY_BYTES = 32;
+const PWD_HASH_DIGEST = 'sha256';
+
+/**
+ * 生成 pbkdf2 口令哈希，格式 'pbkdf2$<iter>$<salt>$<hex>'。
+ * 原来是原样返回 trim 后的明文：quick_share.pwd 在库里裸存分享口令，
+ * 任何能读到 main.db 的人（备份、误挂载、sqlite 客户端）直接拿走所有分享口令。
+ */
 function _hashPwd(pwd) {
   const raw = typeof pwd === 'string' ? pwd : pwd == null ? '' : String(pwd);
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  return trimmed;
+  const salt = crypto.randomBytes(PWD_HASH_SALT_BYTES).toString('hex');
+  const hash = crypto
+    .pbkdf2Sync(trimmed, salt, PWD_HASH_ITERATIONS, PWD_HASH_KEY_BYTES, PWD_HASH_DIGEST)
+    .toString('hex');
+  return `pbkdf2$${PWD_HASH_ITERATIONS}$${salt}$${hash}`;
 }
 
 function _genToken(length = 8) {
