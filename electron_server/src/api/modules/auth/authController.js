@@ -1050,7 +1050,7 @@ class AuthController {
       // 如果有refreshToken，调用service将其失效
       if (refreshToken) {
         const knexMain = req.dbMain;
-        await authService.logout({ knexMain }, refreshToken);
+        await authService.logout({ knexMain }, refreshToken, req.user && req.user.userId);
       }
 
       // 清除cookie

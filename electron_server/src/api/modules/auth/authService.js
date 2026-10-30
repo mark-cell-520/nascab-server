@@ -314,15 +314,21 @@ class AuthService {
   /**
    * 用户登出
    * @param {string} refreshToken - 刷新令牌
+   * @param {number} [userId] - 当前登录用户 id，用于把吊销范围限制在自己名下
    */
-  async logout({ knexMain }, refreshToken) {
+  async logout({ knexMain }, refreshToken, userId) {
     try {
       if (refreshToken) {
         const row = await knexMain('user_token').where({ token: refreshToken }).first();
-        if (row) {
+        // row 必须属于当前登录用户：refreshToken 是客户端上传的，原来只要 token 存在
+        // 就按它的 user_id + device_id 整组吊销——拿别人的 refreshToken 就能把
+        // 别人的所有设备踢下线，构成一个不需要任何凭证的会话销毁接口。
+        if (row && (!userId || row.user_id === Number(userId))) {
           // 使该会话下所有 token（含 access）失效
           await knexMain('user_token').where({ user_id: row.user_id, device_id: row.device_id }).update({ is_valid: false });
-        } else {
+        } else if (row && userId) {
+          await knexMain('user_token').where({ token: refreshToken, user_id: Number(userId) }).update({ is_valid: false });
+        } else if (!row) {
           await knexMain('user_token').where({ token: refreshToken }).update({ is_valid: false });
         }
       }
@@ -534,10 +540,17 @@ class AuthService {
         throw new Error('auth.SECURITY_ANSWER_INCORRECT');
       }
       const encryptedNewPassword = jwtUtil.encryptPassword(newPasswordPlain);
-      await knexMain('user').where({ id: user.id }).update({
-        password: encryptedNewPassword,
-        last_login_time: new Date(),
+      // 改密和吊销 token 放进同一个事务：只改密码的话，access 还能活 12 小时、
+      // refresh 还能活 7 天，拿到旧 token 的人照样登得进来，"找回密码" 毫无止损效果。
+      // 放事务里是为了不留下「密码已经改了、旧 token 还活着」的半完成状态。
+      await knexMain.transaction(async trx => {
+        await trx('user').where({ id: user.id }).update({
+          password: encryptedNewPassword,
+          last_login_time: new Date(),
+        });
+        await trx('user_token').where({ user_id: user.id, is_valid: true }).update({ is_valid: false });
       });
+      Logger.info('密保找回密码成功，已吊销该用户全部登录态', { userId: user.id });
       return { userId: user.id, username: user.username };
     } catch (error) {
       Logger.error('密保找回密码失败', error);
@@ -607,6 +620,19 @@ class AuthService {
 
   async invalidateTokensForDevice({ knexMain, userId, deviceId }) {
     return await knexMain('user_token').where({ user_id: userId, device_id: deviceId, is_valid: true }).update({ is_valid: false });
+  }
+
+  /**
+   * 吊销某用户的全部登录态（所有设备的 access + refresh，以及 scoped 令牌）。
+   * 改密/找回密码后必须调用：token 是自带有效期（access 12h、refresh 7d）的 JWT，
+   * authMiddleware 只查 user_token.is_valid，所以只要把行置为无效就能立刻生效，
+   * 不必等 token 自然过期。只改密码不吊销的话，拿到旧 token 的人还能一直用到过期，
+   * "找回密码" 就起不到任何止损作用。
+   */
+  async invalidateAllTokensForUser({ knexMain }, userId) {
+    const id = Number(userId) || 0;
+    if (!id) return 0;
+    return await knexMain('user_token').where({ user_id: id, is_valid: true }).update({ is_valid: false });
   }
 
   async trimUserDevices({ knexMain, userId, keep = 500 }) {
