@@ -14,6 +14,11 @@ const TINY_PATH_CHECK_MS = 8000;
 const TINY_IMAGE_GEN_MS = 90 * 1000;
 const TINY_VIDEO_GEN_MS = 3 * 60 * 1000;
 
+// gen_tiny 的取值：0/NULL = 待生成，1 = 已生成，
+// 2 = 本轮跳过（文件读不到或生成失败）。2 的作用是把这一行从待处理队列里摘出来，
+// 否则 getOnePhoto() 下一轮又会把它捞回来，原地打转到进程退出。
+const GEN_TINY_SKIPPED = 2;
+
 function tinyGenTimeoutMs(filePath) {
   const ext = path.extname(String(filePath || '')).toLowerCase();
   const videoTypes = Array.isArray(config.videoTypeList) ? config.videoTypeList : [];
@@ -52,6 +57,30 @@ class TinyImageWorker {
     } catch (err) {
       Logger.error('❌ TinyImage Worker init failed:', err);
       process.exit(1);
+    }
+  }
+
+  /**
+   * 把一行标记成「本轮跳过」。写 2 而不是 1：
+   * 1 表示缩略图真的生成成功了，UI 那边会以为有图可取；
+   * 2 只代表「这轮别再试」，下一次重新生成缩略图时 gen_tiny 会被重置回 0，还能再试。
+   * 写库失败也不能抛：抛出去会被 startLoop 的 catch 吞掉然后重试同一行，又回到死循环。
+   */
+  async _markPhotoSkipped(id) {
+    Logger.warn(`⚠️ skip photo thumbnail (file unreadable or gen failed): id=${id}`);
+    try {
+      await this.photoKnex('photo_index').where({ id }).update({ gen_tiny: GEN_TINY_SKIPPED });
+    } catch (err) {
+      Logger.error(`❌ mark photo gen_tiny=${GEN_TINY_SKIPPED} failed: id=${id}`, err);
+    }
+  }
+
+  async _markVideoSkipped(id) {
+    Logger.warn(`⚠️ skip video thumbnail (file unreadable or gen failed): id=${id}`);
+    try {
+      await this.videoKnex('video_index').where({ id }).update({ gen_tiny: GEN_TINY_SKIPPED });
+    } catch (err) {
+      Logger.error(`❌ mark video gen_tiny=${GEN_TINY_SKIPPED} failed: id=${id}`, err);
     }
   }
 
@@ -191,11 +220,21 @@ class TinyImageWorker {
       return false;
     }
 
-    if (!fullPath || !(await pathAccessible(fullPath, TINY_PATH_CHECK_MS))) return false;
+    if (!fullPath || !(await pathAccessible(fullPath, TINY_PATH_CHECK_MS))) {
+      // 文件读不到（已删/离线/IO 卡住）时必须把 gen_tiny 推到跳过值：
+      // 只 return false 的话 gen_tiny 还是 0，getOnePhoto() 下一轮又捞回同一行，
+      // startLoop 的 while 就在这一行原地打转，worker 永远不退出，
+      // 排在后面的所有缩略图一张都生成不了。
+      await this._markPhotoSkipped(id);
+      return false;
+    }
 
     try {
       const tinyPath = await generateTinyWithTimeout(fullPath);
-      if (!tinyPath) return false;
+      if (!tinyPath) {
+        await this._markPhotoSkipped(id);
+        return false;
+      }
       await this.photoKnex('photo_index').where({ id }).update({ gen_tiny: 1 });
       return true;
     } catch (err) {
@@ -223,11 +262,18 @@ class TinyImageWorker {
       return false;
     }
 
-    if (!fullPath || !(await pathAccessible(fullPath, TINY_PATH_CHECK_MS))) return false;
+    if (!fullPath || !(await pathAccessible(fullPath, TINY_PATH_CHECK_MS))) {
+      // 同 processOnePhoto：不推进 gen_tiny 会让这一行被无限捞回
+      await this._markVideoSkipped(id);
+      return false;
+    }
 
     try {
       const tinyPath = await generateTinyWithTimeout(fullPath);
-      if (!tinyPath) return false;
+      if (!tinyPath) {
+        await this._markVideoSkipped(id);
+        return false;
+      }
       await this.videoKnex('video_index').where({ id }).update({ gen_tiny: 1 });
       return true;
     } catch (err) {

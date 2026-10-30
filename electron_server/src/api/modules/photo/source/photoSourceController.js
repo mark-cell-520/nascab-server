@@ -1,7 +1,27 @@
 const ResponseUtil = require('../../../apiUtils/responseUtil');
 const PhotoSourceService = require('./photoSourceService');
 const FileUtil = require('../../../../utils/fileUtil');
+const Logger = require('../../../../utils/logger');
+const config = require('../../../../config/config');
 const fs = require('fs');
+
+// service 层抛出的 message 分两类：一类是 i18n 键（photo.PHOTO_SOURCE_EXISTS /
+// common.NOT_FOUND），ResponseUtil.error 会原样透传；另一类是数据库异常
+// （SQLITE_CONSTRAINT: UNIQUE constraint failed...），ResponseUtil 的
+// isUserFacingMessage 会把它换成 common.ERROR。所以 message/code 本来就是干净的，
+// 真正脏的是下面两件事，都得先认出「这不是键」才知道该走哪条分支：
+//   1) 状态码：冲突（EXISTS/PARENT_EXISTS）该回 409，回 400 前端会当成参数错误重试；
+//   2) 日志：非键的 message 一定是意外，不打日志就只剩前端一句「发生错误」。
+const LOCALE_KEY_RE = /^[a-z][a-zA-Z0-9]*\.[A-Z][A-Z0-9_]+$/;
+
+function localeKeyOf(err, fallback = 'common.ERROR') {
+  const msg = err && err.message ? String(err.message) : '';
+  return LOCALE_KEY_RE.test(msg) ? msg : fallback;
+}
+
+function logUnexpected(where, err) {
+  Logger.error(`[photoSource/${where}] unexpected error: ${err && err.stack ? err.stack : err}`);
+}
 
 async function stopPhotoIndexWorkerBeforeDelete(timeoutMs = 8000) {
   const waitStopped = new Promise(resolve => {
@@ -62,6 +82,8 @@ class PhotoSourceController {
       );
       return ResponseUtil.success(req, res, enriched, 'photo.PHOTO_SOURCE_LIST_SUCCESS', 200);
     } catch (err) {
+      // 原来是裸 catch：前端只看到「获取失败」，日志里一个字都没有
+      logUnexpected('list', err);
       return ResponseUtil.error(req, res, 'photo.PHOTO_SOURCE_LIST_FAILED', 500);
     }
   }
@@ -70,12 +92,26 @@ class PhotoSourceController {
     try {
       const service = new PhotoSourceService(req.dbPhoto);
       const { path } = req.body || {};
+      // path 不是字符串时 FileUtil.isProtectedPath / fs.existsSync 都会静悄悄地当 falsy 处理，
+      // 最后落到「文件夹不存在」—— 空路径明明是参数问题，不该报成 404。
+      if (typeof path !== 'string' || !path.trim()) {
+        return ResponseUtil.error(req, res, 'validation.VALIDATION_ERROR', 400);
+      }
       // 检查系统关键目录
       if (FileUtil.isProtectedPath(path)) {
         return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
       }
-      // 检查目录是否存在
-      if (!fs.existsSync(path)) {
+      // 检查目录是否存在。relocateSource 用 stat().isDirectory() 卡掉了「把文件当来源」，
+      // 这里却只 existsSync：传一个文件路径会 201 成功入库，
+      // 而 photoIndexWorker 的 runTask 看到不是目录就直接把任务删掉，
+      // 于是 UI 里多出一个永远扫不出照片的来源。
+      let stat = null;
+      try {
+        stat = fs.statSync(path);
+      } catch (_) {
+        stat = null;
+      }
+      if (!stat || !stat.isDirectory()) {
         return ResponseUtil.error(req, res, 'file.FOLDER_NOT_EXIST', 404);
       }
 
@@ -97,7 +133,12 @@ class PhotoSourceController {
           if (process.send) {
             process.send({ type: 'startPhotoIndexWorker', data: { scanPath } });
           }
-        } catch (_) {}
+        } catch (err) {
+          // 原来是 catch (_) {}：扫描任务没入队也照样返回 201，
+          // 前端以为加好了，实际上一次都不会扫，用户看到的是「来源加了但是没有照片」。
+          // 来源行已经写进库了，回滚不掉，只能把失败原因写清楚，让运维能定位。
+          logUnexpected('add/queueScan', err);
+        }
       }
       if (process.send) {
         try {
@@ -107,8 +148,9 @@ class PhotoSourceController {
 
       return ResponseUtil.success(req, res, result.row, messageKey, statusCode);
     } catch (err) {
-      const msgKey = err && err.message ? err.message : 'common.ERROR';
+      const msgKey = localeKeyOf(err, 'common.ERROR');
       const statusCode = msgKey === 'photo.PHOTO_SOURCE_EXISTS' || msgKey === 'photo.PHOTO_SOURCE_PARENT_EXISTS' ? 409 : 400;
+      if (msgKey === 'common.ERROR') logUnexpected('add', err);
       if (err && err.args) {
         return ResponseUtil.errorWithArgs(req, res, msgKey, err.args, statusCode);
       }
@@ -176,11 +218,14 @@ class PhotoSourceController {
       if (process.send) {
         try {
           process.send({ type: 'startPhotoIndexWorker', data: { scanPath: input } });
-        } catch (_) {}
+        } catch (err) {
+          logUnexpected('scan/startWorker', err);
+        }
       }
 
       return ResponseUtil.success(req, res, { inserted }, 'common.SUCCESS', 200);
     } catch (err) {
+      logUnexpected('scan', err);
       return ResponseUtil.error(req, res, 'common.ERROR', 500);
     }
   }
@@ -203,7 +248,8 @@ class PhotoSourceController {
       }
       return ResponseUtil.success(req, res, { affected }, 'photo.PHOTO_SOURCE_DELETE_SUCCESS', 200);
     } catch (err) {
-      const msgKey = err && err.message ? err.message : 'common.ERROR';
+      const msgKey = localeKeyOf(err, 'common.ERROR');
+      if (msgKey === 'common.ERROR') logUnexpected('delete', err);
       return ResponseUtil.error(req, res, msgKey, 400);
     }
   }
@@ -220,8 +266,9 @@ class PhotoSourceController {
       }
       return ResponseUtil.success(req, res, row, 'photo.PHOTO_SOURCE_UPDATE_SUCCESS', 200);
     } catch (err) {
-      const msgKey = err && err.message ? err.message : 'common.ERROR';
+      const msgKey = localeKeyOf(err, 'common.ERROR');
       const statusCode = msgKey === 'common.NOT_FOUND' ? 404 : 400;
+      if (msgKey === 'common.ERROR') logUnexpected('update', err);
       return ResponseUtil.error(req, res, msgKey, statusCode);
     }
   }
@@ -258,8 +305,16 @@ class PhotoSourceController {
 
       return ResponseUtil.success(req, res, result, 'photo.PHOTO_SOURCE_RELOCATE_SUCCESS', 200);
     } catch (err) {
-      const msgKey = err && err.message ? err.message : 'common.ERROR';
-      const statusCode = msgKey === 'common.NOT_FOUND' ? 404 : 400;
+      const msgKey = localeKeyOf(err, 'common.ERROR');
+      // relocate 的冲突（EXISTS / PARENT_EXISTS）和 addSource 一样是 409：
+      // 回 400 前端会当成参数错误，让用户改路径重试，而真正该做的是先删掉旧来源。
+      const statusCode =
+        msgKey === 'common.NOT_FOUND'
+          ? 404
+          : msgKey === 'photo.PHOTO_SOURCE_EXISTS' || msgKey === 'photo.PHOTO_SOURCE_PARENT_EXISTS'
+            ? 409
+            : 400;
+      if (msgKey === 'common.ERROR') logUnexpected('relocate', err);
       if (err && err.args) {
         return ResponseUtil.errorWithArgs(req, res, msgKey, err.args, statusCode);
       }
@@ -279,14 +334,7 @@ class PhotoSourceController {
       if (req.dbVideo) {
         await req.dbVideo('video_index')
           .where({ is_file: 1 })
-          .whereIn('ext', (() => {
-            try {
-              const config = require('../../../../config/config');
-              return Array.isArray(config.videoTypeList) ? config.videoTypeList : [];
-            } catch (_) {
-              return [];
-            }
-          })())
+          .whereIn('ext', Array.isArray(config.videoTypeList) ? config.videoTypeList : [])
           .update({ gen_tiny: 0 });
       }
 
@@ -294,11 +342,14 @@ class PhotoSourceController {
       if (process.send) {
         try {
           process.send({ type: 'startTinyImageWorker' });
-        } catch (_) {}
+        } catch (err) {
+          logUnexpected('regenerateThumbnails/startWorker', err);
+        }
       }
 
       return ResponseUtil.success(req, res, {}, 'common.SUCCESS', 200);
     } catch (err) {
+      logUnexpected('regenerateThumbnails', err);
       return ResponseUtil.error(req, res, 'common.ERROR', 500);
     }
   }
