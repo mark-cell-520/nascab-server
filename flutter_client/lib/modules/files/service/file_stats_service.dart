@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/api/api_controller.dart';
+import '../../../core/api/ws_path_util.dart';
 import 'file_ws_channel_factory_stub.dart'
     if (dart.library.io) 'file_ws_channel_factory_io.dart';
 
 /// 解析文件 WebSocket 的 base Uri，与终端 getTerminalConnectUrl 逻辑一致：
 /// Web 端开发模式下用服务器 baseUrl（如 127.0.0.1:9000），否则用地址栏；非 Web 端用登录返回的 httpsPort（有则 wss+该端口，否则用 baseUrl 的端口）。
+/// base 的 path 带上 [webBasePathPrefix]（反代子路径），实际路径由 [buildFileWebSocketUri] 拼接。
 Uri resolveFileWsBaseUri(String baseUrl) {
   final base = baseUrl.trim();
   if (base.isEmpty) return Uri();
@@ -26,7 +28,14 @@ Uri resolveFileWsBaseUri(String baseUrl) {
     final port = Uri.base.hasPort
         ? Uri.base.port
         : (scheme == 'wss' ? 443 : 80);
-    return Uri(scheme: scheme, host: Uri.base.host, port: port, path: '');
+    // path 必须是反代子路径前缀而不是空串：反代部署时（本机 /nascab/）
+    // /api/... 在站点根路径上属于另一个服务，空 path 会让 WS 连到那里直接断开。
+    return Uri(
+      scheme: scheme,
+      host: Uri.base.host,
+      port: port,
+      path: webBasePathPrefix(),
+    );
   }
 
   final baseUri = Uri.tryParse(base);
@@ -62,7 +71,12 @@ Uri buildFileWebSocketUri({
   required String path,
   required Map<String, dynamic> queryParameters,
 }) {
-  return wsBaseUri.replace(path: path, queryParameters: queryParameters);
+  // wsBaseUri.path 可能是 ''（根路径/非 Web/开发模式）或 '/nascab/'（反代子路径），
+  // 必须拼上去，否则绝对 path 会把子路径前缀整个盖掉。
+  return wsBaseUri.replace(
+    path: joinWsPath(wsBaseUri.path, path),
+    queryParameters: queryParameters,
+  );
 }
 
 WebSocketChannel connectFileWebSocket(Uri uri) {

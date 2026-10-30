@@ -612,7 +612,13 @@ extension ApiControllerUrls on ApiController {
         final port = Uri.base.hasPort
             ? Uri.base.port
             : (scheme == 'wss' ? 443 : 80);
-        wsBase = Uri(scheme: scheme, host: Uri.base.host, port: port, path: '');
+        // path 带反代子路径前缀，下面拼 /api/terminal/connect 时用 joinWsPath 保留它
+        wsBase = Uri(
+          scheme: scheme,
+          host: Uri.base.host,
+          port: port,
+          path: webBasePathPrefix(),
+        );
       }
     } else {
       // 非 Web 端：登录接口返回了 https 端口时，用 wss + 该端口；否则用 baseUrl 的协议与端口
@@ -648,14 +654,14 @@ extension ApiControllerUrls on ApiController {
 
     if (aesParam.isNotEmpty) {
       final uri = wsBase.replace(
-        path: '/api/terminal/connect',
+        path: joinWsPath(wsBase.path, '/api/terminal/connect'),
         queryParameters: {'aes': aesParam},
       );
       return uri.toString();
     }
 
     final uri = wsBase.replace(
-      path: '/api/terminal/connect',
+      path: joinWsPath(wsBase.path, '/api/terminal/connect'),
       queryParameters: {
         'cols': safeCols.toString(),
         'rows': safeRows.toString(),

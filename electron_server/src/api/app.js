@@ -294,9 +294,16 @@ require('./modules/terminal/terminalWs')(app);
 
 // 404处理
 // 文案走 i18n：'Endpoint not found' 是硬编码英文，中文界面下直接露英文。
+// 响应体必须是 `{success, message, code}`：客户端的 ApiResponse.fromJson 只读
+// success/message/code 三个字段，之前这里回的是 `{error, path}`（express 默认
+// 形状的本地化版），于是 success 缺省为 false、message 为 null，
+// ApiErrorLocalizer 一路兜底成一句没信息量的"操作失败"——用户点到一个不存在的
+// 接口时永远看不到"接口不存在"，更看不到是哪个路径。
 app.use((req, res) => {
   res.status(404).json({
-    error: _safeLocalize(req, 'common.ENDPOINT_NOT_FOUND'),
+    success: false,
+    message: _safeLocalize(req, 'common.ENDPOINT_NOT_FOUND'),
+    code: 'common.ENDPOINT_NOT_FOUND',
     path: req.originalUrl,
   });
 });

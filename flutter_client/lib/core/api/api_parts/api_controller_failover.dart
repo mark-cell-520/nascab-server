@@ -481,7 +481,10 @@ extension ApiControllerFailover on ApiController {
       return _normalizeBaseUrl(current);
     }
     if (kIsWeb) {
-      return '${Uri.base.scheme}://${Uri.base.authority}';
+      // 必须带反代子路径前缀：本机部署在 https://host/nascab/ 下，
+      // /quickshare/index.html 在站点根路径上属于另一个服务。
+      // 少了前缀，P2P 模式下"复制本地链接"分享出去的地址打开就是 404。
+      return '${Uri.base.scheme}://${Uri.base.authority}${webBasePathPrefix()}';
     }
     final serverId = _state.serverId.trim();
     if (serverId.isEmpty) return current;

@@ -1,4 +1,5 @@
 import 'package:NasCabOS/core/api/api_controller.dart';
+import 'package:NasCabOS/core/api/ws_path_util.dart';
 import 'package:NasCabOS/core/languages/language_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -228,7 +229,10 @@ class NasCabAccountController extends GetxController {
     if (kIsWeb) {
       // 使用不带 hash 的静态 HTML 回调页，避免 Chrome 从 HTTPS(nas.cab)
       // 导航到 http://localhost 时剥离 hash 和 query 参数导致回调丢失
-      return '${Uri.base.origin}/nascab-callback.html';
+      // 必须带反代子路径前缀：本机部署在 https://host/nascab/ 下，
+      // 回调页实体是 <origin>/nascab/nascab-callback.html；
+      // 少了前缀会落到站点根路径上的其他服务，扫码后回调 404、登录永远不闭合。
+      return '${Uri.base.origin}${webBasePathPrefix()}nascab-callback.html';
     }
     return '${ApiController.signalApiBaseUrl}/nascab-callback';
   }

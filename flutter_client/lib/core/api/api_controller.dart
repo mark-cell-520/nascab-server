@@ -22,6 +22,7 @@ import '../../utils/app_window_title.dart';
 import '../../utils/local_web_asset_server.dart';
 import '../../utils/server_version_util.dart';
 import 'api_state.dart';
+import 'ws_path_util.dart';
 import '../../modules/auth/service/auth_api_service.dart';
 import '../../modules/auth/service/server_storage_service.dart';
 import '../../modules/auth/service/response/server_status_response.dart';

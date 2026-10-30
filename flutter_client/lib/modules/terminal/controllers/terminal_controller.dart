@@ -9,6 +9,7 @@ import 'package:xterm/ui.dart' as xterm_ui;
 import 'package:xterm/xterm.dart';
 
 import '../../../core/api/api_controller.dart';
+import '../../../core/api/ws_path_util.dart';
 import '../../../core/web/local_kv_store_stub.dart'
     if (dart.library.html) '../../../core/web/local_kv_store_web.dart';
 import '../../files/service/file_ws_channel_factory_stub.dart'
@@ -673,14 +674,16 @@ class TerminalController extends GetxController {
     final port = baseUri.hasPort
         ? baseUri.port
         : (wsScheme == 'wss' ? 443 : 80);
+    // baseUrl 自带反代子路径（如 https://host/nascab/），保留它：
+    // 空 path 会让重连连到站点根路径上的其他服务。
     final wsBase = Uri(
       scheme: wsScheme,
       host: baseUri.host,
       port: port,
-      path: '',
+      path: baseUri.path,
     );
     final uri = wsBase.replace(
-      path: '/api/terminal/connect',
+      path: joinWsPath(wsBase.path, '/api/terminal/connect'),
       queryParameters: {
         'cols': '100',
         'rows': '30',
