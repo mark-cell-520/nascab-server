@@ -9,6 +9,7 @@ const dbUtil = require('../../db/dbUtil');
 const knexUtil = require('../../db/knexUtil');
 const config = require('../../config/config');
 const certUtil = require('../../utils/certUtil');
+const FileUtil = require('../../utils/fileUtil');
 
 function safeJsonParse(text) {
   if (!text) return null;
@@ -300,6 +301,14 @@ async function buildUsersDump({ homeDir, items }) {
       u.password = decryptedPassword;
 
       const resolvedHomeDir = ensureString(u.home_dir || u.homeDir || fallbackHomeDir).trim() || fallbackHomeDir;
+      // 和 root_path 同一套理由：uid/gid 都是 0，home_dir=/ 就等于给这个
+      // FTP/SFTP 账号一个网络可达的 root shell。校验只对显式配置生效，
+      // 空值走的是 workDir/home 兜底，不会误伤。
+      if (ensureString(u.home_dir || u.homeDir).trim() && FileUtil.isProtectedPath(resolvedHomeDir)) {
+        const err = new Error('home_dir_protected');
+        err.code = 'home_dir_protected';
+        throw err;
+      }
       const permissionOverride = u.permissions && typeof u.permissions === 'object' ? u.permissions : null;
       const permissions = permissionOverride || basePermissions || { '/': ['*'] };
 
@@ -491,6 +500,16 @@ async function startServer({ requestId, serverType, items, httpPort, httpsPort }
       const p0 = entry && entry.path;
       const p = ensureString(p0).trim();
       if (!p) continue;
+      // fileServerValidation 已经拦了系统目录，但那是新写入才生效的；
+      // 修复之前落库的行仍可能把服务根指到 / 或 /etc，启动时再判一次，
+      // 命中就直接拒绝启动（而不是把整个文件系统挂到网络上）。
+      if (FileUtil.isProtectedPath(p)) {
+        process.send?.({
+          type: 'fileServerStartResponse',
+          data: { requestId, ok: false, error: 'root_path_protected' },
+        });
+        return;
+      }
       try {
         const st = await fs.promises.stat(p);
         if (!st || !st.isDirectory()) {

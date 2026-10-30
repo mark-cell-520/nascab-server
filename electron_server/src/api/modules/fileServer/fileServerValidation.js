@@ -1,5 +1,48 @@
 const { body, validationResult } = require('express-validator');
 const { getLocalizedMessage } = require('../../../utils/i18nUtil');
+const path = require('path');
+const FileUtil = require('../../../utils/fileUtil');
+
+// WebDav/FTP/SFTP 是直接暴露到网络的服务，而且 fileServerWorker 里用户是
+// 以 uid:0（root）跑的。root_path 原来只要"是绝对路径"就放行：把服务根指到
+// / 或 /etc，等于把整个文件系统（含 /etc/shadow、main.db）挂到网络上；
+// config.users.*.home_dir 同理，它决定每个 FTP/SFTP 用户登录后落在哪。
+// 这里统一挡掉系统目录（isProtectedPath 内部带 resolve + realpath 还原 +
+// 子树判断；/home、/mnt、/media、/srv 这些 NAS 数据挂载点不在名单里）。
+function assertNoProtectedRootPath(value) {
+  const checkOne = raw => {
+    const p = typeof raw === 'string' ? raw.trim() : '';
+    if (!p) return true;
+    if (FileUtil.isProtectedPath(path.resolve(p))) {
+      throw new Error('fileServer.PROTECTED_PATH');
+    }
+    return true;
+  };
+
+  if (typeof value === 'string') return checkOne(value);
+  if (!Array.isArray(value)) return true;
+  for (const item of value) {
+    if (typeof item === 'string') {
+      checkOne(item);
+      continue;
+    }
+    if (item && typeof item === 'object' && typeof item.path === 'string') {
+      checkOne(item.path);
+    }
+  }
+  return true;
+}
+
+function assertNoProtectedHomeDir(value) {
+  if (value === undefined || value === null || value === '') return true;
+  if (typeof value !== 'string') return true;
+  const p = value.trim();
+  if (!p) return true;
+  if (FileUtil.isProtectedPath(path.resolve(p))) {
+    throw new Error('fileServer.PROTECTED_PATH');
+  }
+  return true;
+}
 
 function isAbsolutePath(value) {
   if (typeof value !== 'string') return false;
@@ -58,14 +101,24 @@ const FileServerValidation = {
     return [
       body('uid').notEmpty().isString().matches(/^\d+$/).withMessage('validation.ID_INVALID'),
       body('server_type').notEmpty().isIn(['WebDav', 'FTP', 'SFTP']).withMessage('validation.VALIDATION_ERROR'),
-      body('root_path').notEmpty().custom(isRootPathMappings).withMessage('validation.VALIDATION_ERROR'),
+      body('root_path')
+        .notEmpty()
+        .custom(isRootPathMappings)
+        .withMessage('validation.VALIDATION_ERROR')
+        .custom(assertNoProtectedRootPath)
+        .withMessage('fileServer.PROTECTED_PATH'),
       body('http_port').optional().isInt({ min: 1, max: 65535 }).withMessage('validation.VALIDATION_ERROR'),
       body('https_port').optional().isInt({ min: 1, max: 65535 }).withMessage('validation.VALIDATION_ERROR'),
       body('config').optional().isObject().withMessage('validation.VALIDATION_ERROR'),
       body('config.users').optional().isArray().withMessage('validation.VALIDATION_ERROR'),
       body('config.users.*.username').optional().isString().notEmpty().withMessage('validation.VALIDATION_ERROR'),
       body('config.users.*.password').optional().isString().notEmpty().withMessage('validation.VALIDATION_ERROR'),
-      body('config.users.*.home_dir').optional().isString().withMessage('validation.VALIDATION_ERROR'),
+      body('config.users.*.home_dir')
+        .optional()
+        .isString()
+        .withMessage('validation.VALIDATION_ERROR')
+        .custom(assertNoProtectedHomeDir)
+        .withMessage('fileServer.PROTECTED_PATH'),
       body('config.tls_cert_pem').optional().custom(isOptionalPem).withMessage('validation.VALIDATION_ERROR'),
       body('config.tls_key_pem').optional().custom(isOptionalPem).withMessage('validation.VALIDATION_ERROR'),
     ];
