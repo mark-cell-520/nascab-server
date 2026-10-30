@@ -2,7 +2,7 @@ const jwtUtil = require('../../utils/jwtUtil');
 const Logger = require('../../utils/logger');
 const { getLocalizedMessage } = require('../../utils/i18nUtil');
 const userUtil = require('../../utils/userUtil');
-const { parseAnyOrArray, matchApi } = require('../../utils/permissionUtil');
+const { parseScopedAllow, matchApi } = require('../../utils/permissionUtil');
 
 const decodeJWT = (req, token) => {
   return jwtUtil.verifyToken(process.env.JWT_SECRET, token);
@@ -57,8 +57,10 @@ const authenticateJWT = async (req, res, next) => {
     }
 
     if (tokenRecord.type === 'scoped') {
-      req.user.allow_api = parseAnyOrArray(tokenRecord.allow_api);
-      req.user.allow_path = parseAnyOrArray(tokenRecord.allow_path);
+      // scoped 令牌用 parseScopedAllow：库里没显式写 'ANY' 时按"什么都不允许"
+      // 处理，不能退回 parseAnyOrArray 的 'ANY' 兜底（见 parseScopedAllow 注释）。
+      req.user.allow_api = parseScopedAllow(tokenRecord.allow_api);
+      req.user.allow_path = parseScopedAllow(tokenRecord.allow_path);
 
       const rawUrl = typeof req.originalUrl === 'string' ? req.originalUrl : String(req.url || '');
       const apiPath = rawUrl.split('?')[0];

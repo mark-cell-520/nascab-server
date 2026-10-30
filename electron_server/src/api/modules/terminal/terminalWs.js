@@ -3,7 +3,7 @@ const Logger = require('../../../utils/logger');
 const { getLocalizedMessage } = require('../../../utils/i18nUtil');
 const jwtUtil = require('../../../utils/jwtUtil');
 const userUtil = require('../../../utils/userUtil');
-const { parseAnyOrArray, matchApi } = require('../../../utils/permissionUtil');
+const { parseScopedAllow, matchApi } = require('../../../utils/permissionUtil');
 const { isAppTerminalEnabled } = require('../../../utils/appAccessScopeUtil');
 
 const WS_CLOSE_UNAUTHORIZED = 4403;
@@ -473,7 +473,7 @@ module.exports = app => {
       }
 
       if (tokenRecord.type === 'scoped') {
-        const allowApi = parseAnyOrArray(tokenRecord.allow_api);
+        const allowApi = parseScopedAllow(tokenRecord.allow_api);
         if (!matchApi(allowApi, '/api/terminal/connect')) {
           safeSendJson(ws, {
             type: 'error',
@@ -483,7 +483,7 @@ module.exports = app => {
           return safeClose(ws, WS_CLOSE_UNAUTHORIZED, 'api not allowed');
         }
         req.user.allow_api = allowApi;
-        req.user.allow_path = parseAnyOrArray(tokenRecord.allow_path);
+        req.user.allow_path = parseScopedAllow(tokenRecord.allow_path);
       }
 
       try {

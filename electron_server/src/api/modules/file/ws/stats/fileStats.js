@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const Logger = require('../../../../../utils/logger');
 const { decodeJWT } = require('../../../../middleware/authMiddleware');
-const { hasPermission, parseAnyOrArray, matchApi } = require('../../../../../utils/permissionUtil');
+const { hasPermission, parseScopedAllow, matchApi } = require('../../../../../utils/permissionUtil');
 
 async function calculateStats(itemPath, stats, onProgress, signal, isRoot = false) {
   if (signal && signal.aborted) return;
@@ -62,13 +62,13 @@ module.exports = app => {
           ws.close(4001, 'invalid accessToken');
           return;
         }
-        const allowApi = parseAnyOrArray(tokenRecord.allow_api);
+        const allowApi = parseScopedAllow(tokenRecord.allow_api);
         if (!matchApi(allowApi, '/api/file/stats')) {
           ws.close(4001, 'no permission');
           return;
         }
         user.allow_api = allowApi;
-        user.allow_path = parseAnyOrArray(tokenRecord.allow_path);
+        user.allow_path = parseScopedAllow(tokenRecord.allow_path);
       }
     } catch (e) {
       Logger.error('[fileStats] auth check failed', e && e.message ? e.message : e);

@@ -24,9 +24,29 @@ function parseAnyOrArray(text) {
   return [raw];
 }
 
+/**
+ * scoped 令牌专用：把库里的 allow_api / allow_path 解释成权限清单。
+ *
+ * parseAnyOrArray 对"没给值"一律返回 'ANY'（全放开），那是给 access 令牌用的
+ * 兜底语义——普通令牌本来就不该被收窄。但 scoped 令牌反过来：它的全部意义就是
+ * 比创建者本身的权限更窄。用户调 /api/user/token/scoped 时省略 allow_api
+ * （或传 []、''、'[]'），normalizeAnyOrArray 会存成 'ANY'，于是一个"受限令牌"
+ * 能调所有接口，创建者是 admin 时连管理接口一起放开，allow_path 同理能读所有路径。
+ * 所以这里只有库里的值显式等于字符串 'ANY' 时才按全放开处理，其余空值一律收敛成
+ * 空数组（什么都不允许）。
+ */
+function parseScopedAllow(text) {
+  const explicitAny = typeof text === 'string' && text.trim() === 'ANY';
+  const list = parseAnyOrArray(text);
+  if (list === 'ANY') return explicitAny ? 'ANY' : [];
+  return list;
+}
+
 function matchApi(allowedList, reqApi) {
   if (allowedList === 'ANY') return true;
-  if (!Array.isArray(allowedList)) return true;
+  // 不是数组又没显式写 'ANY'，一律按不允许处理。原来这里是 return true，
+  // 等于任何非预期形态（null / 对象 / 数字）都直接放行。
+  if (!Array.isArray(allowedList)) return false;
   const api = String(reqApi || '').trim();
   if (!api) return false;
   for (const a of allowedList) {
@@ -123,5 +143,6 @@ async function hasPermission(knex, user, action, resPath, resType = tableUserPer
 module.exports = {
   hasPermission,
   parseAnyOrArray,
+  parseScopedAllow,
   matchApi,
 };

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../../../../../config/config');
 const FileUtil = require('../../../../../utils/fileUtil');
-const { hasPermission, parseAnyOrArray, matchApi } = require('../../../../../utils/permissionUtil');
+const { hasPermission, parseScopedAllow, matchApi } = require('../../../../../utils/permissionUtil');
 const { decodeJWT } = require('../../../../middleware/authMiddleware');
 
 module.exports = app => {
@@ -22,20 +22,32 @@ module.exports = app => {
       }
       req.user.id = req.user.userId || req.user.id || req.user.uid || req.user.user_id;
 
-      if (req.user && req.user.tokenType === 'scoped') {
-        const now = new Date();
-        const tokenRecord = await req.dbMain('user_token').where({ token: accessToken, is_valid: true, type: 'scoped' }).andWhere('expire_time', '>', now).first();
-        if (!tokenRecord) {
-          ws.close(4000, 'invalid accessToken');
-          return;
-        }
-        const allowApi = parseAnyOrArray(tokenRecord.allow_api);
+      // 和 /api/terminal/connect 对齐：user_token 一律查，不只 scoped 查。
+      // 原来 access 令牌只验签名+过期就放行，登出/改密把 is_valid 置 false 之后
+      // 这条 WS 还能继续收文件事件——HTTP 侧 authenticateJWT 是查库的，
+      // WS 侧等于给"撤销令牌"留了个缺口。
+      const now = new Date();
+      const tokenRecord = await req.dbMain('user_token')
+        .where({ token: accessToken, is_valid: true })
+        .andWhere('expire_time', '>', now)
+        .first();
+      if (!tokenRecord) {
+        ws.close(4000, 'invalid accessToken');
+        return;
+      }
+      if (req.user.tokenType === 'scoped' && tokenRecord.type !== 'scoped') {
+        ws.close(4000, 'invalid accessToken');
+        return;
+      }
+
+      if (tokenRecord.type === 'scoped') {
+        const allowApi = parseScopedAllow(tokenRecord.allow_api);
         if (!matchApi(allowApi, '/api/file/watch')) {
           ws.close(4000, 'no permission');
           return;
         }
         req.user.allow_api = allowApi;
-        req.user.allow_path = parseAnyOrArray(tokenRecord.allow_path);
+        req.user.allow_path = parseScopedAllow(tokenRecord.allow_path);
       }
 
       targetPath = decodeURIComponent(targetPath);

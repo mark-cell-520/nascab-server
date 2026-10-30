@@ -14,27 +14,32 @@ const fileService = require('../file/core/fileService');
 /**
  * 控制器：封装HTTP与响应行为，调用业务服务
  */
+/**
+ * 把入参收敛成 'ANY' 或 string[]。
+ *
+ * 注意空值（undefined / null / '' / [] / '[]'）一律收敛成 [] 而不是 'ANY'：
+ * scoped 令牌的语义就是"比创建者本身更窄"，省略 allow_api 时如果按全放开处理，
+ * 这个"受限令牌"反而能调所有接口（创建者是 admin 时含全部管理接口），
+ * allow_path 同理能读所有路径。读取端 permissionUtil.parseScopedAllow 与之对齐。
+ * 只有显式传字符串 'ANY' 才是真的全放开。
+ */
 function normalizeAnyOrArray(value) {
-  if (value === undefined || value === null) return 'ANY';
   if (value === 'ANY') return 'ANY';
   if (Array.isArray(value)) {
-    const list = value.map(v => String(v || '').trim()).filter(Boolean);
-    return list.length > 0 ? list : 'ANY';
+    return value.map(v => String(v || '').trim()).filter(Boolean);
   }
   if (typeof value === 'string') {
     const text = value.trim();
-    if (!text) return 'ANY';
     if (text === 'ANY') return 'ANY';
     try {
       const parsed = JSON.parse(text);
       if (Array.isArray(parsed)) {
-        const list = parsed.map(v => String(v || '').trim()).filter(Boolean);
-        return list.length > 0 ? list : 'ANY';
+        return parsed.map(v => String(v || '').trim()).filter(Boolean);
       }
     } catch (_) {}
-    return [text];
+    return text ? [text] : [];
   }
-  return 'ANY';
+  return [];
 }
 
 function encodeAnyOrArray(value) {
