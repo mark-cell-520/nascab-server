@@ -9,7 +9,7 @@ class VideoFavoriteController {
       if (!uid) return ResponseUtil.unauthorized(req, res);
 
       const indexId = req.body && (req.body.index_id ?? req.body.indexId);
-      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
 
       const service = new VideoFavoriteService(req.dbVideo);
       const data = await service.addFavorite(user, indexId);
@@ -28,7 +28,7 @@ class VideoFavoriteController {
       if (!uid) return ResponseUtil.unauthorized(req, res);
 
       const indexId = req.body && (req.body.index_id ?? req.body.indexId);
-      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
 
       const service = new VideoFavoriteService(req.dbVideo);
       const data = await service.removeFavorite(user, indexId);

@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "Tệp phụ đề này đã hết hạn. Vui lòng tải phụ đề khác.",
-      "SUBTITLE_DELETE_FAILED": "Xóa phụ đề thất bại"
+      "SUBTITLE_DELETE_FAILED": "Xóa phụ đề thất bại",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "Xóa phụ đề đã tải lên thất bại",
+      "GET_INFO_FAILED": "Không thể đọc thông tin video",
+      "INVALID_PARAMS": "Tham số không hợp lệ",
+      "SAVE_PREFERENCE_FAILED": "Lưu tùy chọn phát lại thất bại",
+      "SUBTITLE_DOWNLOAD_FAILED": "Tải phụ đề thất bại",
+      "SUBTITLE_SEARCH_FAILED": "Tìm phụ đề thất bại",
+      "SUBTITLE_UNSUPPORTED": "Định dạng phụ đề không được hỗ trợ",
+      "TRANSCODE_FAILED": "Chuyển mã thất bại. Vui lòng thử lại",
+      "UPLOAD_SUBTITLE_FAILED": "Tải lên phụ đề thất bại"
     },
     "fileMount": {
       "START_FAILED": "Bắt đầu mount thất bại: %s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "Đã đăng nhập trên thiết bị mới %s (Phiên bản OS: %s)",
       "UNKNOWN_DEVICE": "Thiết bị không xác định",
       "IP_BLACKLIST_ADMIN_TITLE": "Cảnh báo bảo mật",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s đã bị chặn tạm thời do nhập sai tên người dùng hoặc mật khẩu nhiều lần. Nếu không phải bạn, hãy đổi mật khẩu ngay và bật 2FA để bảo vệ tài khoản."
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s đã bị chặn tạm thời do nhập sai tên người dùng hoặc mật khẩu nhiều lần. Nếu không phải bạn, hãy đổi mật khẩu ngay và bật 2FA để bảo vệ tài khoản.",
+      "ADD_SUCCESS": "Đã thêm thành công",
+      "CLEAR_SUCCESS": "Đã dọn sạch thành công",
+      "DELETE_SUCCESS": "Đã xóa thành công",
+      "MARK_READ_SUCCESS": "Đã đánh dấu là đã đọc",
+      "MESSAGE_ID_REQUIRED": "Cần có ID tin nhắn",
+      "MESSAGE_NOT_FOUND": "Không tìm thấy tin nhắn",
+      "MESSAGE_REQUIRED": "Nội dung tin nhắn là bắt buộc"
     },
     "auth": {
       "SYS_NO_INIT": "Hệ thống chưa được khởi tạo",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "Vì lý do bảo mật, thao tác này chỉ được hỗ trợ trong cùng mạng cục bộ",
       "RECOVER_ADMIN_LAN_ONLY": "API này chỉ dùng để khôi phục mật khẩu quản trị viên và chỉ hoạt động trong mạng LAN. Vui lòng nhập tên người dùng quản trị. Người dùng thường cần nhờ quản trị viên đổi mật khẩu trong \"Quản lý người dùng\".",
       "PASSWORD_RESET_SUCCESS": "Đặt lại mật khẩu quản trị viên thành công",
-      "PASSWORD_RESET_FAILED": "Đặt lại mật khẩu quản trị viên thất bại"
+      "PASSWORD_RESET_FAILED": "Đặt lại mật khẩu quản trị viên thất bại",
+      "GET_ONLINE_USERS_FAILED": "Không thể lấy danh sách người dùng trực tuyến",
+      "RECOVER_INFO_FETCH_FAILED": "Không thể lấy thông tin khôi phục",
+      "RECOVER_INFO_FETCH_SUCCESS": "Đã lấy thông tin khôi phục thành công",
+      "UNAUTHORIZED": "Không được ủy quyền. Vui lòng đăng nhập lại",
+      "SUPER_ADMIN_CHECK_SUCCESS": "Đã kiểm tra xong siêu quản trị viên",
+      "SERVER_STATUS_CHECK_SUCCESS": "Lấy trạng thái máy chủ thành công"
     },
     "security": {
       "IP_BLACKLISTED": "IP này đã bị cấm. Vui lòng thử lại sau",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "Yêu cầu xác thực hai yếu tố. Vui lòng bật trước",
       "TWO_FACTOR_REQUIRED": "Yêu cầu xác thực hai yếu tố. Vui lòng nhập mã 2FA của bạn",
       "INVALID_CODE": "Mã xác minh không hợp lệ",
-      "TOO_MANY_ATTEMPTS": "Quá nhiều lần thử. Vui lòng thử lại sau"
+      "TOO_MANY_ATTEMPTS": "Quá nhiều lần thử. Vui lòng thử lại sau",
+      "MASTER_KEY_MISSING": "Máy chủ chưa cấu hình khóa chính 2FA, không thể bật xác thực hai yếu tố",
+      "NOT_ENABLED": "Xác thực hai yếu tố chưa được bật",
+      "NO_SECRET": "Chưa liên kết 2FA. Vui lòng hoàn tất liên kết trước",
+      "SECRET_DECRYPT_FAILED": "Giải mã khóa bí mật 2FA thất bại. Vui lòng liên kết lại"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "Không thể lấy danh sách người dùng",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "Lấy lịch sử đăng nhập thành công",
       "LOGIN_RECORDS_FETCH_FAILED": "Không thể lấy lịch sử đăng nhập",
       "SCOPED_TOKEN_CREATE_SUCCESS": "Token phạm vi được tạo thành công",
-      "SCOPED_TOKEN_CREATE_FAILED": "Không thể tạo token phạm vi"
+      "SCOPED_TOKEN_CREATE_FAILED": "Không thể tạo token phạm vi",
+      "CANNOT_DELETE_SUPER_ADMIN": "Không thể xóa tài khoản quản trị viên tối cao"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "Lấy danh sách quyền thành công",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "Tên là bắt buộc",
       "CUSTOM_PATH_PATH_EXISTS": "Đường dẫn đã tồn tại",
       "CUSTOM_PATH_REMOVE_SUCCESS": "Xóa đường dẫn tùy chỉnh thành công",
-      "CUSTOM_PATH_SAVE_FAILED": "Không thể lưu đường dẫn tùy chỉnh"
+      "CUSTOM_PATH_SAVE_FAILED": "Không thể lưu đường dẫn tùy chỉnh",
+      "CHECK_CHUNK_SUCCESS": "Đã xác minh phân đoạn thành công",
+      "CHUNK_MISMATCH": "Checksum phân đoạn không khớp. Vui lòng tải lên lại phân đoạn này",
+      "CONFIG_FETCH_SUCCESS": "Đã lấy cấu hình chỉ mục thành công",
+      "CONFIG_RESET_SUCCESS": "Đã đặt lại cấu hình chỉ mục thành công",
+      "CONFIG_SAVE_SUCCESS": "Đã lưu cấu hình chỉ mục thành công",
+      "DIRECTORY_LIST_TIMEOUT": "Hết thời gian đọc thư mục. Vui lòng thử lại",
+      "DIRECTORY_LIST_WORKER_ERROR": "Tiến trình đọc thư mục báo lỗi",
+      "DIRECTORY_LIST_WORKER_EXITED": "Tiến trình đọc thư mục đã thoát bất ngờ (mã %s). Vui lòng thử lại",
+      "DOWNLOAD_FAILED": "Tải xuống thất bại",
+      "FILE_NOT_EXIST": "Tệp không tồn tại",
+      "GET_ATTRIBUTES_FAILED": "Không thể đọc thuộc tính tệp",
+      "GLOBAL_SEARCH_SUCCESS": "Đã hoàn tất tìm kiếm",
+      "LOG_CANNOT_CANCEL": "Tác vụ này đã bắt đầu và không thể hủy",
+      "LOG_CLEAR_FAILED": "Xóa nhật ký thất bại",
+      "LOG_CLEAR_SUCCESS": "Đã xóa nhật ký thành công",
+      "LOG_NOT_FOUND": "Không tìm thấy bản ghi nhật ký",
+      "MISSING_PREVIOUS_CHUNKS": "Thiếu các phân đoạn trước đó. Vui lòng tải lên theo thứ tự",
+      "NOT_FOUND": "Không tìm thấy",
+      "NO_FILE_SELECTED": "Chưa chọn tệp nào",
+      "OPERATION_CANCELLED": "Thao tác đã bị hủy",
+      "OPERATION_CANCEL_FAILED": "Hủy thao tác thất bại",
+      "PERMISSION_DENIED": "Quyền bị từ chối",
+      "RECENT_CLEAR_FAILED": "Xóa danh sách gần đây thất bại",
+      "RECENT_CLEAR_SUCCESS": "Đã xóa danh sách gần đây thành công",
+      "RENAME_SUCCESS": "Đổi tên thành công",
+      "TINY_PENDING": "Hình thu nhỏ đang được tạo. Vui lòng thử lại",
+      "TINY_TIMEOUT": "Hết thời gian tạo hình thu nhỏ. Vui lòng thử lại",
+      "UNKNOWN_WORKER_TASK": "Loại tác vụ nền không xác định",
+      "UPLOAD_CHUNK_SUCCESS": "Đã tải lên phân đoạn thành công",
+      "UPLOAD_COMPLETED": "Đã hoàn tất tải lên"
     },
     "quickShare": {
       "INVALID_TOKEN": "Token chia sẻ không hợp lệ",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "Khôi phục ảnh từ thùng rác thành công",
       "TRASH_DELETE_SUCCESS": "Xóa ảnh khỏi thùng rác thành công",
       "TRASH_EMPTY_SUCCESS": "Dọn sạch thùng rác thành công",
-      "PHOTO_COLLECTION_NAME_EXISTS": "Tên bộ sưu tập ảnh đã tồn tại"
+      "PHOTO_COLLECTION_NAME_EXISTS": "Tên bộ sưu tập ảnh đã tồn tại",
+      "PHOTO_SOURCE_LIST_EMPTY": "Chưa thêm thư mục nguồn ảnh nào",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "Chỉ mục nguồn ảnh ngoài phạm vi"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "Lấy nguồn video thành công",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "Không thể tuần tự hóa thông tin người dùng",
       "USER_PARSE_FAILED": "Không thể phân tích thông tin người dùng",
       "DB_WRITE_FAILED": "Không thể ghi cấu hình",
-      "DB_CONNECTION_FAILED": "Kết nối cơ sở dữ liệu thất bại"
+      "DB_CONNECTION_FAILED": "Kết nối cơ sở dữ liệu thất bại",
+      "P2P_BIND_FAILED": "Liên kết P2P thất bại. Vui lòng thử lại",
+      "TEMP_CODE_FAILED": "Không thể lấy mã tạm thời",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "API mã ghép nối tùy chỉnh không khả dụng. Vui lòng thử lại sau",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "Thiết lập mã ghép nối tùy chỉnh thất bại. Vui lòng thử lại sau",
+      "DDNS_NOT_CONFIGURED": "DNS động chưa được cấu hình. Vui lòng đặt tên miền trong cài đặt trước",
+      "DEVICE_NOT_BOUND": "Thiết bị này chưa được liên kết với tài khoản. Vui lòng liên kết thiết bị trước",
+      "NEED_VIP": "Tính năng này yêu cầu thành viên. Vui lòng nâng cấp rồi thử lại",
+      "DEVICE_COUNT_LIMIT": "Tài khoản đã đạt giới hạn số thiết bị. Vui lòng bỏ liên kết thiết bị khác trước",
+      "REMOTE_ERROR": "Dịch vụ từ xa trả về lỗi: %s"
     },
     "terminal": {
       "START_FAILED": "Không thể khởi động terminal",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "Số trang phải là số nguyên dương",
       "LIMIT_INVALID": "Giới hạn phải là số nguyên từ 1 đến 100",
       "ID_INVALID": "ID phải là số nguyên dương",
-      "KEYWORD_LENGTH_INVALID": "Độ dài từ khóa tìm kiếm phải từ 1 đến 100 ký tự"
+      "KEYWORD_LENGTH_INVALID": "Độ dài từ khóa tìm kiếm phải từ 1 đến 100 ký tự",
+      "INVALID_VALUE": "Giá trị không hợp lệ"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "Mật khẩu không chính xác",
       "SIGN_FILE_MISSING": "Tệp ký hiệu không gian mã hóa bị thiếu hoặc trống",
-      "SPACE_DB_INVALID": "Cơ sở dữ liệu chỉ mục không gian mã hóa bị thiếu hoặc hỏng"
+      "SPACE_DB_INVALID": "Cơ sở dữ liệu chỉ mục không gian mã hóa bị thiếu hoặc hỏng",
+      "SPACE_FOLDER_MISSING": "Thư mục không gian mã hóa bị thiếu hoặc đã bị di chuyển. Vui lòng kiểm tra đường dẫn rồi thử lại"
     },
     "apiSetting": {
       "FETCH_SUCCESS": "Lấy thành công",
@@ -352,7 +422,14 @@
       "ERROR": "Đã xảy ra lỗi",
       "NOT_FOUND": "Không tìm thấy",
       "UNAUTHORIZED": "Không được ủy quyền",
-      "FORBIDDEN": "Bị cấm"
+      "FORBIDDEN": "Bị cấm",
+      "DELETE_SUCCESS": "Đã xóa thành công",
+      "DUPLICATE": "Bản ghi cùng tên đã tồn tại",
+      "INVALID_PARAMS": "Tham số không hợp lệ",
+      "PARAM_ERROR": "Lỗi tham số",
+      "ENDPOINT_NOT_FOUND": "Không tìm thấy endpoint",
+      "INTERNAL_SERVER_ERROR": "Lỗi máy chủ nội bộ",
+      "RESOURCE_NOT_FOUND": "Không tìm thấy tài nguyên"
     },
     "mediaTool": {
       "INVALID_PARAMS": "Tham số không hợp lệ",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "Lệnh Docker thực thi thất bại",
       "CONFIG_SAVE_FAILED": "Lưu cấu hình Docker thất bại",
       "INVALID_PROXY_URL": "Định dạng URL proxy không hợp lệ",
-      "TASK_NOT_FOUND": "Không tìm thấy tác vụ Docker"
+      "TASK_NOT_FOUND": "Không tìm thấy tác vụ Docker",
+      "IMAGE_ARCHIVE_NOT_FOUND": "Không tìm thấy tệp nén image",
+      "IMAGE_ARCHIVE_REQUIRED": "Cần chọn tệp nén image",
+      "IMAGE_IN_USE": "Image đang được container sử dụng và không thể xóa",
+      "INVALID_CONFIG_JSON": "Định dạng JSON cấu hình không hợp lệ",
+      "INVALID_IMAGE_ARCHIVE": "Tệp nén image không hợp lệ",
+      "START_FAILED": "Khởi động thất bại",
+      "STOP_FAILED": "Dừng thất bại",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "Không thể xóa tác vụ đang chạy"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "Plugin cần thiết cho tính năng này vẫn đang tải xuống. Vui lòng thử lại sau."
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "Khởi động gắn lưu trữ đám mây thất bại. Vui lòng thử lại",
+      "START_FAILED": "Khởi động gắn lưu trữ đám mây thất bại",
+      "START_TIMEOUT": "Hết thời gian khởi động gắn lưu trữ đám mây. Vui lòng thử lại",
+      "STOP_TIMEOUT": "Hết thời gian dừng gắn lưu trữ đám mây",
+      "WORKER_SEND_FAILED": "Không giao tiếp được với tiến trình gắn OpenList",
+      "STORAGE_SYNC_FAILED": "Đồng bộ cấu hình lưu trữ đám mây thất bại",
+      "STORAGE_NOT_FOUND": "Không tìm thấy lưu trữ trong OpenList",
+      "INVALID_MOUNT_NAME": "Tên mount không hợp lệ (tên thư mục)",
+      "MOUNT_PARENT_NO_ACCESS": "Đường dẫn cha của mount phải có quyền đọc và ghi",
+      "OBSCURE_FAILED": "Mã hóa mật khẩu trên máy chủ thất bại. Vui lòng thử lại",
+      "SERVICE_START_TIMEOUT": "Hết thời gian khởi động dịch vụ OpenList",
+      "BINARY_NOT_FOUND": "Không tìm thấy tệp thực thi OpenList",
+      "PLATFORM_NOT_SUPPORTED": "Tính năng này không được hỗ trợ trên nền tảng hiện tại",
+      "ADMIN_PASSWORD_MISSING": "Chưa cấu hình mật khẩu quản trị OpenList",
+      "ADMIN_SET_FAILED": "Thiết lập tài khoản quản trị OpenList thất bại",
+      "ADMIN_TOKEN_FAILED": "Không thể lấy token quản trị OpenList",
+      "ADMIN_TOKEN_PARSE_FAILED": "Không thể phân tích token quản trị OpenList",
+      "BASE_URL_MISSING": "Chưa cấu hình URL cơ sở của OpenList",
+      "DB_INIT_FAILED": "Khởi tạo cơ sở dữ liệu OpenList thất bại",
+      "DB_NOT_READY": "Cơ sở dữ liệu OpenList chưa sẵn sàng",
+      "DRIVER_NOT_ALLOWED": "Driver lưu trữ không được hỗ trợ",
+      "MOUNT_PARENT_NOT_DIR": "Đường dẫn cha của mount phải là thư mục",
+      "MOUNT_PARENT_NOT_FOUND": "Đường dẫn cha của mount không tồn tại",
+      "STOP_FAILED": "Dừng gắn thất bại",
+      "STORAGE_INIT_FAILED": "Khởi tạo lưu trữ đám mây thất bại: %s",
+      "TIMEOUT": "Thao tác hết thời gian. Vui lòng thử lại"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "Dịch vụ tải xuống (Transmission) không khả dụng. Vui lòng cài đặt và khởi động transmission-daemon trước",
+      "STARTED": "Dịch vụ tải xuống đã khởi động",
+      "START_FAILED": "Khởi động dịch vụ tải xuống thất bại",
+      "START_FAILED_DETAIL": "Khởi động dịch vụ tải xuống thất bại: %s",
+      "STOPPED": "Dịch vụ tải xuống đã dừng",
+      "STOP_FAILED": "Dừng dịch vụ tải xuống thất bại",
+      "STOP_FAILED_DETAIL": "Dừng dịch vụ tải xuống thất bại: %s",
+      "RESTARTED": "Dịch vụ tải xuống đã khởi động lại",
+      "CONFIG_SAVED": "Đã lưu cấu hình",
+      "TORRENT_ADDED": "Đã thêm tác vụ",
+      "TORRENT_FILE_REQUIRED": "Vui lòng chọn tệp torrent để thêm",
+      "DOWNLOAD_DIR_REQUIRED": "Vui lòng chỉ định thư mục tải xuống",
+      "PORT_INVALID": "Cổng %s không hợp lệ. Vui lòng nhập cổng từ 1024 đến 65535",
+      "PORT_DISABLED": "Cổng đó được hệ thống dành riêng (0-1023). Vui lòng dùng cổng trên 1024",
+      "PORT_RESERVED": "Cổng đó đã được dịch vụ khác sử dụng. Vui lòng chọn cổng khác",
+      "RPC_ERROR": "Dịch vụ tải xuống trả về lỗi: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "Vui lòng chọn notebook trước",
+      "NOTEBOOK_NOT_FOUND": "Notebook không tồn tại hoặc đã bị xóa",
+      "NOTEBOOK_INVALID": "Tên notebook không hợp lệ. Vui lòng dùng 1-50 ký tự",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "Notebook này vẫn còn ghi chú và không thể xóa",
+      "GROUP_NOT_EMPTY": "Nhóm này vẫn còn notebook và không thể xóa"
+    },
+    "system": {
+      "NOT_SUPPORTED": "Thao tác này không được hỗ trợ trong chế độ chạy hiện tại"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "Lấy danh sách ứng dụng thành công",
+      "SET_HIDE_APPS_SUCCESS": "Cập nhật hiển thị ứng dụng thành công",
+      "HIDE_APP_SUCCESS": "Đã ẩn ứng dụng",
+      "UNHIDE_APP_SUCCESS": "Đã hiện ứng dụng",
+      "SET_APPS_ORDER_SUCCESS": "Đã lưu thứ tự ứng dụng"
     }
   },
   "places365": {

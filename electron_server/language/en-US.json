@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "This subtitle file has expired. Please download another subtitle.",
-      "SUBTITLE_DELETE_FAILED": "Failed to delete subtitle"
+      "SUBTITLE_DELETE_FAILED": "Failed to delete subtitle",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "Failed to remove the uploaded subtitle",
+      "GET_INFO_FAILED": "Failed to read video information",
+      "INVALID_PARAMS": "Invalid parameters",
+      "SAVE_PREFERENCE_FAILED": "Failed to save playback preferences",
+      "SUBTITLE_DOWNLOAD_FAILED": "Failed to download the subtitle",
+      "SUBTITLE_SEARCH_FAILED": "Subtitle search failed",
+      "SUBTITLE_UNSUPPORTED": "Unsupported subtitle format",
+      "TRANSCODE_FAILED": "Transcoding failed, please retry",
+      "UPLOAD_SUBTITLE_FAILED": "Failed to upload the subtitle"
     },
     "fileMount": {
       "START_FAILED": "Mount start failed: %s",
@@ -60,7 +69,20 @@
       "OBSCURE_FAILED": "Failed to encrypt password on the server; please retry",
       "SERVICE_START_TIMEOUT": "OpenList service start timed out",
       "BINARY_NOT_FOUND": "OpenList binary not found",
-      "PLATFORM_NOT_SUPPORTED": "This feature is not supported on the current platform."
+      "PLATFORM_NOT_SUPPORTED": "This feature is not supported on the current platform.",
+      "ADMIN_PASSWORD_MISSING": "OpenList admin password is not configured",
+      "ADMIN_SET_FAILED": "Failed to set the OpenList admin account",
+      "ADMIN_TOKEN_FAILED": "Failed to obtain the OpenList admin token",
+      "ADMIN_TOKEN_PARSE_FAILED": "Failed to parse the OpenList admin token",
+      "BASE_URL_MISSING": "OpenList base URL is not configured",
+      "DB_INIT_FAILED": "Failed to initialize the OpenList database",
+      "DB_NOT_READY": "OpenList database is not ready",
+      "DRIVER_NOT_ALLOWED": "Unsupported storage driver",
+      "MOUNT_PARENT_NOT_DIR": "Mount parent path must be a directory",
+      "MOUNT_PARENT_NOT_FOUND": "Mount parent path does not exist",
+      "STOP_FAILED": "Failed to stop the mount",
+      "STORAGE_INIT_FAILED": "Failed to initialize cloud storage: %s",
+      "TIMEOUT": "Operation timed out, please retry"
     },
     "fileBackup": {
       "SOURCE_TARGET_PATH_CONFLICT": "Source path and target path cannot be the same or contain each other",
@@ -72,7 +94,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "Logged in on a new device %s (OS version: %s)",
       "UNKNOWN_DEVICE": "Unknown device",
       "IP_BLACKLIST_ADMIN_TITLE": "Security alert",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s was temporarily blocked after multiple incorrect username or password attempts. If this was not you, change your password as soon as possible and enable 2FA to better protect your account."
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s was temporarily blocked after multiple incorrect username or password attempts. If this was not you, change your password as soon as possible and enable 2FA to better protect your account.",
+      "ADD_SUCCESS": "Added successfully",
+      "CLEAR_SUCCESS": "Cleared",
+      "DELETE_SUCCESS": "Deleted successfully",
+      "MARK_READ_SUCCESS": "Marked as read",
+      "MESSAGE_ID_REQUIRED": "Message ID is required",
+      "MESSAGE_NOT_FOUND": "Message not found",
+      "MESSAGE_REQUIRED": "Message content is required"
     },
     "auth": {
       "SYS_NO_INIT": "System not initialized",
@@ -109,7 +138,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "Due to security reasons, this operation is only supported within the same local network",
       "RECOVER_ADMIN_LAN_ONLY": "This endpoint is only for recovering the administrator password and only works on the local network. Please enter an administrator username. Regular users should ask an administrator to change their password in \"User Management\".",
       "PASSWORD_RESET_SUCCESS": "Admin password reset successful",
-      "PASSWORD_RESET_FAILED": "Admin password reset failed"
+      "PASSWORD_RESET_FAILED": "Admin password reset failed",
+      "GET_ONLINE_USERS_FAILED": "Failed to retrieve the online user list",
+      "RECOVER_INFO_FETCH_FAILED": "Failed to retrieve recovery information",
+      "RECOVER_INFO_FETCH_SUCCESS": "Recovery information retrieved",
+      "UNAUTHORIZED": "Unauthorized, please sign in again",
+      "SUPER_ADMIN_CHECK_SUCCESS": "Super admin check completed",
+      "SERVER_STATUS_CHECK_SUCCESS": "Server status fetched successfully"
     },
     "security": {
       "IP_BLACKLISTED": "This IP is banned. Please try again later",
@@ -119,7 +154,11 @@
       "REQUIRE_ADMIN_SETUP": "This server has enforced 2FA. Please contact administrator to bind before logging in",
       "TWO_FACTOR_REQUIRED": "Two-factor authentication required. Please enter your 2FA code",
       "INVALID_CODE": "Invalid verification code",
-      "TOO_MANY_ATTEMPTS": "Too many verification attempts. Please try again later"
+      "TOO_MANY_ATTEMPTS": "Too many verification attempts. Please try again later",
+      "MASTER_KEY_MISSING": "The server has no 2FA master key configured, two-factor authentication cannot be enabled",
+      "NOT_ENABLED": "Two-factor authentication is not enabled",
+      "NO_SECRET": "Two-factor authentication is not set up yet, please complete the binding first",
+      "SECRET_DECRYPT_FAILED": "Failed to decrypt the 2FA secret, please bind it again"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "Failed to fetch user list",
@@ -134,7 +173,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "Login records fetched successfully",
       "LOGIN_RECORDS_FETCH_FAILED": "Failed to fetch login records",
       "SCOPED_TOKEN_CREATE_SUCCESS": "Scoped token created successfully",
-      "SCOPED_TOKEN_CREATE_FAILED": "Failed to create scoped token"
+      "SCOPED_TOKEN_CREATE_FAILED": "Failed to create scoped token",
+      "CANNOT_DELETE_SUPER_ADMIN": "The super admin account cannot be deleted"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "Permission list fetched successfully",
@@ -184,7 +224,7 @@
       "RECENT_SUCCESS": "Recent fetched successfully",
       "RECENT_FAILED": "Failed to fetch recent",
       "NOT_FILE": "Not a file",
-      "UNSUPPORTED_TYPE": "Unsupported file type",
+      "UNSUPPORTED_TYPE": "Unsupported file type: %s",
       "TINY_FAILED": "Failed to fetch thumbnail",
       "OPERATION_QUEUED": "Operation queued",
       "OPERATION_FAILED": "Operation failed",
@@ -203,7 +243,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "Name is required",
       "CUSTOM_PATH_PATH_EXISTS": "Path already exists",
       "CUSTOM_PATH_REMOVE_SUCCESS": "Custom path removed successfully",
-      "CUSTOM_PATH_SAVE_FAILED": "Failed to save custom paths"
+      "CUSTOM_PATH_SAVE_FAILED": "Failed to save custom paths",
+      "CHECK_CHUNK_SUCCESS": "Chunk verified",
+      "CHUNK_MISMATCH": "Chunk checksum mismatch, please upload this chunk again",
+      "CONFIG_FETCH_SUCCESS": "Index settings retrieved",
+      "CONFIG_RESET_SUCCESS": "Index settings reset",
+      "CONFIG_SAVE_SUCCESS": "Index settings saved",
+      "DIRECTORY_LIST_TIMEOUT": "Timed out while listing the directory, please retry",
+      "DIRECTORY_LIST_WORKER_ERROR": "The directory listing worker reported an error",
+      "DIRECTORY_LIST_WORKER_EXITED": "Directory listing worker exited unexpectedly (code %s), please retry",
+      "DOWNLOAD_FAILED": "Download failed",
+      "FILE_NOT_EXIST": "File does not exist",
+      "GET_ATTRIBUTES_FAILED": "Failed to read file attributes",
+      "GLOBAL_SEARCH_SUCCESS": "Search completed",
+      "LOG_CANNOT_CANCEL": "This task has already started and cannot be cancelled",
+      "LOG_CLEAR_FAILED": "Failed to clear the logs",
+      "LOG_CLEAR_SUCCESS": "Logs cleared",
+      "LOG_NOT_FOUND": "Log entry not found",
+      "MISSING_PREVIOUS_CHUNKS": "Previous chunks are missing, please upload in order",
+      "NOT_FOUND": "Not found",
+      "NO_FILE_SELECTED": "No file selected",
+      "OPERATION_CANCELLED": "Operation cancelled",
+      "OPERATION_CANCEL_FAILED": "Failed to cancel the operation",
+      "PERMISSION_DENIED": "Permission denied",
+      "RECENT_CLEAR_FAILED": "Failed to clear the recent list",
+      "RECENT_CLEAR_SUCCESS": "Recent list cleared",
+      "RENAME_SUCCESS": "Renamed successfully",
+      "TINY_PENDING": "The thumbnail is being generated, please retry",
+      "TINY_TIMEOUT": "Thumbnail generation timed out, please retry",
+      "UNKNOWN_WORKER_TASK": "Unknown background task",
+      "UPLOAD_CHUNK_SUCCESS": "Chunk uploaded",
+      "UPLOAD_COMPLETED": "Upload completed"
     },
     "quickShare": {
       "INVALID_TOKEN": "Invalid share token",
@@ -235,7 +305,9 @@
       "TRASH_RESTORE_SUCCESS": "Photo restored from trash successfully",
       "TRASH_DELETE_SUCCESS": "Photo deleted from trash successfully",
       "TRASH_EMPTY_SUCCESS": "Trash emptied successfully",
-      "PHOTO_COLLECTION_NAME_EXISTS": "Photo collection name already exists"
+      "PHOTO_COLLECTION_NAME_EXISTS": "Photo collection name already exists",
+      "PHOTO_SOURCE_LIST_EMPTY": "No photo source directories have been added",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "Photo source index out of range"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "Video sources fetched successfully",
@@ -313,7 +385,16 @@
       "USER_SERIALIZE_FAILED": "Failed to serialize user info",
       "USER_PARSE_FAILED": "Failed to parse user info",
       "DB_WRITE_FAILED": "Failed to write config",
-      "DB_CONNECTION_FAILED": "Database connection failed"
+      "DB_CONNECTION_FAILED": "Database connection failed",
+      "P2P_BIND_FAILED": "P2P binding failed, please retry",
+      "TEMP_CODE_FAILED": "Failed to obtain the temporary code",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "The custom pairing-code API is unavailable. Please try again later",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "Failed to set the custom pairing code. Please try again later",
+      "DDNS_NOT_CONFIGURED": "Dynamic DNS is not configured yet. Please set a domain name in the settings first",
+      "DEVICE_NOT_BOUND": "This device is not bound to an account. Please bind the device first",
+      "NEED_VIP": "This feature requires a membership. Please upgrade and try again",
+      "DEVICE_COUNT_LIMIT": "The account has reached its device limit. Unbind another device first",
+      "REMOTE_ERROR": "The remote service returned an error: %s"
     },
     "terminal": {
       "START_FAILED": "Failed to start terminal",
@@ -344,7 +425,8 @@
       "PAGE_NUMBER_INVALID": "Page number must be a positive integer",
       "LIMIT_INVALID": "Limit must be an integer between 1 and 100",
       "ID_INVALID": "ID must be a positive integer",
-      "KEYWORD_LENGTH_INVALID": "Search keyword length must be between 1 and 100 characters"
+      "KEYWORD_LENGTH_INVALID": "Search keyword length must be between 1 and 100 characters",
+      "INVALID_VALUE": "Invalid value"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "Incorrect password",
@@ -368,7 +450,14 @@
       "ERROR": "Error occurred",
       "NOT_FOUND": "Not found",
       "UNAUTHORIZED": "Unauthorized",
-      "FORBIDDEN": "Forbidden"
+      "FORBIDDEN": "Forbidden",
+      "DELETE_SUCCESS": "Deleted successfully",
+      "DUPLICATE": "An entry with the same name already exists",
+      "INVALID_PARAMS": "Invalid parameters",
+      "PARAM_ERROR": "Invalid parameter",
+      "ENDPOINT_NOT_FOUND": "Endpoint not found",
+      "INTERNAL_SERVER_ERROR": "Internal server error",
+      "RESOURCE_NOT_FOUND": "Resource not found"
     },
     "mediaTool": {
       "INVALID_PARAMS": "Invalid params",
@@ -406,10 +495,53 @@
       "COMMAND_FAILED": "Docker command failed",
       "CONFIG_SAVE_FAILED": "Failed to save Docker configuration",
       "INVALID_PROXY_URL": "Invalid proxy URL format",
-      "TASK_NOT_FOUND": "Docker task not found"
+      "TASK_NOT_FOUND": "Docker task not found",
+      "IMAGE_ARCHIVE_NOT_FOUND": "Image archive not found",
+      "IMAGE_ARCHIVE_REQUIRED": "An image archive is required",
+      "IMAGE_IN_USE": "The image is in use by a container and cannot be deleted",
+      "INVALID_CONFIG_JSON": "Invalid configuration JSON",
+      "INVALID_IMAGE_ARCHIVE": "Invalid image archive",
+      "START_FAILED": "Failed to start",
+      "STOP_FAILED": "Failed to stop",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "A running task cannot be deleted"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "Required plugins for this feature are still downloading. Please try again later."
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "Download service (Transmission) is unavailable. Please install and start transmission-daemon first",
+      "STARTED": "Download service started",
+      "START_FAILED": "Failed to start the download service",
+      "START_FAILED_DETAIL": "Failed to start the download service: %s",
+      "STOPPED": "Download service stopped",
+      "STOP_FAILED": "Failed to stop the download service",
+      "STOP_FAILED_DETAIL": "Failed to stop the download service: %s",
+      "RESTARTED": "Download service restarted",
+      "CONFIG_SAVED": "Configuration saved",
+      "TORRENT_ADDED": "Task added",
+      "TORRENT_FILE_REQUIRED": "Please select a torrent file to add",
+      "DOWNLOAD_DIR_REQUIRED": "Please specify a download directory",
+      "PORT_INVALID": "Invalid port: %s. Please enter a port between 1024 and 65535",
+      "PORT_DISABLED": "That port is reserved by the system (0-1023). Please use a port above 1024",
+      "PORT_RESERVED": "That port is already in use by another service. Please choose another port",
+      "RPC_ERROR": "The download service returned an error: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "Please select a notebook first",
+      "NOTEBOOK_NOT_FOUND": "Notebook does not exist or has been deleted",
+      "NOTEBOOK_INVALID": "Invalid notebook name. Please use 1-50 characters",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "This notebook still contains notes and cannot be deleted",
+      "GROUP_NOT_EMPTY": "This group still contains notebooks and cannot be deleted"
+    },
+    "system": {
+      "NOT_SUPPORTED": "This operation is not supported in the current run mode"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "App list fetched successfully",
+      "SET_HIDE_APPS_SUCCESS": "App visibility updated successfully",
+      "HIDE_APP_SUCCESS": "App hidden",
+      "UNHIDE_APP_SUCCESS": "App shown",
+      "SET_APPS_ORDER_SUCCESS": "App order saved"
     }
   },
   "places365": {

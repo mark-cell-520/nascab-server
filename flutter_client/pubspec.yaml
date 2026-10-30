@@ -110,6 +110,14 @@ dependencies:
   flutter_webrtc: ^1.6.2+hotfix.4
 
 dependency_overrides:
+  # image 4.11.0 起在 png_decoder.dart 里调用 ZLibDecoder.decodeLazy，
+  # 但那是 archive 4.1.0+ 才有的 API，而 image 4.11.0 自己声明的
+  # archive 约束仍是 ^4.0.9（上游声明有误）。同时 pdf 3.12.0 把 archive
+  # 锁在 <4.1.0，于是 dart2js 解到 archive 4.0.9，Web 构建在
+  # png_decoder.dart 编译失败、build/web 里产不出 main.dart.js。
+  # 把 image 钉回 4.10.2（pdfrx_engine 要 ^4.5.4，仍满足）。
+  # 等 pdf 升到 3.13.1+（放开 archive <5.0.0）后可解除本覆盖。
+  image: 4.10.2
   # 覆盖 pub 版：修复 Android MediaSession.onPlayPause 未转发（桌面小组件/部分系统播放暂停键无响应）
   audio_service:
     path: packages/audio_service

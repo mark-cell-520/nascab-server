@@ -12,7 +12,7 @@ async function rename(req, res) {
     }
 
     if (FileUtil.isProtectedPath(oldPath)) {
-      return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+      return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
     }
 
     const canWrite = await hasPermission(req.dbMain, req.user, 'update', oldPath);

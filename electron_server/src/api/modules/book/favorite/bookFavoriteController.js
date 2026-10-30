@@ -9,7 +9,7 @@ class BookFavoriteController {
       if (!uid) return ResponseUtil.unauthorized(req, res);
 
       const indexId = req.body && (req.body.index_id ?? req.body.indexId);
-      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
 
       const service = new BookFavoriteService(req.dbBook);
       const data = await service.addFavorite(user, indexId);
@@ -28,7 +28,7 @@ class BookFavoriteController {
       if (!uid) return ResponseUtil.unauthorized(req, res);
 
       const indexId = req.body && (req.body.index_id ?? req.body.indexId);
-      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+      if (!indexId) return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
 
       const service = new BookFavoriteService(req.dbBook);
       const data = await service.removeFavorite(user, indexId);
@@ -48,7 +48,7 @@ class BookFavoriteController {
 
       const indexIds = req.body && (req.body.index_ids ?? req.body.indexIds);
       if (!Array.isArray(indexIds)) {
-        return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+        return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
       }
       const isFavoriteRaw = req.body && (req.body.is_favorite ?? req.body.isFavorite);
       const isFavorite = isFavoriteRaw === true || isFavoriteRaw === 1 || isFavoriteRaw === '1';

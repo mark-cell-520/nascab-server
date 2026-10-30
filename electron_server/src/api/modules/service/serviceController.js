@@ -215,7 +215,6 @@ class ServiceController {
     const refreshToken = data && data.refreshToken ? String(data.refreshToken) : '';
     const user = data && data.user ? data.user : null;
     const membership = data && data.membership ? data.membership : null;
-    user.membership = membership;
     if (code !== 0 || !newToken || !refreshToken || !user) {
       if (code === 401) {
         try {
@@ -229,6 +228,9 @@ class ServiceController {
         message: remoteJson && remoteJson.message ? remoteJson.message : '',
       });
     }
+    // 必须放在 !user 判空之后：远端未返回 data.user 时 user 为 null，
+    // 先赋值会抛 TypeError 且未被捕获，请求永远不响应（客户端只能等到超时）。
+    user.membership = membership;
 
     const userJson = (() => {
       try {
@@ -426,10 +428,10 @@ class ServiceController {
     }
 
     if (remote.status === 404) {
-      return ResponseUtil.error(req, res, 'P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE', 502);
+      return ResponseUtil.error(req, res, 'service.P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE', 502);
     }
     if (!remote.json || typeof remote.json !== 'object') {
-      return ResponseUtil.error(req, res, 'P2P_CUSTOM_PAIR_CODE_FAILED', 502);
+      return ResponseUtil.error(req, res, 'service.P2P_CUSTOM_PAIR_CODE_FAILED', 502);
     }
 
     const code = remote.json.code;
@@ -440,7 +442,7 @@ class ServiceController {
       if (errorCode) {
         return ResponseUtil.error(req, res, errorCode, remote.status);
       }
-      return ResponseUtil.error(req, res, 'P2P_CUSTOM_PAIR_CODE_FAILED', 502, {
+      return ResponseUtil.error(req, res, 'service.P2P_CUSTOM_PAIR_CODE_FAILED', 502, {
         code,
         message: remote.json.message ? String(remote.json.message) : '',
       });

@@ -5,10 +5,16 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const Logger = require('../utils/logger');
-const { initI18nMiddleware } = require('../utils/i18nUtil');
+const { initI18nMiddleware, getLocalizedMessage } = require('../utils/i18nUtil');
 const config = require('../config/config');
 const path = require('path');
 const { authenticateJWT } = require('./middleware/authMiddleware');
+// 必须在任何 router 被 require 之前装上：让 async 控制器的 rejection 能走到
+// 本文件末尾的错误中间件，否则请求会永久挂住、客户端只能等到超时。
+require('./middleware/asyncGuard').install();
+// express-validator 7 的默认校验消息是硬编码英文且 withMessage 只覆盖最后一个校验器，
+// 会让每个表单错误都变成中英混杂；同理 array() 不去重导致同一提示出现两遍。
+require('./middleware/expressValidatorI18n').install();
 //初始化数据库和链接
 const dbUtil = require('../db/dbUtil');
 dbUtil.init();
@@ -21,6 +27,17 @@ app.disable('x-powered-by');
 // 仅信任来自本机回环地址（P2P 代理从 127.0.0.1 转发）的 X-Forwarded-For / X-Real-IP
 // 外部直接请求伪造的 X-Forwarded-For 会被忽略，req.ip = 真实连接 IP
 app.set('trust proxy', ['loopback']);
+
+// 本地化失败不能把错误处理本身搞崩（404/500 是最后的兜底路径，
+// 这里再抛一次就变成请求挂死），统一退回英文原文。
+function _safeLocalize(req, key) {
+  try {
+    const msg = getLocalizedMessage(req, key);
+    return typeof msg === 'string' && msg ? msg : key;
+  } catch (e) {
+    return key;
+  }
+}
 
 function _isScannerPath(rawPath) {
   const p = String(rawPath || '');
@@ -87,6 +104,14 @@ app.use(
 app.use(bodyParser.json({ limit: config.upload.maxFileSize })); //限制上传大小
 app.use(bodyParser.urlencoded({ limit: config.upload.maxFileSize, extended: true })); //限制上传大小
 app.use(cookieParser()); // 使用cookie-parser中间件
+// body-parser 在没有 Content-Type 的请求上直接 next()，不会给 req.body 赋值——
+// 于是 GET /api/file/download 这类"query 和 body 二选一"的控制器会在
+// `req.body.paths` 上抛 TypeError，把本该返回 400 的请求打成 500。
+// 全库有 20 多处这样的裸访问，在这里统一兜底比逐个加 || {} 可靠。
+app.use((req, res, next) => {
+  if (req.body === undefined || req.body === null) req.body = {};
+  next();
+});
 app.use(initI18nMiddleware()); // 使用i18n中间件
 app.use(require('./middleware/decryptMiddleware')); // 参数解密中间件
 
@@ -268,9 +293,10 @@ require('./modules/editor/ws/editorWs')(app);
 require('./modules/terminal/terminalWs')(app);
 
 // 404处理
+// 文案走 i18n：'Endpoint not found' 是硬编码英文，中文界面下直接露英文。
 app.use((req, res) => {
   res.status(404).json({
-    error: 'Endpoint not found',
+    error: _safeLocalize(req, 'common.ENDPOINT_NOT_FOUND'),
     path: req.originalUrl,
   });
 });
@@ -283,11 +309,20 @@ app.use((err, req, res, next) => {
     ip: req.ip,
   });
 
-  // 使用统一的错误响应格式
-  res.status(500).json({
+  // 控制器抛出的 error 常带 i18n 键（含 `模块.键:上游原文` 形式），
+  // 之前一律回 'Internal server error'，用户看到的就是一句没信息量的英文，
+  // 真正的原因（如网盘 token 失效、目录读取进程退出）全被丢掉。
+  // 这里只透传"形如 i18n 键"的 message；SQL 报错、文件路径等原文仍被
+  // 通用文案盖掉，不向内网之外泄露实现细节。
+  const status = Number(err && (err.statusCode || err.status)) || 500;
+  const httpStatus = status >= 400 && status < 600 ? status : 500;
+  const raw = err && typeof err.message === 'string' ? err.message.trim() : '';
+  const looksLikeKey = /^[a-z][a-zA-Z0-9]*\.[A-Z][A-Z0-9_]+/.test(raw);
+
+  res.status(httpStatus).json({
     success: false,
-    message: 'Internal server error',
-    code: 'INTERNAL_SERVER_ERROR',
+    message: looksLikeKey ? _safeLocalize(req, raw) : _safeLocalize(req, 'common.INTERNAL_SERVER_ERROR'),
+    code: looksLikeKey ? raw.split(':')[0] : 'INTERNAL_SERVER_ERROR',
   });
 });
 module.exports = app;

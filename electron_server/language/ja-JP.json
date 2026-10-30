@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "この字幕ファイルは期限切れです。別の字幕をダウンロードしてください。",
-      "SUBTITLE_DELETE_FAILED": "字幕の削除に失敗しました"
+      "SUBTITLE_DELETE_FAILED": "字幕の削除に失敗しました",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "アップロードした字幕の削除に失敗しました",
+      "GET_INFO_FAILED": "動画情報の取得に失敗しました",
+      "INVALID_PARAMS": "パラメータが無効です",
+      "SAVE_PREFERENCE_FAILED": "再生設定の保存に失敗しました",
+      "SUBTITLE_DOWNLOAD_FAILED": "字幕のダウンロードに失敗しました",
+      "SUBTITLE_SEARCH_FAILED": "字幕の検索に失敗しました",
+      "SUBTITLE_UNSUPPORTED": "サポートされていない字幕形式です",
+      "TRANSCODE_FAILED": "トランスコードに失敗しました。しばらくしてからお試しください",
+      "UPLOAD_SUBTITLE_FAILED": "字幕のアップロードに失敗しました"
     },
     "fileMount": {
       "START_FAILED": "マウントの起動に失敗しました：%s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "新しいデバイス %s でログインしました（OSバージョン：%s）",
       "UNKNOWN_DEVICE": "不明なデバイス",
       "IP_BLACKLIST_ADMIN_TITLE": "セキュリティ通知",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s はユーザー名またはパスワードの誤入力が繰り返されたため一時的にブロックされました。ご本人でない場合は、すぐにパスワードを変更し、2FA を有効にしてアカウントを保護してください。"
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s はユーザー名またはパスワードの誤入力が繰り返されたため一時的にブロックされました。ご本人でない場合は、すぐにパスワードを変更し、2FA を有効にしてアカウントを保護してください。",
+      "ADD_SUCCESS": "追加に成功しました",
+      "CLEAR_SUCCESS": "クリアに成功しました",
+      "DELETE_SUCCESS": "削除に成功しました",
+      "MARK_READ_SUCCESS": "既読にしました",
+      "MESSAGE_ID_REQUIRED": "メッセージIDは必須です",
+      "MESSAGE_NOT_FOUND": "メッセージが存在しません",
+      "MESSAGE_REQUIRED": "メッセージ内容は必須です"
     },
     "auth": {
       "SYS_NO_INIT": "システムが初期化されていません",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "セキュリティ上の理由により、この操作は同一ローカルネットワーク内でのみサポートされています",
       "RECOVER_ADMIN_LAN_ONLY": "このAPIは管理者パスワードの復旧専用で、LAN内からのみ利用できます。管理者のユーザー名を入力してください。一般ユーザーは「ユーザー管理」で管理者にパスワード変更を依頼してください。",
       "PASSWORD_RESET_SUCCESS": "スーパー管理者パスワードのリセットに成功しました",
-      "PASSWORD_RESET_FAILED": "スーパー管理者パスワードのリセットに失敗しました"
+      "PASSWORD_RESET_FAILED": "スーパー管理者パスワードのリセットに失敗しました",
+      "GET_ONLINE_USERS_FAILED": "オンラインユーザーリストの取得に失敗しました",
+      "RECOVER_INFO_FETCH_FAILED": "パスワード復旧情報の取得に失敗しました",
+      "RECOVER_INFO_FETCH_SUCCESS": "パスワード復旧情報の取得に成功しました",
+      "UNAUTHORIZED": "未認証です。再度ログインしてください",
+      "SUPER_ADMIN_CHECK_SUCCESS": "スーパー管理者の確認が完了しました",
+      "SERVER_STATUS_CHECK_SUCCESS": "サーバー状態の取得に成功しました"
     },
     "security": {
       "IP_BLACKLISTED": "このIPはブロックされています。しばらくしてからお試しください",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "サーバーで2FAが強制されています。管理者に連絡してバインドしてからログインしてください",
       "TWO_FACTOR_REQUIRED": "二要素認証が必要です。2FA認証コードを入力してください",
       "INVALID_CODE": "認証コードが正しくありません",
-      "TOO_MANY_ATTEMPTS": "試行回数が多すぎます。しばらくしてからお試しください"
+      "TOO_MANY_ATTEMPTS": "試行回数が多すぎます。しばらくしてからお試しください",
+      "MASTER_KEY_MISSING": "サーバーに2FAのマスターキーが設定されていないため、二要素認証を有効にできません",
+      "NOT_ENABLED": "二要素認証が有効になっていません",
+      "NO_SECRET": "2FAはまだバインドされていません。先にバインドを完了してください",
+      "SECRET_DECRYPT_FAILED": "2FAシークレットの復号化に失敗しました。再度バインドしてください"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "ユーザーリストの取得に失敗しました",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "ログイン記録の取得に成功しました",
       "LOGIN_RECORDS_FETCH_FAILED": "ログイン記録の取得に失敗しました",
       "SCOPED_TOKEN_CREATE_SUCCESS": "制限付きトークンの作成に成功しました",
-      "SCOPED_TOKEN_CREATE_FAILED": "制限付きトークンの作成に失敗しました"
+      "SCOPED_TOKEN_CREATE_FAILED": "制限付きトークンの作成に失敗しました",
+      "CANNOT_DELETE_SUPER_ADMIN": "スーパー管理者は削除できません"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "権限リストの取得に成功しました",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "名前は必須です",
       "CUSTOM_PATH_PATH_EXISTS": "パスは既に存在します",
       "CUSTOM_PATH_REMOVE_SUCCESS": "カスタムパスの削除に成功しました",
-      "CUSTOM_PATH_SAVE_FAILED": "カスタムパスの保存に失敗しました"
+      "CUSTOM_PATH_SAVE_FAILED": "カスタムパスの保存に失敗しました",
+      "CHECK_CHUNK_SUCCESS": "チャンクの検証に成功しました",
+      "CHUNK_MISMATCH": "チャンクのチェックサムが一致しません。このチャンクを再アップロードしてください",
+      "CONFIG_FETCH_SUCCESS": "インデックス設定の取得に成功しました",
+      "CONFIG_RESET_SUCCESS": "インデックス設定のリセットに成功しました",
+      "CONFIG_SAVE_SUCCESS": "インデックス設定の保存に成功しました",
+      "DIRECTORY_LIST_TIMEOUT": "ディレクトリの読み取りがタイムアウトしました。しばらくしてからお試しください",
+      "DIRECTORY_LIST_WORKER_ERROR": "ディレクトリ読み取りプロセスがエラーを返しました",
+      "DIRECTORY_LIST_WORKER_EXITED": "ディレクトリ読み取りプロセスが予期せず終了しました（終了コード %s）。再試行してください",
+      "DOWNLOAD_FAILED": "ダウンロードに失敗しました",
+      "FILE_NOT_EXIST": "ファイルが存在しません",
+      "GET_ATTRIBUTES_FAILED": "ファイル属性の取得に失敗しました",
+      "GLOBAL_SEARCH_SUCCESS": "検索が完了しました",
+      "LOG_CANNOT_CANCEL": "このタスクは既に実行開始済みで、キャンセルできません",
+      "LOG_CLEAR_FAILED": "ログのクリアに失敗しました",
+      "LOG_CLEAR_SUCCESS": "ログをクリアしました",
+      "LOG_NOT_FOUND": "ログ記録が存在しません",
+      "MISSING_PREVIOUS_CHUNKS": "前のチャンクが不足しています。順番にアップロードしてください",
+      "NOT_FOUND": "見つかりません",
+      "NO_FILE_SELECTED": "ファイルが選択されていません",
+      "OPERATION_CANCELLED": "操作はキャンセルされました",
+      "OPERATION_CANCEL_FAILED": "操作のキャンセルに失敗しました",
+      "PERMISSION_DENIED": "権限が不足しています",
+      "RECENT_CLEAR_FAILED": "最近のアクセス履歴のクリアに失敗しました",
+      "RECENT_CLEAR_SUCCESS": "最近のアクセス履歴をクリアしました",
+      "RENAME_SUCCESS": "名前の変更に成功しました",
+      "TINY_PENDING": "サムネイルを生成中です。しばらくしてからお試しください",
+      "TINY_TIMEOUT": "サムネイルの生成がタイムアウトしました。しばらくしてからお試しください",
+      "UNKNOWN_WORKER_TASK": "不明なバックグラウンドタスクの種類です",
+      "UPLOAD_CHUNK_SUCCESS": "チャンクのアップロードに成功しました",
+      "UPLOAD_COMPLETED": "アップロードが完了しました"
     },
     "quickShare": {
       "INVALID_TOKEN": "無効な共有トークンです",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "写真をゴミ箱から復元しました",
       "TRASH_DELETE_SUCCESS": "写真をゴミ箱から削除しました",
       "TRASH_EMPTY_SUCCESS": "ゴミ箱を空にしました",
-      "PHOTO_COLLECTION_NAME_EXISTS": "コレクション名は既に存在します"
+      "PHOTO_COLLECTION_NAME_EXISTS": "コレクション名は既に存在します",
+      "PHOTO_SOURCE_LIST_EMPTY": "写真ソースディレクトリはまだ追加されていません",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "写真ソースの番号が範囲外です"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "動画ソースディレクトリの取得に成功しました",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "ユーザー情報のシリアル化に失敗しました",
       "USER_PARSE_FAILED": "ユーザー情報の解析に失敗しました",
       "DB_WRITE_FAILED": "設定の書き込みに失敗しました",
-      "DB_CONNECTION_FAILED": "データベース接続に失敗しました"
+      "DB_CONNECTION_FAILED": "データベース接続に失敗しました",
+      "P2P_BIND_FAILED": "P2P のバインドに失敗しました。しばらくしてからお試しください",
+      "TEMP_CODE_FAILED": "一時コードの取得に失敗しました",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "カスタムペアコードのAPIが利用できません。しばらくしてからお試しください",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "カスタムペアコードの設定に失敗しました。しばらくしてからお試しください",
+      "DDNS_NOT_CONFIGURED": "ダイナミックDNSが未設定です。先に設定でドメインを入力してください",
+      "DEVICE_NOT_BOUND": "このデバイスはアカウントにバインドされていません。先にデバイスのバインドを完了してください",
+      "NEED_VIP": "この機能には会員権限が必要です。アップグレードしてからお試しください",
+      "DEVICE_COUNT_LIMIT": "アカウントのデバイス数が上限に達しました。先に他のデバイスのバインドを解除してください",
+      "REMOTE_ERROR": "リモートサービスがエラーを返しました：%s"
     },
     "terminal": {
       "START_FAILED": "ターミナルの起動に失敗しました",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "ページ番号は0より大きい整数である必要があります",
       "LIMIT_INVALID": "1ページあたりの件数は1〜100の整数である必要があります",
       "ID_INVALID": "IDは0より大きい整数である必要があります",
-      "KEYWORD_LENGTH_INVALID": "検索キーワードは1〜100文字である必要があります"
+      "KEYWORD_LENGTH_INVALID": "検索キーワードは1〜100文字である必要があります",
+      "INVALID_VALUE": "無効な値です"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "パスワードが正しくありません",
       "SIGN_FILE_MISSING": "暗号化スペースの識別ファイルが存在しないか空です",
-      "SPACE_DB_INVALID": "暗号化スペースのインデックスデータベースが存在しないか破損しています"
+      "SPACE_DB_INVALID": "暗号化スペースのインデックスデータベースが存在しないか破損しています",
+      "SPACE_FOLDER_MISSING": "暗号化スペースのフォルダが存在しないか移動されています。パスを確認してからお試しください"
     },
     "apiSetting": {
       "FETCH_SUCCESS": "取得に成功しました",
@@ -352,7 +422,14 @@
       "ERROR": "エラーが発生しました",
       "NOT_FOUND": "見つかりません",
       "UNAUTHORIZED": "未認証",
-      "FORBIDDEN": "アクセス禁止"
+      "FORBIDDEN": "アクセス禁止",
+      "DELETE_SUCCESS": "削除に成功しました",
+      "DUPLICATE": "同じ名前の項目が既に存在します",
+      "INVALID_PARAMS": "パラメータが無効です",
+      "PARAM_ERROR": "パラメータエラー",
+      "ENDPOINT_NOT_FOUND": "エンドポイントが存在しません",
+      "INTERNAL_SERVER_ERROR": "サーバー内部エラー",
+      "RESOURCE_NOT_FOUND": "リソースが見つかりません"
     },
     "mediaTool": {
       "INVALID_PARAMS": "パラメータが正しくありません",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "Docker コマンドの実行に失敗しました",
       "CONFIG_SAVE_FAILED": "Docker 設定の保存に失敗しました",
       "INVALID_PROXY_URL": "プロキシ URL の形式が正しくありません",
-      "TASK_NOT_FOUND": "Docker タスクが見つかりません"
+      "TASK_NOT_FOUND": "Docker タスクが見つかりません",
+      "IMAGE_ARCHIVE_NOT_FOUND": "イメージアーカイブファイルが存在しません",
+      "IMAGE_ARCHIVE_REQUIRED": "イメージアーカイブファイルを選択してください",
+      "IMAGE_IN_USE": "イメージはコンテナで使用中のため削除できません",
+      "INVALID_CONFIG_JSON": "設定 JSON の形式が正しくありません",
+      "INVALID_IMAGE_ARCHIVE": "イメージアーカイブファイルが無効です",
+      "START_FAILED": "起動に失敗しました",
+      "STOP_FAILED": "停止に失敗しました",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "タスクは実行中のため削除できません"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "この機能に必要なプラグインはまだダウンロード中です。しばらくしてから再度お試しください。"
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "クラウドディスクのマウント開始に失敗しました。しばらくしてからお試しください",
+      "START_FAILED": "クラウドディスクのマウント開始に失敗しました",
+      "START_TIMEOUT": "クラウドディスクのマウント開始がタイムアウトしました。しばらくしてからお試しください",
+      "STOP_TIMEOUT": "クラウドディスクのマウント停止がタイムアウトしました",
+      "WORKER_SEND_FAILED": "OpenList マウントプロセスとの通信に失敗しました",
+      "STORAGE_SYNC_FAILED": "クラウドストレージ設定の同期に失敗しました",
+      "STORAGE_NOT_FOUND": "OpenList に該当するストレージが見つかりません",
+      "INVALID_MOUNT_NAME": "マウント名が無効です（フォルダ名の規則に従ってください）",
+      "MOUNT_PARENT_NO_ACCESS": "マウントの親パスは読み書き可能である必要があります",
+      "OBSCURE_FAILED": "パスワードの暗号化に失敗しました。サーバー環境を確認してからお試しください",
+      "SERVICE_START_TIMEOUT": "OpenList サービスの起動がタイムアウトしました",
+      "BINARY_NOT_FOUND": "OpenList の実行ファイルが見つかりません",
+      "PLATFORM_NOT_SUPPORTED": "現在のプラットフォームではこの機能はサポートされていません",
+      "ADMIN_PASSWORD_MISSING": "OpenList の管理者パスワードが設定されていません",
+      "ADMIN_SET_FAILED": "OpenList の管理者アカウントの設定に失敗しました",
+      "ADMIN_TOKEN_FAILED": "OpenList の管理者トークンの取得に失敗しました",
+      "ADMIN_TOKEN_PARSE_FAILED": "OpenList の管理者トークンの解析に失敗しました",
+      "BASE_URL_MISSING": "OpenList サービスのアドレスが設定されていません",
+      "DB_INIT_FAILED": "OpenList データベースの初期化に失敗しました",
+      "DB_NOT_READY": "OpenList データベースの準備ができていません",
+      "DRIVER_NOT_ALLOWED": "サポートされていないストレージドライバです",
+      "MOUNT_PARENT_NOT_DIR": "マウントの親パスはディレクトリである必要があります",
+      "MOUNT_PARENT_NOT_FOUND": "マウントの親パスが存在しません",
+      "STOP_FAILED": "クラウドディスクのマウント停止に失敗しました",
+      "STORAGE_INIT_FAILED": "クラウドストレージの初期化に失敗しました：%s",
+      "TIMEOUT": "操作がタイムアウトしました。しばらくしてからお試しください"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "ダウンロードサービス（Transmission）が利用できません。先に transmission-daemon をインストールして起動してください",
+      "STARTED": "ダウンロードサービスを起動しました",
+      "START_FAILED": "ダウンロードサービスの起動に失敗しました",
+      "START_FAILED_DETAIL": "ダウンロードサービスの起動に失敗しました：%s",
+      "STOPPED": "ダウンロードサービスを停止しました",
+      "STOP_FAILED": "ダウンロードサービスの停止に失敗しました",
+      "STOP_FAILED_DETAIL": "ダウンロードサービスの停止に失敗しました：%s",
+      "RESTARTED": "ダウンロードサービスを再起動しました",
+      "CONFIG_SAVED": "設定を保存しました",
+      "TORRENT_ADDED": "タスクを追加しました",
+      "TORRENT_FILE_REQUIRED": "追加するトレントファイルを選択してください",
+      "DOWNLOAD_DIR_REQUIRED": "ダウンロードディレクトリを入力してください",
+      "PORT_INVALID": "無効なポート：%s。1024〜65535 の範囲で入力してください",
+      "PORT_DISABLED": "このポートはシステム予約済みです（0-1023）。1024 より大きいポートを使用してください",
+      "PORT_RESERVED": "このポートは他のサービスで使用中です。別のポートを選択してください",
+      "RPC_ERROR": "ダウンロードサービスがエラーを返しました：%s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "先にノートブックを選択してください",
+      "NOTEBOOK_NOT_FOUND": "ノートブックが存在しないか削除されています",
+      "NOTEBOOK_INVALID": "ノートブック名が無効です。1〜50文字で入力してください",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "このノートブックにはまだノートがあるため削除できません",
+      "GROUP_NOT_EMPTY": "このグループにはまだノートブックがあるため削除できません"
+    },
+    "system": {
+      "NOT_SUPPORTED": "現在の実行モードではこの操作はサポートされていません"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "アプリ一覧の取得に成功しました",
+      "SET_HIDE_APPS_SUCCESS": "アプリの表示状態を一括設定しました",
+      "HIDE_APP_SUCCESS": "アプリを非表示にしました",
+      "UNHIDE_APP_SUCCESS": "アプリを表示しました",
+      "SET_APPS_ORDER_SUCCESS": "アプリの並び順を保存しました"
     }
   },
   "places365": {

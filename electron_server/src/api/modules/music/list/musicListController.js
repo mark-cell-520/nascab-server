@@ -528,7 +528,7 @@ class MusicListController {
 
       for (const p of targets) {
         if (FileUtil.isProtectedPath(p)) {
-          return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+          return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
         }
         if (!isUnderAnyRoot(p, roots)) {
           return ResponseUtil.error(req, res, 'auth.PERMISSION_DENIED', 403);

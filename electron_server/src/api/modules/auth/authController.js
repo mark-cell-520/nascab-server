@@ -354,7 +354,7 @@ class AuthController {
       const knexMain = req.dbMain;
       const hasSuperAdmin = await authService.hasSuperAdmin({ knexMain });
       Logger.business('check_super_admin', null, { hasSuperAdmin });
-      return ResponseUtil.success(req, res, { hasSuperAdmin }, 'SUPER_ADMIN_CHECK_SUCCESS');
+      return ResponseUtil.success(req, res, { hasSuperAdmin }, 'auth.SUPER_ADMIN_CHECK_SUCCESS');
     } catch (err) {
       Logger.error('hasSuperAdmin failed', err, { method: 'hasSuperAdmin' });
       if (err.message && err.message.startsWith('auth.')) {
@@ -384,7 +384,7 @@ class AuthController {
           serverId: process.env.SERVER_ID,
           hasSuperAdmin: hasSuperAdmin,
         },
-        'SERVER_STATUS_CHECK_SUCCESS'
+        'auth.SERVER_STATUS_CHECK_SUCCESS'
       );
     } catch (err) {
       return ResponseUtil.serverError(req, res, err);

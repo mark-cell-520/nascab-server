@@ -83,9 +83,30 @@ async function clearDdnsError() {
   await saveLocalDdnsConfig({ [tableConfig.KEY_DDNS_LAST_ERROR]: '' });
 }
 
+// 远端 P2P/DDNS 服务回传的是它自己的错误码（P2P.ERR_DEVICE_NOT_BIND、
+// P2P.ERR_NEED_VIP 这类）。这些码既不在服务端 13 个语言文件里，也不在客户端
+// _serverCodeToTrKey 里，原样透出去用户看到的就是一串裸键。统一翻成 service.*
+// 下的正式词条；认不出来的码走 `service.REMOTE_ERROR:原文`，i18nUtil 会翻译
+// 前缀、把原文当 %s 插进去，至少不会把机器码亮给人看。
+const REMOTE_ERROR_KEY_MAP = {
+  'P2P.ERR_DEVICE_NOT_BIND': 'service.DEVICE_NOT_BOUND',
+  'P2P.ERR_NEED_VIP': 'service.NEED_VIP',
+  'P2P.ERR_DEVICE_COUNT_LIMIT': 'service.DEVICE_COUNT_LIMIT',
+};
+
+function toDisplayErrorKey(raw) {
+  const code = String(raw || '').trim();
+  if (!code) return 'common.ERROR';
+  const mapped = REMOTE_ERROR_KEY_MAP[code];
+  if (mapped) return mapped;
+  // 已经是服务端自己的词条（service.XXX / common.XXX）就原样返回
+  if (/^[a-z][a-zA-Z0-9]*\.[A-Z][A-Z0-9_]+$/.test(code)) return code;
+  return `service.REMOTE_ERROR:${code}`;
+}
+
 async function setDdnsErrorAndStop(errorCode) {
   await saveLocalDdnsConfig({
-    [tableConfig.KEY_DDNS_LAST_ERROR]: errorCode || 'common.ERROR',
+    [tableConfig.KEY_DDNS_LAST_ERROR]: toDisplayErrorKey(errorCode),
     [tableConfig.KEY_DDNS_ENABLED]: '0',
   });
   await stopDdnsWorkerIfRunning();
@@ -199,7 +220,7 @@ module.exports = {
 
     const deviceId = await nascabAccountUtil.getDecryptedConfigValue(req.dbMain, tableConfig, 'p2p_device_id').catch(() => '');
     const did = deviceId ? String(deviceId).trim() : '';
-    if (!did) return ResponseUtil.error(req, res, 'P2P.ERR_DEVICE_NOT_BIND', 403);
+    if (!did) return ResponseUtil.error(req, res, 'service.DEVICE_NOT_BOUND', 403);
     const currentTypeRaw = await tableConfig.getConfigByKey(tableConfig.KEY_DDNS_TYPE).catch(() => '');
     const ddnsCallBase = getDdnsBaseUrlByType(currentTypeRaw, apiConfig);
     const remote = await nascabAccountUtil.remoteRequestWithAutoRefresh(req.dbMain, tableConfig, apiConfig, {
@@ -222,11 +243,11 @@ module.exports = {
       const errorCode = data && data.errorCode ? String(data.errorCode) : '';
       if (errorCode) {
         if (errorCode === 'P2P.ERR_DEVICE_NOT_BIND' || errorCode === 'P2P.ERR_NEED_VIP') {
-          await setDdnsErrorAndStop(errorCode).catch(() => {});
+          await setDdnsErrorAndStop(toDisplayErrorKey(errorCode)).catch(() => {});
         } else {
-          await saveLocalDdnsConfig({ [tableConfig.KEY_DDNS_LAST_ERROR]: errorCode }).catch(() => {});
+          await saveLocalDdnsConfig({ [tableConfig.KEY_DDNS_LAST_ERROR]: toDisplayErrorKey(errorCode) }).catch(() => {});
         }
-        return ResponseUtil.error(req, res, errorCode, remote.status || 400);
+        return ResponseUtil.error(req, res, toDisplayErrorKey(errorCode), remote.status || 400);
       }
       return ResponseUtil.error(req, res, 'common.ERROR', remote.status || 500);
     }
@@ -241,7 +262,7 @@ module.exports = {
       ...(ddnsBase ? { [tableConfig.KEY_DDNS_BASE]: ddnsBase } : {}),
       [tableConfig.KEY_DDNS_LAST_IP]: applied && ddnsIp ? ddnsIp : '',
       [tableConfig.KEY_DDNS_LAST_TIME]: ddnsLastTime,
-      [tableConfig.KEY_DDNS_LAST_ERROR]: appliedErrorCode,
+      [tableConfig.KEY_DDNS_LAST_ERROR]: toDisplayErrorKey(appliedErrorCode),
     }).catch(() => {});
 
     const ddnsFullDomain = ddnsDomain && ddnsBase ? `${ddnsDomain}.${ddnsBase}` : '';
@@ -263,7 +284,7 @@ module.exports = {
 
     const deviceId = await nascabAccountUtil.getDecryptedConfigValue(req.dbMain, tableConfig, 'p2p_device_id').catch(() => '');
     const did = deviceId ? String(deviceId).trim() : '';
-    if (!did) return ResponseUtil.error(req, res, 'P2P.ERR_DEVICE_NOT_BIND', 403);
+    if (!did) return ResponseUtil.error(req, res, 'service.DEVICE_NOT_BOUND', 403);
 
     const ddnsCallBase = getDdnsBaseUrlByType(ddnsType, apiConfig);
     const remote = await nascabAccountUtil.remoteRequestWithAutoRefresh(req.dbMain, tableConfig, apiConfig, {
@@ -284,11 +305,11 @@ module.exports = {
       const errorCode = data && data.errorCode ? String(data.errorCode) : '';
       if (errorCode) {
         if (errorCode === 'P2P.ERR_DEVICE_NOT_BIND' || errorCode === 'P2P.ERR_NEED_VIP') {
-          await setDdnsErrorAndStop(errorCode).catch(() => {});
+          await setDdnsErrorAndStop(toDisplayErrorKey(errorCode)).catch(() => {});
         } else {
-          await saveLocalDdnsConfig({ [tableConfig.KEY_DDNS_LAST_ERROR]: errorCode }).catch(() => {});
+          await saveLocalDdnsConfig({ [tableConfig.KEY_DDNS_LAST_ERROR]: toDisplayErrorKey(errorCode) }).catch(() => {});
         }
-        return ResponseUtil.error(req, res, errorCode, remote.status || 400);
+        return ResponseUtil.error(req, res, toDisplayErrorKey(errorCode), remote.status || 400);
       }
       return ResponseUtil.error(req, res, 'common.ERROR', remote.status || 500);
     }
@@ -301,7 +322,7 @@ module.exports = {
       [tableConfig.KEY_DDNS_TYPE]: ddnsType,
       [tableConfig.KEY_DDNS_LAST_IP]: applied && ddnsIp ? ddnsIp : '',
       [tableConfig.KEY_DDNS_LAST_TIME]: ddnsLastTime,
-      [tableConfig.KEY_DDNS_LAST_ERROR]: appliedErrorCode,
+      [tableConfig.KEY_DDNS_LAST_ERROR]: toDisplayErrorKey(appliedErrorCode),
     }).catch(() => {});
 
     return ResponseUtil.success(req, res, {
@@ -321,8 +342,8 @@ module.exports = {
       if (!local) return ResponseUtil.error(req, res, 'service.DB_CONNECTION_FAILED', 500);
       const { loggedIn } = await ensureLoggedIn(req);
       if (!loggedIn) return ResponseUtil.error(req, res, 'service.NASCAB_LOGIN_REQUIRED', 403);
-      if (!local.deviceId) return ResponseUtil.error(req, res, 'P2P.ERR_DEVICE_NOT_BIND', 403);
-      if (!local.ddnsDomain || !local.ddnsType) return ResponseUtil.error(req, res, 'DDNS_NOT_CONFIGURED', 400);
+      if (!local.deviceId) return ResponseUtil.error(req, res, 'service.DEVICE_NOT_BOUND', 403);
+      if (!local.ddnsDomain || !local.ddnsType) return ResponseUtil.error(req, res, 'service.DDNS_NOT_CONFIGURED', 400);
     }
 
     await saveLocalDdnsConfig({
@@ -365,10 +386,10 @@ module.exports = {
     if (remote.status !== 200 || code !== 0 || !data) {
       const errorCode = data && data.errorCode ? String(data.errorCode) : '';
       if (errorCode === 'P2P.ERR_DEVICE_NOT_BIND' || errorCode === 'P2P.ERR_NEED_VIP') {
-        await setDdnsErrorAndStop(errorCode).catch(() => {});
+        await setDdnsErrorAndStop(toDisplayErrorKey(errorCode)).catch(() => {});
         return ResponseUtil.success(req, res, { enabled: false, errorCode }, 'common.SUCCESS', 200);
       }
-      await saveLocalDdnsConfig({ [tableConfig.KEY_DDNS_LAST_ERROR]: errorCode || 'common.ERROR' }).catch(() => {});
+      await saveLocalDdnsConfig({ [tableConfig.KEY_DDNS_LAST_ERROR]: toDisplayErrorKey(errorCode) }).catch(() => {});
       return ResponseUtil.success(req, res, { enabled, ...(errorCode ? { errorCode } : {}) }, 'common.SUCCESS', 200);
     }
 

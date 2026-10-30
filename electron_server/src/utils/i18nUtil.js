@@ -13,6 +13,14 @@ i18n.configure({
   autoReload: false,
   updateFiles: false,
   objectNotation: true,
+  // 关键：i18n 默认对"某语言文件里缺这个键"的处理是原样返回键名，客户端就会把
+  // "messages.file.NO_FILE_SELECTED" 当错误提示展示。13 个语言文件的键从来不是同步补齐的，
+  // 之前 437 个模块化键里有 103 个在全部语言里都缺失。retryInDefaultLocale 让缺失的键
+  // 回退到 defaultLocale（zh-CN，已补齐）取值；updateFiles=false 时 write() 直接 return，
+  // 所以不会把回退值写进语言文件。
+  // 注意不要用 fallbacks 解决这个问题：i18n 的 getFallback 只在 !locales[locale]
+  // （整个语言文件不存在）时才触发，13 个文件都在，fallbacks 对缺键完全无效。
+  retryInDefaultLocale: true,
 });
 
 let cachedServerUiLanguage = null;
@@ -157,6 +165,14 @@ function setResponseLanguage(req, res) {
   res.setLocale(userLanguage);
 }
 
+// 上游服务把状态原文拼在 i18n 键后面抛出来，形如
+//   `openlistMount.STORAGE_INIT_FAILED:empty token returned from official API, ...`
+//   `file.DIRECTORY_LIST_WORKER_EXITED:1`
+// 整串当键去查必然落空（messages.openlistMount.STORAGE_INIT_FAILED:empty token...
+// 这个键不存在），用户就直接看到英文。按第一个冒号拆开：只翻译前面的键，
+// 原文作为 %s 插值参数交给语言文件（语言文件里对应条目须写成 "xxx：%s"）。
+const KEY_WITH_DETAIL = /^([a-z][a-zA-Z0-9]*\.[A-Z][A-Z0-9_]+):([\s\S]*)$/;
+
 /**
  * 获取本地化消息
  * @param {Object} req - Express请求对象
@@ -165,23 +181,34 @@ function setResponseLanguage(req, res) {
  */
 function getLocalizedMessage(req, key, args = []) {
   const userLanguage = getUserLanguage(req);
+  const raw = key === null || key === undefined ? '' : String(key);
+
+  const withDetail = KEY_WITH_DETAIL.exec(raw);
+  if (withDetail) {
+    const prefix = withDetail[1];
+    const detail = withDetail[2];
+    const list = Array.isArray(args) && args.length > 0 ? args : [detail];
+    const translated = getTranslation(`messages.${prefix}`, userLanguage, list);
+    // 翻译命中才采用；miss 时退回整串，保持原有行为（不至于把错误信息吞掉）
+    if (translated && translated !== `messages.${prefix}`) return translated;
+  }
 
   // 如果key包含点号，说明是模块化格式（如 'auth.SUPER_ADMIN_EXISTS'）
-  if (key.includes('.')) {
-    return getTranslation(`messages.${key}`, userLanguage, args);
+  if (raw.includes('.')) {
+    return getTranslation(`messages.${raw}`, userLanguage, args);
   }
 
   // 否则，尝试在常见模块中查找
   const modules = ['auth', 'validation', 'common'];
   for (const module of modules) {
-    const translation = getTranslation(`messages.${module}.${key}`, userLanguage, args);
-    if (translation && translation !== `messages.${module}.${key}`) {
+    const translation = getTranslation(`messages.${module}.${raw}`, userLanguage, args);
+    if (translation && translation !== `messages.${module}.${raw}`) {
       return translation;
     }
   }
 
   // 如果没找到，返回原始key
-  return key;
+  return raw;
 }
 
 refreshServerUiLanguageCache();

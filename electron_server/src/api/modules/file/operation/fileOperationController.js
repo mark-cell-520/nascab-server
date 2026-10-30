@@ -32,9 +32,13 @@ async function download(req, res) {
   try {
     let { paths, path: singlePath } = req.query;
 
+    // body-parser 在没有 Content-Type 的请求上不会给 req.body 赋值（保持 undefined），
+    // 直接 req.body.paths 会抛 TypeError 把下载接口打成 500。
+    const body = req.body || {};
+
     if (!paths && !singlePath) {
-      paths = req.body.paths;
-      singlePath = req.body.path;
+      paths = body.paths;
+      singlePath = body.path;
     }
 
     if (singlePath && (!paths || paths.length === 0)) {
@@ -44,7 +48,8 @@ async function download(req, res) {
     if (typeof paths === 'string') paths = [paths];
 
     if (!paths || paths.length === 0) {
-      return ResponseUtil.error(req, res, 'file.NO_FILE_SELECTED');
+      // 没传 paths/path 是客户端参数问题，回 400；ResponseUtil.error 默认 500
+      return ResponseUtil.error(req, res, 'file.NO_FILE_SELECTED', 400);
     }
     for (const p of paths) {
       const hasPerm = await hasPermission(req.dbMain, req.user, 'download', p);
@@ -75,7 +80,7 @@ async function download(req, res) {
               const code = err && err.code != null ? String(err.code) : '';
               if (code === 'EPIPE' || code === 'ECONNRESET' || code === 'ECONNABORTED') return;
               if (!res.headersSent) {
-                ResponseUtil.error(req, res, 'file.DOWNLOAD_ERROR');
+                ResponseUtil.error(req, res, 'file.DOWNLOAD_ERROR', 500);
               } else {
                 try {
                   res.destroy(err instanceof Error ? err : new Error('stream error'));
@@ -92,13 +97,13 @@ async function download(req, res) {
               console.log('Download error:', err);
               if (res.headersSent) {
               } else {
-                return ResponseUtil.error(req, res, 'file.DOWNLOAD_ERROR');
+                return ResponseUtil.error(req, res, 'file.DOWNLOAD_ERROR', 500);
               }
             }
           });
         }
       } catch (e) {
-        return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND');
+        return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND', 404);
       }
     }
 
@@ -174,7 +179,7 @@ async function download(req, res) {
     }
     Logger.error('Download error', err);
     if (!res.headersSent) {
-      ResponseUtil.error(req, res, 'file.DOWNLOAD_FAILED');
+      ResponseUtil.error(req, res, 'file.DOWNLOAD_FAILED', 500);
       return;
     }
     res.destroy(err instanceof Error ? err : new Error('Download error'));
@@ -199,7 +204,7 @@ async function handleFileOperation(req, res, type) {
     for (const p of paths) {
       if (type === tableFileLog.TYPE_MOVE && FileUtil.isProtectedPath(p)) {
         console.log('系统保护路径 无法操作');
-        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
       }
 
       const canRead = await hasPermission(req.dbMain, req.user, 'download', p);

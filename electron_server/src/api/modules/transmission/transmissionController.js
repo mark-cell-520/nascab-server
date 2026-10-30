@@ -78,6 +78,33 @@ function buildHttpError(msgKey, statusCode) {
   return err;
 }
 
+// torrent-get 的默认字段。与 Flutter 端 transmission_controller._torrentFields 对齐，
+// 另加 hashString（服务端记录下载目录、做位置修复都要用它）。
+const DEFAULT_TORRENT_FIELDS = [
+  'id',
+  'hashString',
+  'name',
+  'status',
+  'addedDate',
+  'percentDone',
+  'rateDownload',
+  'rateUpload',
+  'eta',
+  'totalSize',
+  'sizeWhenDone',
+  'leftUntilDone',
+  'haveValid',
+  'haveUnchecked',
+  'downloadedEver',
+  'uploadedEver',
+  'uploadRatio',
+  'error',
+  'errorString',
+  'isFinished',
+  'labels',
+  'downloadDir',
+];
+
 class TransmissionController {
   constructor() {
     this.service = new TransmissionService();
@@ -94,7 +121,16 @@ class TransmissionController {
     });
     const data = await wait;
     if (!data.started) {
-      throw buildHttpError(data.error || 'transmission.START_FAILED', 500);
+      // 子进程回传的 data.error 是原文（如 "daemon_spawn_failed:error while loading
+      // shared libraries: libevent-2.1.so.7"），不是 i18n 键。拆成两段：
+      // 有原文时用 _DETAIL 键（带 %s），没有时用纯文案键——
+      // 语言文件里 START_FAILED 不带 %s，硬拼成 `键:原文` 会让 i18n 把整串当键名查，
+      // 用户看到的就是 "transmission.START_FAILED:xxx"。
+      const detail = data.error ? String(data.error) : '';
+      throw buildHttpError(
+        detail ? `transmission.START_FAILED_DETAIL:${detail}` : 'transmission.START_FAILED',
+        500,
+      );
     }
     return data;
   }
@@ -109,7 +145,11 @@ class TransmissionController {
     });
     const data = await wait;
     if (!data.stopped) {
-      throw buildHttpError(data.error || 'transmission.STOP_FAILED', 500);
+      const detail = data.error ? String(data.error) : '';
+      throw buildHttpError(
+        detail ? `transmission.STOP_FAILED_DETAIL:${detail}` : 'transmission.STOP_FAILED',
+        500,
+      );
     }
     return data;
   }
@@ -179,7 +219,10 @@ class TransmissionController {
       const needsRestart = !!(body.rpc_port || body.peer_port);
       return ResponseUtil.success(req, res, { ...data, needs_restart: needsRestart }, 'transmission.CONFIG_SAVED', 200);
     } catch (e) {
-      return ResponseUtil.error(req, res, e.message || 'common.ERROR', e.statusCode || 500, e.msgArgs);
+      // ResponseUtil.error 的签名是 (req, res, messageKey, statusCode, errorData, args)：
+      // msgArgs 必须落在第 6 位。之前放在第 5 位会变成 errorData，端口校验的
+      // "无效端口：xxx" 里的值永远插不进去，用户看到的是没带值的半句话。
+      return ResponseUtil.error(req, res, e.message || 'common.ERROR', e.statusCode || 500, null, e.msgArgs);
     }
   }
 
@@ -189,7 +232,7 @@ class TransmissionController {
       const data = await this.service.setRpcPort(rpc_port);
       return ResponseUtil.success(req, res, { ...data, needs_restart: true }, 'transmission.CONFIG_SAVED', 200);
     } catch (e) {
-      return ResponseUtil.error(req, res, e.msgKey || e.message || 'common.ERROR', e.statusCode || 500, e.msgArgs);
+      return ResponseUtil.error(req, res, e.msgKey || e.message || 'common.ERROR', e.statusCode || 500, null, e.msgArgs);
     }
   }
 
@@ -240,9 +283,18 @@ class TransmissionController {
           fields = fields.split(',').map(v => v.trim()).filter(Boolean);
         }
       }
+      const requested = Array.isArray(fields) ? fields.filter(f => typeof f === 'string' && f.trim()) : [];
+      // torrent-get 的 fields 是必填项：不传时 transmission 直接回 "no fields specified"，
+      // 服务端把这个原文当 502 抛给前端，种子列表整个打不开。
+      // 客户端不一定带 fields（脚本/旧版本/直连 API 都不带），这里给一套完整默认值，
+      // 并补上服务端自身处理必需的 id / hashString。
+      const merged = requested.length ? requested.slice() : DEFAULT_TORRENT_FIELDS.slice();
+      for (const required of ['id', 'hashString']) {
+        if (!merged.includes(required)) merged.push(required);
+      }
       const args = {};
       if (ids !== undefined) args.ids = ids;
-      if (fields !== undefined) args.fields = fields;
+      args.fields = merged;
       if (query.format) args.format = query.format;
       const result = await this.rpc.call('torrent-get', args);
       if (Array.isArray(result.torrents)) {
@@ -462,7 +514,13 @@ class TransmissionController {
     try {
       await this.service.assertDaemonRunning();
       const query = req.method === 'GET' ? req.query || {} : req.body || {};
-      const id = Number(query.id);
+      // 客户端传 id，但 setTorrentFiles 一直兼容 ids 形式；这里也接一下，
+      // 免得换个调用方（脚本/新版客户端）就拿到一句"参数无效"。
+      let id = query.id;
+      if (id === undefined && query.ids !== undefined) {
+        id = Array.isArray(query.ids) ? query.ids[0] : query.ids;
+      }
+      id = Number(id);
       if (!Number.isFinite(id)) {
         return ResponseUtil.error(req, res, 'common.INVALID_PARAMS', 400);
       }

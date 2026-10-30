@@ -121,22 +121,6 @@ class ExpressBroadcastWorker {
   }
 
   /**
-   * 启动定时广播
-   */
-  startBroadcastInterval() {
-    if (this.broadcastInterval) {
-      clearInterval(this.broadcastInterval);
-    }
-
-    this.broadcastInterval = setInterval(() => {
-      this.broadcastServiceInfo();
-    }, this.broadcastIntervalMs);
-
-    // 立即广播一次
-    this.broadcastServiceInfo();
-  }
-
-  /**
    * 广播服务信息
    */
   broadcastServiceInfo() {
@@ -213,9 +197,10 @@ class ExpressBroadcastWorker {
       gracefulShutdown('uncaughtException');
     });
 
+    // 同 expressWorker：unhandledRejection 不致命，记录后继续服务。
+    // 这里曾经 gracefulShutdown，一条漏 await 的广播就能掀翻整个 worker。
     process.on('unhandledRejection', (reason, promise) => {
       Logger.error('❌ Unhandled rejection:', reason);
-      gracefulShutdown('unhandledRejection');
     });
   }
 }

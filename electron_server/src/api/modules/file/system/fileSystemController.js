@@ -39,6 +39,16 @@ function resolveAndCheck(filePath) {
 }
 
 /**
+ * 无界面（Docker/NasCabOS）模式下主进程没有 electron.shell，
+ * `process.send` 却仍然存在——只判 process.send 会把消息发到一个
+ * 没人接的通道，然后回 200 成功，用户端"点了没反应"。
+ * 这里显式识别该模式并返回 501，而不是假装成功。
+ */
+function shellUnavailable(req, res) {
+  return ResponseUtil.error(req, res, 'system.NOT_SUPPORTED', 501);
+}
+
+/**
  * 在系统中用默认程序打开文件/文件夹
  * POST /api/file/system/open  body: { path }
  */
@@ -48,16 +58,16 @@ function openInSystem(req, res) {
     Logger.debug('[fileSystem/open] 收到请求 path:', filePath);
 
     if (!filePath) {
-      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND');
+      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND', 404);
     }
 
     const resolved = resolveAndCheck(filePath);
     if (!resolved) {
-      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND');
+      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND', 404);
     }
 
-    if (!process.send) {
-      return ResponseUtil.error(req, res, 'system.NOT_SUPPORTED');
+    if (!process.send || process.env.NASCAB_CLIENTLESS) {
+      return shellUnavailable(req, res);
     }
 
     process.send({
@@ -83,16 +93,16 @@ function showInSystem(req, res) {
     Logger.debug('[fileSystem/show] 收到请求 path:', filePath);
 
     if (!filePath) {
-      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND');
+      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND', 404);
     }
 
     const resolved = resolveAndCheck(filePath);
     if (!resolved) {
-      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND');
+      return ResponseUtil.error(req, res, 'file.FILE_NOT_FOUND', 404);
     }
 
-    if (!process.send) {
-      return ResponseUtil.error(req, res, 'system.NOT_SUPPORTED');
+    if (!process.send || process.env.NASCAB_CLIENTLESS) {
+      return shellUnavailable(req, res);
     }
 
     process.send({

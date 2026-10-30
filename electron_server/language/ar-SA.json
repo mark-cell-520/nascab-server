@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "انتهت صلاحية ملف الترجمة هذا. يرجى تنزيل ترجمة أخرى.",
-      "SUBTITLE_DELETE_FAILED": "فشل حذف الترجمة"
+      "SUBTITLE_DELETE_FAILED": "فشل حذف الترجمة",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "فشل إزالة الترجمة التي تم تحميلها",
+      "GET_INFO_FAILED": "فشل قراءة معلومات الفيديو",
+      "INVALID_PARAMS": "معلمات غير صالحة",
+      "SAVE_PREFERENCE_FAILED": "فشل حفظ تفضيلات التشغيل",
+      "SUBTITLE_DOWNLOAD_FAILED": "فشل تنزيل الترجمة",
+      "SUBTITLE_SEARCH_FAILED": "فشل البحث عن الترجمة",
+      "SUBTITLE_UNSUPPORTED": "صيغة الترجمة غير مدعومة",
+      "TRANSCODE_FAILED": "فشل التحويل، يرجى إعادة المحاولة",
+      "UPLOAD_SUBTITLE_FAILED": "فشل تحميل الترجمة"
     },
     "fileMount": {
       "START_FAILED": "فشل بدء التثبيت: %s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "تم تسجيل الدخول من جهاز جديد %s، إصدار النظام: %s",
       "UNKNOWN_DEVICE": "جهاز غير معروف",
       "IP_BLACKLIST_ADMIN_TITLE": "تنبيه أمني",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "تم حظر عنوان IP %s مؤقتاً بعد عدة محاولات خاطئة لاسم المستخدم أو كلمة المرور. إن لم تكن أنت، غيّر كلمة المرور فوراً وفعّل التحقق الثنائي (2FA) لحماية الحساب."
+      "IP_BLACKLIST_ADMIN_MESSAGE": "تم حظر عنوان IP %s مؤقتاً بعد عدة محاولات خاطئة لاسم المستخدم أو كلمة المرور. إن لم تكن أنت، غيّر كلمة المرور فوراً وفعّل التحقق الثنائي (2FA) لحماية الحساب.",
+      "ADD_SUCCESS": "تمت الإضافة بنجاح",
+      "CLEAR_SUCCESS": "تم الإفراغ بنجاح",
+      "DELETE_SUCCESS": "تم الحذف بنجاح",
+      "MARK_READ_SUCCESS": "تم التعليم كمقروء",
+      "MESSAGE_ID_REQUIRED": "معرف الرسالة مطلوب",
+      "MESSAGE_NOT_FOUND": "الرسالة غير موجودة",
+      "MESSAGE_REQUIRED": "محتوى الرسالة مطلوب"
     },
     "auth": {
       "SYS_NO_INIT": "النظام غير مهيأ",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "لأسباب أمنية، هذه العملية مدعومة فقط داخل نفس الشبكة المحلية",
       "RECOVER_ADMIN_LAN_ONLY": "هذه الواجهة مخصصة فقط لاستعادة كلمة مرور المشرف وتعمل داخل الشبكة المحلية فقط. يُرجى إدخال اسم مستخدم المشرف. على المستخدمين العاديين طلب تغيير كلمة المرور من المشرف في «إدارة المستخدمين».",
       "PASSWORD_RESET_SUCCESS": "تم إعادة تعيين كلمة مرور المشرف بنجاح",
-      "PASSWORD_RESET_FAILED": "فشل إعادة تعيين كلمة مرور المشرف"
+      "PASSWORD_RESET_FAILED": "فشل إعادة تعيين كلمة مرور المشرف",
+      "GET_ONLINE_USERS_FAILED": "فشل جلب قائمة المستخدمين المتصلين",
+      "RECOVER_INFO_FETCH_FAILED": "فشل جلب معلومات استعادة كلمة المرور",
+      "RECOVER_INFO_FETCH_SUCCESS": "تم جلب معلومات استعادة كلمة المرور بنجاح",
+      "UNAUTHORIZED": "غير مصرح، يرجى تسجيل الدخول مرة أخرى",
+      "SUPER_ADMIN_CHECK_SUCCESS": "اكتمل التحقق من المسؤول الرئيسي",
+      "SERVER_STATUS_CHECK_SUCCESS": "تم جلب حالة الخادم بنجاح"
     },
     "security": {
       "IP_BLACKLISTED": "تم حظر عنوان IP هذا، يرجى المحاولة لاحقاً",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "الخادم يتطلب المصادقة الثنائية. اتصل بالمشرف للربط قبل تسجيل الدخول",
       "TWO_FACTOR_REQUIRED": "التحقق الثنائي مطلوب، أدخل رمز 2FA",
       "INVALID_CODE": "رمز التحقق غير صحيح",
-      "TOO_MANY_ATTEMPTS": "محاولات كثيرة، يرجى المحاولة لاحقاً"
+      "TOO_MANY_ATTEMPTS": "محاولات كثيرة، يرجى المحاولة لاحقاً",
+      "MASTER_KEY_MISSING": "لم يتم تهيئة المفتاح الرئيسي لـ 2FA على الخادم، ولا يمكن تفعيل التحقق الثنائي",
+      "NOT_ENABLED": "التحقق الثنائي غير مفعل",
+      "NO_SECRET": "لم يتم ربط 2FA بعد، يرجى إتمام الربط أولاً",
+      "SECRET_DECRYPT_FAILED": "فشل فك تشفير مفتاح 2FA، يرجى إعادة الربط"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "فشل جلب قائمة المستخدمين",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "تم جلب سجلات تسجيل الدخول بنجاح",
       "LOGIN_RECORDS_FETCH_FAILED": "فشل جلب سجلات تسجيل الدخول",
       "SCOPED_TOKEN_CREATE_SUCCESS": "تم إنشاء الرمز المحدود بنجاح",
-      "SCOPED_TOKEN_CREATE_FAILED": "فشل إنشاء الرمز المحدود"
+      "SCOPED_TOKEN_CREATE_FAILED": "فشل إنشاء الرمز المحدود",
+      "CANNOT_DELETE_SUPER_ADMIN": "لا يمكن حذف حساب المشرف الأعلى"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "تم جلب قائمة الصلاحيات بنجاح",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "الاسم لا يمكن أن يكون فارغاً",
       "CUSTOM_PATH_PATH_EXISTS": "المسار موجود بالفعل",
       "CUSTOM_PATH_REMOVE_SUCCESS": "تمت إزالة المسار المخصص بنجاح",
-      "CUSTOM_PATH_SAVE_FAILED": "فشل حفظ المسار المخصص"
+      "CUSTOM_PATH_SAVE_FAILED": "فشل حفظ المسار المخصص",
+      "CHECK_CHUNK_SUCCESS": "تم التحقق من الجزء بنجاح",
+      "CHUNK_MISMATCH": "الجزء غير متطابق مع المجموع الاختباري، يرجى إعادة تحميله",
+      "CONFIG_FETCH_SUCCESS": "تم جلب إعدادات الفهرس بنجاح",
+      "CONFIG_RESET_SUCCESS": "تمت إعادة تعيين إعدادات الفهرس بنجاح",
+      "CONFIG_SAVE_SUCCESS": "تم حفظ إعدادات الفهرس بنجاح",
+      "DIRECTORY_LIST_TIMEOUT": "انتهت مدة قراءة المجلد، يرجى إعادة المحاولة",
+      "DIRECTORY_LIST_WORKER_ERROR": "أبلغت عملية قراءة المجلد عن خطأ",
+      "DIRECTORY_LIST_WORKER_EXITED": "خرجت عملية قراءة المجلد بشكل غير متوقع (الرمز %s)، يرجى إعادة المحاولة",
+      "DOWNLOAD_FAILED": "فشل التحميل",
+      "FILE_NOT_EXIST": "الملف غير موجود",
+      "GET_ATTRIBUTES_FAILED": "فشل قراءة خصائص الملف",
+      "GLOBAL_SEARCH_SUCCESS": "تم إكمال البحث",
+      "LOG_CANNOT_CANCEL": "لقد بدأت هذه المهمة ولا يمكن إلغاؤها",
+      "LOG_CLEAR_FAILED": "فشل إفراغ السجلات",
+      "LOG_CLEAR_SUCCESS": "تم إفراغ السجلات بنجاح",
+      "LOG_NOT_FOUND": "مدخل السجل غير موجود",
+      "MISSING_PREVIOUS_CHUNKS": "الأجزاء السابقة مفقودة، يرجى التحميل بالترتيب",
+      "NOT_FOUND": "غير موجود",
+      "NO_FILE_SELECTED": "لم يتم اختيار أي ملف",
+      "OPERATION_CANCELLED": "تم إلغاء العملية",
+      "OPERATION_CANCEL_FAILED": "فشل إلغاء العملية",
+      "PERMISSION_DENIED": "صلاحيات غير كافية",
+      "RECENT_CLEAR_FAILED": "فشل إفراغ قائمة الزيارات الأخيرة",
+      "RECENT_CLEAR_SUCCESS": "تم إفراغ قائمة الزيارات الأخيرة",
+      "RENAME_SUCCESS": "تمت إعادة التسمية بنجاح",
+      "TINY_PENDING": "يجري إنشاء الصورة المصغرة، يرجى إعادة المحاولة",
+      "TINY_TIMEOUT": "انتهت مدة إنشاء الصورة المصغرة، يرجى إعادة المحاولة",
+      "UNKNOWN_WORKER_TASK": "نوع مهمة خلفية غير معروف",
+      "UPLOAD_CHUNK_SUCCESS": "تم تحميل الجزء بنجاح",
+      "UPLOAD_COMPLETED": "تم إكمال التحميل"
     },
     "quickShare": {
       "INVALID_TOKEN": "بيانات اعتماد المشاركة غير صالحة",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "تم استعادة الصورة من سلة المحذوفات بنجاح",
       "TRASH_DELETE_SUCCESS": "تم حذف الصورة من سلة المحذوفات بنجاح",
       "TRASH_EMPTY_SUCCESS": "تم إفراغ سلة المحذوفات بنجاح",
-      "PHOTO_COLLECTION_NAME_EXISTS": "يوجد مجموعة بهذا الاسم بالفعل"
+      "PHOTO_COLLECTION_NAME_EXISTS": "يوجد مجموعة بهذا الاسم بالفعل",
+      "PHOTO_SOURCE_LIST_EMPTY": "لم تتم إضافة أي مجلدات مصدر للصور",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "فهرس مصدر الصور خارج النطاق"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "تم جلب مجلدات مصدر الفيديو بنجاح",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "فشل تسلسل معلومات المستخدم",
       "USER_PARSE_FAILED": "فشل تحليل معلومات المستخدم",
       "DB_WRITE_FAILED": "فشل كتابة الإعدادات",
-      "DB_CONNECTION_FAILED": "فشل الاتصال بقاعدة البيانات"
+      "DB_CONNECTION_FAILED": "فشل الاتصال بقاعدة البيانات",
+      "P2P_BIND_FAILED": "فشل ربط P2P، يرجى إعادة المحاولة",
+      "TEMP_CODE_FAILED": "فشل الحصول على الرمز المؤقت",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "واجهة رمز الاقتران المخصص غير متاحة. يرجى المحاولة لاحقاً",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "فشل تعيين رمز الاقتران المخصص. يرجى المحاولة لاحقاً",
+      "DDNS_NOT_CONFIGURED": "لم يتم تهيئة DNS الديناميكي بعد. يرجى تعيين اسم النطاق في الإعدادات أولاً",
+      "DEVICE_NOT_BOUND": "هذا الجهاز غير مرتبط بحساب. يرجى ربط الجهاز أولاً",
+      "NEED_VIP": "تتطلب هذه الميزة عضوية. يرجى الترقية والمحاولة مرة أخرى",
+      "DEVICE_COUNT_LIMIT": "وصل الحساب إلى الحد الأقصى للأجهزة. يرجى إلغاء ربط جهاز آخر أولاً",
+      "REMOTE_ERROR": "أرجعت الخدمة البعيدة خطأ: %s"
     },
     "terminal": {
       "START_FAILED": "فشل بدء الطرفية",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "رقم الصفحة يجب أن يكون عدداً صحيحاً أكبر من 0",
       "LIMIT_INVALID": "العدد لكل صفحة يجب أن يكون بين 1 و100",
       "ID_INVALID": "المعرف يجب أن يكون عدداً صحيحاً أكبر من 0",
-      "KEYWORD_LENGTH_INVALID": "كلمة البحث يجب أن تكون بين 1 و100 حرف"
+      "KEYWORD_LENGTH_INVALID": "كلمة البحث يجب أن تكون بين 1 و100 حرف",
+      "INVALID_VALUE": "قيمة غير صالحة"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "كلمة المرور غير صحيحة",
       "SIGN_FILE_MISSING": "ملف تعريف المساحة المشفرة غير موجود أو فارغ",
-      "SPACE_DB_INVALID": "قاعدة بيانات فهرس المساحة المشفرة غير موجودة أو تالفة"
+      "SPACE_DB_INVALID": "قاعدة بيانات فهرس المساحة المشفرة غير موجودة أو تالفة",
+      "SPACE_FOLDER_MISSING": "مجلد المساحة المشفرة غير موجود أو تم نقله. يرجى التحقق من المسار والمحاولة مرة أخرى"
     },
     "apiSetting": {
       "FETCH_SUCCESS": "تم الجلب بنجاح",
@@ -352,7 +422,14 @@
       "ERROR": "حدث خطأ",
       "NOT_FOUND": "غير موجود",
       "UNAUTHORIZED": "غير مصرح",
-      "FORBIDDEN": "الوصول مرفوض"
+      "FORBIDDEN": "الوصول مرفوض",
+      "DELETE_SUCCESS": "تم الحذف بنجاح",
+      "DUPLICATE": "يوجد سجل بنفس الاسم بالفعل",
+      "INVALID_PARAMS": "معلمات غير صالحة",
+      "PARAM_ERROR": "خطأ في المعلمة",
+      "ENDPOINT_NOT_FOUND": "الواجهة غير موجودة",
+      "INTERNAL_SERVER_ERROR": "خطأ داخلي في الخادم",
+      "RESOURCE_NOT_FOUND": "المورد غير موجود"
     },
     "mediaTool": {
       "INVALID_PARAMS": "معلمات خاطئة",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "فشل تنفيذ أمر Docker",
       "CONFIG_SAVE_FAILED": "فشل حفظ إعدادات Docker",
       "INVALID_PROXY_URL": "تنسيق عنوان URL للوكيل غير صحيح",
-      "TASK_NOT_FOUND": "مهمة Docker غير موجودة"
+      "TASK_NOT_FOUND": "مهمة Docker غير موجودة",
+      "IMAGE_ARCHIVE_NOT_FOUND": "ملف الصورة غير موجود",
+      "IMAGE_ARCHIVE_REQUIRED": "يلزم اختيار ملف صورة",
+      "IMAGE_IN_USE": "الصورة مستخدمة من قبل حاوية ولا يمكن حذفها",
+      "INVALID_CONFIG_JSON": "تنسيق JSON للإعدادات غير صحيح",
+      "INVALID_IMAGE_ARCHIVE": "ملف الصورة غير صالح",
+      "START_FAILED": "فشل التشغيل",
+      "STOP_FAILED": "فشل الإيقاف",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "لا يمكن حذف مهمة قيد التشغيل"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "الإضافات المطلوبة لهذه الميزة لا تزال قيد التنزيل. يرجى المحاولة لاحقًا."
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "فشل بدء تثبيت التخزين السحابي. يرجى المحاولة مرة أخرى",
+      "START_FAILED": "فشل بدء تثبيت التخزين السحابي",
+      "START_TIMEOUT": "انتهت مهلة بدء تثبيت التخزين السحابي. يرجى المحاولة مرة أخرى",
+      "STOP_TIMEOUT": "انتهت مهلة إيقاف تثبيت التخزين السحابي",
+      "WORKER_SEND_FAILED": "فشل الاتصال بعملية تثبيت OpenList",
+      "STORAGE_SYNC_FAILED": "فشل مزامنة إعدادات التخزين السحابي",
+      "STORAGE_NOT_FOUND": "لم يتم العثور على التخزين في OpenList",
+      "INVALID_MOUNT_NAME": "اسم التثبيت غير صالح (يجب أن يتوافق مع تسمية المجلدات)",
+      "MOUNT_PARENT_NO_ACCESS": "المسار الأصلي للتثبيت يجب أن يكون قابلاً للقراءة والكتابة",
+      "OBSCURE_FAILED": "فشل تشفير كلمة المرور على الخادم. يرجى المحاولة مرة أخرى",
+      "SERVICE_START_TIMEOUT": "انتهت مهلة بدء خدمة OpenList",
+      "BINARY_NOT_FOUND": "لم يتم العثور على الملف التنفيذي لـ OpenList",
+      "PLATFORM_NOT_SUPPORTED": "هذه الميزة غير مدعومة على المنصة الحالية",
+      "ADMIN_PASSWORD_MISSING": "كلمة مرور مشرف OpenList غير مهيأة",
+      "ADMIN_SET_FAILED": "فشل تعيين حساب مشرف OpenList",
+      "ADMIN_TOKEN_FAILED": "فشل الحصول على رمز مشرف OpenList",
+      "ADMIN_TOKEN_PARSE_FAILED": "فشل تحليل رمز مشرف OpenList",
+      "BASE_URL_MISSING": "عنوان URL الأساسي لـ OpenList غير مهيأ",
+      "DB_INIT_FAILED": "فشل تهيئة قاعدة بيانات OpenList",
+      "DB_NOT_READY": "قاعدة بيانات OpenList غير جاهزة",
+      "DRIVER_NOT_ALLOWED": "نوع التخزين غير مدعوم",
+      "MOUNT_PARENT_NOT_DIR": "المسار الأصلي للتثبيت يجب أن يكون مجلداً",
+      "MOUNT_PARENT_NOT_FOUND": "المسار الأصلي للتثبيت غير موجود",
+      "STOP_FAILED": "فشل إيقاف التثبيت",
+      "STORAGE_INIT_FAILED": "فشل تهيئة التخزين السحابي: %s",
+      "TIMEOUT": "انتهت مدة العملية، يرجى إعادة المحاولة"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "خدمة التحميل (Transmission) غير متاحة. يرجى تثبيت transmission-daemon وتشغيله أولاً",
+      "STARTED": "تم تشغيل خدمة التحميل",
+      "START_FAILED": "فشل تشغيل خدمة التحميل",
+      "START_FAILED_DETAIL": "فشل تشغيل خدمة التحميل: %s",
+      "STOPPED": "تم إيقاف خدمة التحميل",
+      "STOP_FAILED": "فشل إيقاف خدمة التحميل",
+      "STOP_FAILED_DETAIL": "فشل إيقاف خدمة التحميل: %s",
+      "RESTARTED": "تمت إعادة تشغيل خدمة التحميل",
+      "CONFIG_SAVED": "تم حفظ الإعدادات",
+      "TORRENT_ADDED": "تمت إضافة المهمة",
+      "TORRENT_FILE_REQUIRED": "يرجى اختيار ملف تورنت لإضافته",
+      "DOWNLOAD_DIR_REQUIRED": "يرجى تحديد مجلد التحميل",
+      "PORT_INVALID": "منفذ غير صالح: %s. يرجى إدخال منفذ بين 1024 و65535",
+      "PORT_DISABLED": "هذا المنفذ محجوز من قبل النظام (0-1023). يرجى استخدام منفذ أعلى من 1024",
+      "PORT_RESERVED": "هذا المنفذ مستخدم بالفعل من قبل خدمة أخرى. يرجى اختيار منفذ آخر",
+      "RPC_ERROR": "أرجعت خدمة التحميل خطأ: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "يرجى اختيار دفتر ملاحظات أولاً",
+      "NOTEBOOK_NOT_FOUND": "دفتر الملاحظات غير موجود أو تم حذفه",
+      "NOTEBOOK_INVALID": "اسم دفتر الملاحظات غير صالح. يرجى استخدام 1 إلى 50 حرفاً",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "لا يزال دفتر الملاحظات يحتوي على ملاحظات ولا يمكن حذفه",
+      "GROUP_NOT_EMPTY": "لا تزال المجموعة تحتوي على دفاتر ملاحظات ولا يمكن حذفها"
+    },
+    "system": {
+      "NOT_SUPPORTED": "هذه العملية غير مدعومة في وضع التشغيل الحالي"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "تم جلب قائمة التطبيقات بنجاح",
+      "SET_HIDE_APPS_SUCCESS": "تم تحديث ظهور التطبيقات بنجاح",
+      "HIDE_APP_SUCCESS": "تم إخفاء التطبيق",
+      "UNHIDE_APP_SUCCESS": "تم إظهار التطبيق",
+      "SET_APPS_ORDER_SUCCESS": "تم حفظ ترتيب التطبيقات"
     }
   },
   "places365": {

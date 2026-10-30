@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "ไฟล์คำบรรยายนี้หมดอายุแล้ว โปรดดาวน์โหลดคำบรรยายอื่น",
-      "SUBTITLE_DELETE_FAILED": "ลบคำบรรยายไม่สำเร็จ"
+      "SUBTITLE_DELETE_FAILED": "ลบคำบรรยายไม่สำเร็จ",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "ลบคำบรรยายที่อัปโหลดไม่สำเร็จ",
+      "GET_INFO_FAILED": "ดึงข้อมูลวิดีโอล้มเหลว",
+      "INVALID_PARAMS": "พารามิเตอร์ไม่ถูกต้อง",
+      "SAVE_PREFERENCE_FAILED": "บันทึกการตั้งค่าการเล่นล้มเหลว",
+      "SUBTITLE_DOWNLOAD_FAILED": "ดาวน์โหลดคำบรรยายไม่สำเร็จ",
+      "SUBTITLE_SEARCH_FAILED": "ค้นหาคำบรรยายไม่สำเร็จ",
+      "SUBTITLE_UNSUPPORTED": "ไม่รองรับรูปแบบคำบรรยายนี้",
+      "TRANSCODE_FAILED": "ทรานส์โคดล้มเหลว โปรดลองอีกครั้งภายหลัง",
+      "UPLOAD_SUBTITLE_FAILED": "อัปโหลดคำบรรยายไม่สำเร็จ"
     },
     "fileMount": {
       "START_FAILED": "การเริ่มเมาท์ล้มเหลว: %s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "เข้าสู่ระบบบนอุปกรณ์ใหม่ %s (เวอร์ชัน OS: %s)",
       "UNKNOWN_DEVICE": "อุปกรณ์ที่ไม่รู้จัก",
       "IP_BLACKLIST_ADMIN_TITLE": "แจ้งเตือนความปลอดภัย",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s ถูกบล็อกชั่วคราวเนื่องจากป้อนชื่อผู้ใช้หรือรหัสผ่านผิดหลายครั้ง หากไม่ใช่คุณ โปรดเปลี่ยนรหัสผ่านทันทีและเปิดใช้ 2FA เพื่อความปลอดภัยของบัญชี"
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s ถูกบล็อกชั่วคราวเนื่องจากป้อนชื่อผู้ใช้หรือรหัสผ่านผิดหลายครั้ง หากไม่ใช่คุณ โปรดเปลี่ยนรหัสผ่านทันทีและเปิดใช้ 2FA เพื่อความปลอดภัยของบัญชี",
+      "ADD_SUCCESS": "เพิ่มสำเร็จ",
+      "CLEAR_SUCCESS": "ล้างสำเร็จ",
+      "DELETE_SUCCESS": "ลบสำเร็จ",
+      "MARK_READ_SUCCESS": "ทำเครื่องหมายว่าอ่านแล้ว",
+      "MESSAGE_ID_REQUIRED": "จำเป็นต้องมี ID ข้อความ",
+      "MESSAGE_NOT_FOUND": "ไม่พบข้อความ",
+      "MESSAGE_REQUIRED": "เนื้อหาข้อความต้องไม่ว่างเปล่า"
     },
     "auth": {
       "SYS_NO_INIT": "ระบบยังไม่ได้รับการเริ่มต้น",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "เนื่องจากเหตุผลด้านความปลอดภัย การดำเนินการนี้รองรับเฉพาะภายในเครือข่ายท้องถิ่นเดียวกัน",
       "RECOVER_ADMIN_LAN_ONLY": "จุดเชื่อมต่อนี้ใช้กู้รหัสผ่านผู้ดูแลระบบเท่านั้นและใช้ได้เฉพาะในเครือข่าย LAN โปรดป้อนชื่อผู้ใช้ของผู้ดูแลระบบ ผู้ใช้ทั่วไปโปรดให้ผู้ดูแลระบบเปลี่ยนรหัสผ่านใน \"การจัดการผู้ใช้\"",
       "PASSWORD_RESET_SUCCESS": "รีเซ็ตรหัสผ่านผู้ดูแลระบบสำเร็จ",
-      "PASSWORD_RESET_FAILED": "รีเซ็ตรหัสผ่านผู้ดูแลระบบล้มเหลว"
+      "PASSWORD_RESET_FAILED": "รีเซ็ตรหัสผ่านผู้ดูแลระบบล้มเหลว",
+      "GET_ONLINE_USERS_FAILED": "ดึงรายการผู้ใช้ที่ออนไลน์ล้มเหลว",
+      "RECOVER_INFO_FETCH_FAILED": "ดึงข้อมูลการกู้รหัสผ่านล้มเหลว",
+      "RECOVER_INFO_FETCH_SUCCESS": "ดึงข้อมูลการกู้รหัสผ่านสำเร็จ",
+      "UNAUTHORIZED": "ไม่ได้รับอนุญาต โปรดเข้าสู่ระบบอีกครั้ง",
+      "SUPER_ADMIN_CHECK_SUCCESS": "ตรวจสอบผู้ดูแลระบบหลักเรียบร้อยแล้ว",
+      "SERVER_STATUS_CHECK_SUCCESS": "ดึงสถานะเซิร์ฟเวอร์สำเร็จ"
     },
     "security": {
       "IP_BLACKLISTED": "IP นี้ถูกแบน โปรดลองอีกครั้งในภายหลัง",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "การตรวจสอบสิทธิ์สองปัจจัยจำเป็นต้องเปิดใช้งาน โปรดเปิดใช้งานก่อน",
       "TWO_FACTOR_REQUIRED": "ต้องการการตรวจสอบสิทธิ์สองปัจจัย โปรดป้อนรหัส 2FA ของคุณ",
       "INVALID_CODE": "รหัสยืนยันไม่ถูกต้อง",
-      "TOO_MANY_ATTEMPTS": "ความพยายามในการยืนยันมากเกินไป โปรดลองอีกครั้งในภายหลัง"
+      "TOO_MANY_ATTEMPTS": "ความพยายามในการยืนยันมากเกินไป โปรดลองอีกครั้งในภายหลัง",
+      "MASTER_KEY_MISSING": "เซิร์ฟเวอร์ยังไม่ได้ตั้งคีย์หลัก 2FA จึงไม่สามารถเปิดใช้การตรวจสอบสิทธิ์สองปัจจัยได้",
+      "NOT_ENABLED": "ยังไม่ได้เปิดใช้การตรวจสอบสิทธิ์สองปัจจัย",
+      "NO_SECRET": "ยังไม่ได้ผูก 2FA โปรดผูกให้เสร็จก่อน",
+      "SECRET_DECRYPT_FAILED": "ถอดรหัสคีย์ลับ 2FA ล้มเหลว โปรดผูกอีกครั้ง"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "ดึงรายการผู้ใช้ล้มเหลว",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "ดึงบันทึกการเข้าสู่ระบบสำเร็จ",
       "LOGIN_RECORDS_FETCH_FAILED": "ดึงบันทึกการเข้าสู่ระบบล้มเหลว",
       "SCOPED_TOKEN_CREATE_SUCCESS": "สร้างโทเค็นที่มีขอบเขตสำเร็จ",
-      "SCOPED_TOKEN_CREATE_FAILED": "สร้างโทเค็นที่มีขอบเขตล้มเหลว"
+      "SCOPED_TOKEN_CREATE_FAILED": "สร้างโทเค็นที่มีขอบเขตล้มเหลว",
+      "CANNOT_DELETE_SUPER_ADMIN": "ไม่สามารถลบผู้ดูแลระบบสูงสุดได้"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "ดึงรายการการอนุญาตสำเร็จ",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "ชื่อจำเป็นต้องกรอก",
       "CUSTOM_PATH_PATH_EXISTS": "พาธมีอยู่แล้ว",
       "CUSTOM_PATH_REMOVE_SUCCESS": "ลบพาธที่กำหนดเองสำเร็จ",
-      "CUSTOM_PATH_SAVE_FAILED": "บันทึกพาธที่กำหนดเองล้มเหลว"
+      "CUSTOM_PATH_SAVE_FAILED": "บันทึกพาธที่กำหนดเองล้มเหลว",
+      "CHECK_CHUNK_SUCCESS": "ตรวจสอบชิ้นส่วนสำเร็จ",
+      "CHUNK_MISMATCH": "ผลตรวจสอบชิ้นส่วนไม่ตรงกัน โปรดอัปโหลดชิ้นส่วนนี้อีกครั้ง",
+      "CONFIG_FETCH_SUCCESS": "ดึงการตั้งค่าดัชนีสำเร็จ",
+      "CONFIG_RESET_SUCCESS": "รีเซ็ตการตั้งค่าดัชนีสำเร็จ",
+      "CONFIG_SAVE_SUCCESS": "บันทึกการตั้งค่าดัชนีสำเร็จ",
+      "DIRECTORY_LIST_TIMEOUT": "หมดเวลาอ่านไดเรกทอรี โปรดลองอีกครั้งภายหลัง",
+      "DIRECTORY_LIST_WORKER_ERROR": "โปรเซสอ่านไดเรกทอรีรายงานข้อผิดพลาด",
+      "DIRECTORY_LIST_WORKER_EXITED": "โปรเซสอ่านไดเรกทอรีหยุดทำงานอย่างไม่คาดคิด (รหัสออก %s) โปรดลองอีกครั้ง",
+      "DOWNLOAD_FAILED": "ดาวน์โหลดล้มเหลว",
+      "FILE_NOT_EXIST": "ไม่มีไฟล์นี้อยู่",
+      "GET_ATTRIBUTES_FAILED": "ดึงคุณสมบัติไฟล์ล้มเหลว",
+      "GLOBAL_SEARCH_SUCCESS": "ค้นหาเสร็จสิ้นแล้ว",
+      "LOG_CANNOT_CANCEL": "งานนี้เริ่มทำงานแล้ว ไม่สามารถยกเลิกได้",
+      "LOG_CLEAR_FAILED": "ล้างบันทึกล้มเหลว",
+      "LOG_CLEAR_SUCCESS": "ล้างบันทึกสำเร็จ",
+      "LOG_NOT_FOUND": "ไม่พบบันทึก",
+      "MISSING_PREVIOUS_CHUNKS": "ชิ้นส่วนก่อนหน้าขาดหายไป โปรดอัปโหลดตามลำดับ",
+      "NOT_FOUND": "ไม่พบ",
+      "NO_FILE_SELECTED": "ยังไม่ได้เลือกไฟล์",
+      "OPERATION_CANCELLED": "การดำเนินการถูกยกเลิกแล้ว",
+      "OPERATION_CANCEL_FAILED": "ยกเลิกการดำเนินการล้มเหลว",
+      "PERMISSION_DENIED": "การอนุญาตไม่เพียงพอ",
+      "RECENT_CLEAR_FAILED": "ล้างการเข้าถึงล่าสุดล้มเหลว",
+      "RECENT_CLEAR_SUCCESS": "ล้างการเข้าถึงล่าสุดสำเร็จ",
+      "RENAME_SUCCESS": "เปลี่ยนชื่อสำเร็จ",
+      "TINY_PENDING": "กำลังสร้างภาพขนาดย่อ โปรดลองอีกครั้งภายหลัง",
+      "TINY_TIMEOUT": "หมดเวลาสร้างภาพขนาดย่อ โปรดลองอีกครั้งภายหลัง",
+      "UNKNOWN_WORKER_TASK": "ไม่รู้จักประเภทงานเบื้องหลัง",
+      "UPLOAD_CHUNK_SUCCESS": "อัปโหลดชิ้นส่วนสำเร็จ",
+      "UPLOAD_COMPLETED": "อัปโหลดเสร็จสิ้นแล้ว"
     },
     "quickShare": {
       "INVALID_TOKEN": "凭证การแชร์ไม่ถูกต้อง",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "รูปภาพถูกกู้คืนจากถังขยะแล้ว",
       "TRASH_DELETE_SUCCESS": "รูปภาพถูกลบจากถังขยะแล้ว",
       "TRASH_EMPTY_SUCCESS": "ถังขยะถูกล้างแล้ว",
-      "PHOTO_COLLECTION_NAME_EXISTS": "ชื่อคอลเลกชันมีอยู่แล้ว"
+      "PHOTO_COLLECTION_NAME_EXISTS": "ชื่อคอลเลกชันมีอยู่แล้ว",
+      "PHOTO_SOURCE_LIST_EMPTY": "ยังไม่ได้เพิ่มไดเรกทอรีต้นทางรูปภาพ",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "ลำดับไดเรกทอรีต้นทางรูปภาพเกินช่วงที่กำหนด"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "ดึงไดเรกทอรีต้นทางวิดีโอสำเร็จ",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "การทำให้ข้อมูลผู้ใช้เป็นอนุกรมล้มเหลว",
       "USER_PARSE_FAILED": "การแยกวิเคราะห์ข้อมูลผู้ใช้ล้มเหลว",
       "DB_WRITE_FAILED": "การเขียนการตั้งค่าล้มเหลว",
-      "DB_CONNECTION_FAILED": "การเชื่อมต่อฐานข้อมูลล้มเหลว"
+      "DB_CONNECTION_FAILED": "การเชื่อมต่อฐานข้อมูลล้มเหลว",
+      "P2P_BIND_FAILED": "ผูก P2P ล้มเหลว โปรดลองอีกครั้งภายหลัง",
+      "TEMP_CODE_FAILED": "ดึงรหัสชั่วคราวล้มเหลว",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "จุดเชื่อมต่อสำหรับกำหนดรหัสคู่เองไม่พร้อมใช้งาน โปรดลองอีกครั้งภายหลัง",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "ตั้งรหัสคู่เองล้มเหลว โปรดลองอีกครั้งภายหลัง",
+      "DDNS_NOT_CONFIGURED": "ยังไม่ได้ตั้งค่า DDNS โปรดกรอกชื่อโดเมนในการตั้งค่าก่อน",
+      "DEVICE_NOT_BOUND": "อุปกรณ์นี้ยังไม่ได้ผูกกับบัญชี โปรดผูกอุปกรณ์ก่อน",
+      "NEED_VIP": "ฟังก์ชันนี้ต้องมีสิทธิ์สมาชิก โปรดอัปเกรดแล้วลองอีกครั้ง",
+      "DEVICE_COUNT_LIMIT": "จำนวนอุปกรณ์ในบัญชีถึงขีดจำกัดแล้ว โปรดยกเลิกการผูกอุปกรณ์อื่นก่อน",
+      "REMOTE_ERROR": "บริการระยะไกลตอบกลับข้อผิดพลาด: %s"
     },
     "terminal": {
       "START_FAILED": "การเริ่มเทอร์มินัลล้มเหลว",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "หมายเลขหน้าต้องเป็นจำนวนเต็มที่มากกว่า 0",
       "LIMIT_INVALID": "จำนวนต่อหน้าต้องเป็นจำนวนเต็มระหว่าง 1 ถึง 100",
       "ID_INVALID": "ID ต้องเป็นจำนวนเต็มที่มากกว่า 0",
-      "KEYWORD_LENGTH_INVALID": "ความยาวคำค้นหาต้องอยู่ระหว่าง 1 ถึง 100 ตัวอักษร"
+      "KEYWORD_LENGTH_INVALID": "ความยาวคำค้นหาต้องอยู่ระหว่าง 1 ถึง 100 ตัวอักษร",
+      "INVALID_VALUE": "ค่าไม่ถูกต้อง"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "รหัสผ่านไม่ถูกต้อง",
       "SIGN_FILE_MISSING": "ไฟล์ระบุพื้นที่เข้ารหัสไม่มีอยู่หรือว่างเปล่า",
-      "SPACE_DB_INVALID": "ฐานข้อมูลดัชนีพื้นที่เข้ารหัสไม่มีอยู่หรือเสียหาย"
+      "SPACE_DB_INVALID": "ฐานข้อมูลดัชนีพื้นที่เข้ารหัสไม่มีอยู่หรือเสียหาย",
+      "SPACE_FOLDER_MISSING": "โฟลเดอร์พื้นที่เข้ารหัสไม่มีอยู่หรือถูกย้ายไปแล้ว โปรดตรวจสอบพาธแล้วลองอีกครั้ง"
     },
     "apiSetting": {
       "FETCH_SUCCESS": "ดึงสำเร็จ",
@@ -352,7 +422,14 @@
       "ERROR": "เกิดข้อผิดพลาด",
       "NOT_FOUND": "ไม่พบ",
       "UNAUTHORIZED": "ไม่ได้รับอนุญาต",
-      "FORBIDDEN": "ห้ามเข้าถึง"
+      "FORBIDDEN": "ห้ามเข้าถึง",
+      "DELETE_SUCCESS": "ลบสำเร็จ",
+      "DUPLICATE": "มีรายการชื่อเดียวกันอยู่แล้ว",
+      "INVALID_PARAMS": "พารามิเตอร์ไม่ถูกต้อง",
+      "PARAM_ERROR": "พารามิเตอร์ผิดพลาด",
+      "ENDPOINT_NOT_FOUND": "ไม่พบจุดเชื่อมต่อ",
+      "INTERNAL_SERVER_ERROR": "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์",
+      "RESOURCE_NOT_FOUND": "ไม่พบทรัพยากร"
     },
     "mediaTool": {
       "INVALID_PARAMS": "พารามิเตอร์ผิดพลาด",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "คำสั่ง Docker ทำงานล้มเหลว",
       "CONFIG_SAVE_FAILED": "บันทึกการตั้งค่า Docker ไม่สำเร็จ",
       "INVALID_PROXY_URL": "รูปแบบ URL พร็อกซีไม่ถูกต้อง",
-      "TASK_NOT_FOUND": "ไม่พบงาน Docker"
+      "TASK_NOT_FOUND": "ไม่พบงาน Docker",
+      "IMAGE_ARCHIVE_NOT_FOUND": "ไม่พบไฟล์แพ็กเกจอิมเมจ",
+      "IMAGE_ARCHIVE_REQUIRED": "กรุณาเลือกไฟล์แพ็กเกจอิมเมจ",
+      "IMAGE_IN_USE": "อิมเมจถูกใช้งานโดยคอนเทนเนอร์อยู่ ไม่สามารถลบได้",
+      "INVALID_CONFIG_JSON": "รูปแบบ JSON ของการตั้งค่าไม่ถูกต้อง",
+      "INVALID_IMAGE_ARCHIVE": "ไฟล์แพ็กเกจอิมเมจไม่ถูกต้อง",
+      "START_FAILED": "เริ่มทำงานล้มเหลว",
+      "STOP_FAILED": "หยุดทำงานล้มเหลว",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "งานกำลังทำงานอยู่ ไม่สามารถลบได้"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "ปลั๊กอินที่จำเป็นสำหรับฟีเจอร์นี้ยังดาวน์โหลดไม่เสร็จ โปรดลองอีกครั้งในภายหลัง"
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "การเริ่มเมาท์ OpenList ล้มเหลว โปรดลองอีกครั้งภายหลัง",
+      "START_FAILED": "การเริ่มเมาท์ OpenList ล้มเหลว",
+      "START_TIMEOUT": "หมดเวลาเริ่มเมาท์ OpenList โปรดลองอีกครั้งภายหลัง",
+      "STOP_TIMEOUT": "หมดเวลาหยุดเมาท์ OpenList",
+      "WORKER_SEND_FAILED": "สื่อสารกับโปรเซสเมาท์ OpenList ไม่สำเร็จ",
+      "STORAGE_SYNC_FAILED": "ซิงค์การตั้งค่าพื้นที่เก็บข้อมูลคลาวด์ไม่สำเร็จ",
+      "STORAGE_NOT_FOUND": "ไม่พบพื้นที่เก็บข้อมูลที่ตรงกันใน OpenList",
+      "INVALID_MOUNT_NAME": "ชื่อเมาท์ไม่ถูกต้อง (ต้องเป็นไปตามข้อกำหนดของชื่อโฟลเดอร์)",
+      "MOUNT_PARENT_NO_ACCESS": "พาธแม่ของเมาท์ต้องสามารถอ่านและเขียนได้",
+      "OBSCURE_FAILED": "เข้ารหัสรหัสผ่านบนเซิร์ฟเวอร์ไม่สำเร็จ โปรดตรวจสอบสภาพแวดล้อมของเซิร์ฟเวอร์แล้วลองอีกครั้ง",
+      "SERVICE_START_TIMEOUT": "หมดเวลาเริ่มบริการ OpenList",
+      "BINARY_NOT_FOUND": "ไม่พบไฟล์ปฏิบัติการของ OpenList",
+      "PLATFORM_NOT_SUPPORTED": "แพลตฟอร์มปัจจุบันไม่รองรับฟังก์ชันนี้",
+      "ADMIN_PASSWORD_MISSING": "ยังไม่ได้ตั้งรหัสผ่านผู้ดูแล OpenList",
+      "ADMIN_SET_FAILED": "ตั้งค่าผู้ดูแล OpenList ล้มเหลว",
+      "ADMIN_TOKEN_FAILED": "ดึงโทเค็นผู้ดูแล OpenList ล้มเหลว",
+      "ADMIN_TOKEN_PARSE_FAILED": "แยกวิเคราะห์โทเค็นผู้ดูแล OpenList ล้มเหลว",
+      "BASE_URL_MISSING": "ยังไม่ได้ตั้งที่อยู่บริการ OpenList",
+      "DB_INIT_FAILED": "เริ่มต้นฐานข้อมูล OpenList ล้มเหลว",
+      "DB_NOT_READY": "ฐานข้อมูล OpenList ยังไม่พร้อม",
+      "DRIVER_NOT_ALLOWED": "ไม่รองรับประเภทพื้นที่เก็บข้อมูลนี้",
+      "MOUNT_PARENT_NOT_DIR": "พาธแม่ของเมาท์ต้องเป็นไดเรกทอรี",
+      "MOUNT_PARENT_NOT_FOUND": "ไม่พบพาธแม่ของเมาท์",
+      "STOP_FAILED": "หยุดเมาท์ OpenList ล้มเหลว",
+      "STORAGE_INIT_FAILED": "เริ่มต้นพื้นที่เก็บข้อมูลคลาวด์ล้มเหลว: %s",
+      "TIMEOUT": "การดำเนินการหมดเวลา โปรดลองอีกครั้งภายหลัง"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "บริการดาวน์โหลด (Transmission) ไม่พร้อมใช้งาน กรุณาติดตั้งและเริ่ม transmission-daemon ก่อน",
+      "STARTED": "เริ่มบริการดาวน์โหลดแล้ว",
+      "START_FAILED": "เริ่มบริการดาวน์โหลดล้มเหลว",
+      "START_FAILED_DETAIL": "เริ่มบริการดาวน์โหลดล้มเหลว: %s",
+      "STOPPED": "หยุดบริการดาวน์โหลดแล้ว",
+      "STOP_FAILED": "หยุดบริการดาวน์โหลดล้มเหลว",
+      "STOP_FAILED_DETAIL": "หยุดบริการดาวน์โหลดล้มเหลว: %s",
+      "RESTARTED": "รีสตาร์ทบริการดาวน์โหลดแล้ว",
+      "CONFIG_SAVED": "บันทึกการตั้งค่าแล้ว",
+      "TORRENT_ADDED": "เพิ่มงานแล้ว",
+      "TORRENT_FILE_REQUIRED": "กรุณาเลือกไฟล์ทอร์เรนต์ที่ต้องการเพิ่ม",
+      "DOWNLOAD_DIR_REQUIRED": "กรุณากรอกไดเรกทอรีดาวน์โหลด",
+      "PORT_INVALID": "พอร์ต %s ไม่ถูกต้อง โปรดป้อนพอร์ตระหว่าง 1024 ถึง 65535",
+      "PORT_DISABLED": "พอร์ตนี้ถูกสงวนโดยระบบ (0-1023) โปรดใช้พอร์ตที่มากกว่า 1024",
+      "PORT_RESERVED": "พอร์ตนี้ถูกใช้งานโดยบริการอื่นแล้ว โปรดเลือกพอร์ตอื่น",
+      "RPC_ERROR": "บริการดาวน์โหลดตอบกลับข้อผิดพลาด: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "กรุณาเลือกสมุดบันทึกก่อน",
+      "NOTEBOOK_NOT_FOUND": "ไม่มีสมุดบันทึกนี้หรือถูกลบไปแล้ว",
+      "NOTEBOOK_INVALID": "ชื่อสมุดบันทึกไม่ถูกต้อง กรุณาใช้ความยาว 1 ถึง 50 ตัวอักษร",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "สมุดบันทึกนี้ยังมีโน้ตอยู่ ไม่สามารถลบได้",
+      "GROUP_NOT_EMPTY": "กลุ่มนี้ยังมีสมุดบันทึกอยู่ ไม่สามารถลบได้"
+    },
+    "system": {
+      "NOT_SUPPORTED": "โหมดการทำงานปัจจุบันไม่รองรับการดำเนินการนี้"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "ดึงรายการแอปสำเร็จ",
+      "SET_HIDE_APPS_SUCCESS": "อัปเดตการแสดงแอปสำเร็จ",
+      "HIDE_APP_SUCCESS": "ซ่อนแอปแล้ว",
+      "UNHIDE_APP_SUCCESS": "แสดงแอปแล้ว",
+      "SET_APPS_ORDER_SUCCESS": "บันทึกลำดับแอปแล้ว"
     }
   },
   "places365": {

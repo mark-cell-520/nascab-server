@@ -112,7 +112,7 @@ class VideoSourceController {
         return ResponseUtil.error(req, res, 'validation.VALIDATION_ERROR', 400);
       }
       if (FileUtil.isProtectedPath(p)) {
-        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
       }
       let stat;
       try {
@@ -121,7 +121,7 @@ class VideoSourceController {
         stat = null;
       }
       if (!stat || !stat.isDirectory()) {
-        return ResponseUtil.error(req, res, 'file.FOLDER_NOT_EXIST');
+        return ResponseUtil.error(req, res, 'file.FOLDER_NOT_EXIST', 404);
       }
 
       const mt = String(mediaType || '')
@@ -265,7 +265,7 @@ class VideoSourceController {
       const id = req.params && req.params.id;
       const { new_path: newPath } = req.body || {};
       if (FileUtil.isProtectedPath(newPath)) {
-        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
       }
       if (!newPath) {
         return ResponseUtil.error(req, res, 'validation.VALIDATION_ERROR', 400);

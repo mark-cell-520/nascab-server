@@ -443,6 +443,19 @@ class TransmissionWorker {
     this.adoptedPid = null;
     this.actualRpcPort = resolvedPort;
 
+    // spawn 失败（ENOENT/EACCES，最典型的就是缺 libevent-2.1.so.7 这类共享库）时
+    // child 会 emit 'error'；没有监听器就是未捕获异常，worker 直接崩掉，
+    // 接口侧连"启动失败"都拿不到，只能干等到 IPC 超时。这里兜住并落库。
+    child.on('error', err => {
+      const detail = err && err.message ? String(err.message) : 'spawn_failed';
+      this.lastError = `daemon_spawn_failed:${detail}`;
+      this.daemonChild = null;
+      this.actualRpcPort = null;
+      this.startedAt = null;
+      saveConfig({ status: 'error', enabled: false, last_error: this.lastError }).catch(() => {});
+      Logger.error('[transmissionWorker] failed to spawn daemon', { error: detail, binaryPath });
+    });
+
     const startupLog = [];
     const appendLog = text => {
       const t = ensureString(text);
@@ -480,7 +493,10 @@ class TransmissionWorker {
     });
 
     if (!ready || this.stopping) {
-      this.lastError = 'rpc_start_timeout';
+      // spawn 已经失败时不要用 rpc_start_timeout 盖掉真正的原因
+      this.lastError = this.lastError && String(this.lastError).startsWith('daemon_spawn_failed')
+        ? this.lastError
+        : 'rpc_start_timeout';
       try {
         child.kill('SIGTERM');
       } catch (_) {}

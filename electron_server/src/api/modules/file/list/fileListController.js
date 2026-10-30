@@ -488,7 +488,7 @@ async function getAttributes(req, res) {
   try {
     const { path: filePath } = req.query;
     if (!filePath) {
-      return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+      return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
     }
 
     const stat = await fs.promises.stat(filePath);

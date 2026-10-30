@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "File subtitle ini sudah kedaluwarsa. Silakan unduh subtitle lain.",
-      "SUBTITLE_DELETE_FAILED": "Gagal menghapus subtitle"
+      "SUBTITLE_DELETE_FAILED": "Gagal menghapus subtitle",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "Gagal menghapus subtitle yang diunggah",
+      "GET_INFO_FAILED": "Gagal membaca informasi video",
+      "INVALID_PARAMS": "Parameter tidak valid",
+      "SAVE_PREFERENCE_FAILED": "Gagal menyimpan preferensi pemutaran",
+      "SUBTITLE_DOWNLOAD_FAILED": "Gagal mengunduh subtitle",
+      "SUBTITLE_SEARCH_FAILED": "Pencarian subtitle gagal",
+      "SUBTITLE_UNSUPPORTED": "Format subtitle tidak didukung",
+      "TRANSCODE_FAILED": "Transkode gagal. Silakan coba lagi",
+      "UPLOAD_SUBTITLE_FAILED": "Gagal mengunggah subtitle"
     },
     "fileMount": {
       "START_FAILED": "Mount gagal dimulai: %s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "Login di perangkat baru %s (Versi OS: %s)",
       "UNKNOWN_DEVICE": "Perangkat tidak dikenal",
       "IP_BLACKLIST_ADMIN_TITLE": "Peringatan keamanan",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s diblokir sementara karena beberapa kali memasukkan nama pengguna atau kata sandi yang salah. Jika bukan Anda, segera ubah kata sandi dan aktifkan 2FA untuk melindungi akun."
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s diblokir sementara karena beberapa kali memasukkan nama pengguna atau kata sandi yang salah. Jika bukan Anda, segera ubah kata sandi dan aktifkan 2FA untuk melindungi akun.",
+      "ADD_SUCCESS": "Berhasil ditambahkan",
+      "CLEAR_SUCCESS": "Berhasil dikosongkan",
+      "DELETE_SUCCESS": "Berhasil dihapus",
+      "MARK_READ_SUCCESS": "Ditandai sudah dibaca",
+      "MESSAGE_ID_REQUIRED": "ID pesan wajib diisi",
+      "MESSAGE_NOT_FOUND": "Pesan tidak ditemukan",
+      "MESSAGE_REQUIRED": "Konten pesan wajib diisi"
     },
     "auth": {
       "SYS_NO_INIT": "Sistem belum diinisialisasi",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "Karena alasan keamanan, operasi ini hanya didukung dalam jaringan lokal yang sama",
       "RECOVER_ADMIN_LAN_ONLY": "Endpoint ini hanya untuk memulihkan kata sandi administrator dan hanya berfungsi di jaringan lokal. Masukkan nama pengguna administrator. Pengguna biasa harus meminta administrator mengubah kata sandi di \"Manajemen Pengguna\".",
       "PASSWORD_RESET_SUCCESS": "Reset kata sandi admin berhasil",
-      "PASSWORD_RESET_FAILED": "Reset kata sandi admin gagal"
+      "PASSWORD_RESET_FAILED": "Reset kata sandi admin gagal",
+      "GET_ONLINE_USERS_FAILED": "Gagal mengambil daftar pengguna online",
+      "RECOVER_INFO_FETCH_FAILED": "Gagal mengambil informasi pemulihan",
+      "RECOVER_INFO_FETCH_SUCCESS": "Informasi pemulihan berhasil diambil",
+      "UNAUTHORIZED": "Tidak diizinkan. Silakan login ulang",
+      "SUPER_ADMIN_CHECK_SUCCESS": "Pemeriksaan super admin selesai",
+      "SERVER_STATUS_CHECK_SUCCESS": "Status server berhasil diambil"
     },
     "security": {
       "IP_BLACKLISTED": "IP ini diblokir. Silakan coba lagi nanti",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "Server ini telah memaksa mengaktifkan 2FA, hubungi administrator untuk mengikat sebelum login",
       "TWO_FACTOR_REQUIRED": "Autentikasi dua faktor diperlukan. Silakan masukkan kode 2FA Anda",
       "INVALID_CODE": "Kode verifikasi tidak valid",
-      "TOO_MANY_ATTEMPTS": "Terlalu banyak percobaan. Silakan coba lagi nanti"
+      "TOO_MANY_ATTEMPTS": "Terlalu banyak percobaan. Silakan coba lagi nanti",
+      "MASTER_KEY_MISSING": "Server belum mengonfigurasi kunci utama 2FA, autentikasi dua faktor tidak dapat diaktifkan",
+      "NOT_ENABLED": "Autentikasi dua faktor belum diaktifkan",
+      "NO_SECRET": "2FA belum diatur. Silakan selesaikan pengikatan terlebih dahulu",
+      "SECRET_DECRYPT_FAILED": "Gagal mendekripsi rahasia 2FA. Silakan ikatkan lagi"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "Gagal mengambil daftar pengguna",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "Rekaman login berhasil diambil",
       "LOGIN_RECORDS_FETCH_FAILED": "Gagal mengambil rekaman login",
       "SCOPED_TOKEN_CREATE_SUCCESS": "Scoped token berhasil dibuat",
-      "SCOPED_TOKEN_CREATE_FAILED": "Gagal membuat scoped token"
+      "SCOPED_TOKEN_CREATE_FAILED": "Gagal membuat scoped token",
+      "CANNOT_DELETE_SUPER_ADMIN": "Akun super admin tidak dapat dihapus"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "Daftar izin berhasil diambil",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "Nama wajib diisi",
       "CUSTOM_PATH_PATH_EXISTS": "Path sudah ada",
       "CUSTOM_PATH_REMOVE_SUCCESS": "Path kustom berhasil dihapus",
-      "CUSTOM_PATH_SAVE_FAILED": "Gagal menyimpan path kustom"
+      "CUSTOM_PATH_SAVE_FAILED": "Gagal menyimpan path kustom",
+      "CHECK_CHUNK_SUCCESS": "Potongan berhasil diverifikasi",
+      "CHUNK_MISMATCH": "Checksum potongan tidak cocok. Silakan unggah ulang potongan ini",
+      "CONFIG_FETCH_SUCCESS": "Pengaturan indeks berhasil diambil",
+      "CONFIG_RESET_SUCCESS": "Pengaturan indeks berhasil diatur ulang",
+      "CONFIG_SAVE_SUCCESS": "Pengaturan indeks berhasil disimpan",
+      "DIRECTORY_LIST_TIMEOUT": "Waktu membaca konten direktori habis. Silakan coba lagi",
+      "DIRECTORY_LIST_WORKER_ERROR": "Proses pembacaan direktori melaporkan kesalahan",
+      "DIRECTORY_LIST_WORKER_EXITED": "Proses pembacaan direktori keluar tak terduga (kode %s). Silakan coba lagi",
+      "DOWNLOAD_FAILED": "Unduh gagal",
+      "FILE_NOT_EXIST": "File tidak ada",
+      "GET_ATTRIBUTES_FAILED": "Gagal membaca atribut file",
+      "GLOBAL_SEARCH_SUCCESS": "Pencarian selesai",
+      "LOG_CANNOT_CANCEL": "Tugas ini sudah dimulai dan tidak dapat dibatalkan",
+      "LOG_CLEAR_FAILED": "Gagal mengosongkan log",
+      "LOG_CLEAR_SUCCESS": "Log berhasil dikosongkan",
+      "LOG_NOT_FOUND": "Entri log tidak ditemukan",
+      "MISSING_PREVIOUS_CHUNKS": "Potongan sebelumnya belum ada. Silakan unggah berurutan",
+      "NOT_FOUND": "Tidak ditemukan",
+      "NO_FILE_SELECTED": "Tidak ada file yang dipilih",
+      "OPERATION_CANCELLED": "Operasi dibatalkan",
+      "OPERATION_CANCEL_FAILED": "Gagal membatalkan operasi",
+      "PERMISSION_DENIED": "Izin ditolak",
+      "RECENT_CLEAR_FAILED": "Gagal mengosongkan daftar terbaru",
+      "RECENT_CLEAR_SUCCESS": "Daftar terbaru berhasil dikosongkan",
+      "RENAME_SUCCESS": "Berhasil diganti nama",
+      "TINY_PENDING": "Thumbnail sedang dibuat. Silakan coba lagi",
+      "TINY_TIMEOUT": "Waktu pembuatan thumbnail habis. Silakan coba lagi",
+      "UNKNOWN_WORKER_TASK": "Jenis tugas latar belakang tidak dikenal",
+      "UPLOAD_CHUNK_SUCCESS": "Potongan berhasil diunggah",
+      "UPLOAD_COMPLETED": "Unggahan selesai"
     },
     "quickShare": {
       "INVALID_TOKEN": "Token berbagi tidak valid",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "Foto berhasil dipulihkan dari tempat sampah",
       "TRASH_DELETE_SUCCESS": "Foto berhasil dihapus dari tempat sampah",
       "TRASH_EMPTY_SUCCESS": "Tempat sampah berhasil dikosongkan",
-      "PHOTO_COLLECTION_NAME_EXISTS": "Nama koleksi foto sudah ada"
+      "PHOTO_COLLECTION_NAME_EXISTS": "Nama koleksi foto sudah ada",
+      "PHOTO_SOURCE_LIST_EMPTY": "Belum ada direktori sumber foto yang ditambahkan",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "Indeks sumber foto di luar rentang"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "Sumber video berhasil diambil",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "Gagal serialisasi info pengguna",
       "USER_PARSE_FAILED": "Gagal mengurai info pengguna",
       "DB_WRITE_FAILED": "Gagal menulis konfigurasi",
-      "DB_CONNECTION_FAILED": "Koneksi database gagal"
+      "DB_CONNECTION_FAILED": "Koneksi database gagal",
+      "P2P_BIND_FAILED": "Pengikatan P2P gagal. Silakan coba lagi",
+      "TEMP_CODE_FAILED": "Gagal mendapatkan kode sementara",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "API kode pasangan kustom tidak tersedia. Silakan coba lagi nanti",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "Gagal mengatur kode pasangan kustom. Silakan coba lagi nanti",
+      "DDNS_NOT_CONFIGURED": "DNS dinamis belum dikonfigurasi. Silakan atur nama domain di pengaturan terlebih dahulu",
+      "DEVICE_NOT_BOUND": "Perangkat ini belum terikat ke akun. Silakan ikatkan perangkat terlebih dahulu",
+      "NEED_VIP": "Fitur ini memerlukan keanggotaan. Silakan tingkatkan lalu coba lagi",
+      "DEVICE_COUNT_LIMIT": "Akun telah mencapai batas jumlah perangkat. Silakan batalkan pengikatan perangkat lain terlebih dahulu",
+      "REMOTE_ERROR": "Layanan jarak jauh mengembalikan kesalahan: %s"
     },
     "terminal": {
       "START_FAILED": "Gagal memulai terminal",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "Nomor halaman harus berupa bilangan bulat positif",
       "LIMIT_INVALID": "Batas harus berupa bilangan bulat antara 1 hingga 100",
       "ID_INVALID": "ID harus berupa bilangan bulat positif",
-      "KEYWORD_LENGTH_INVALID": "Panjang kata kunci pencarian harus antara 1 hingga 100 karakter"
+      "KEYWORD_LENGTH_INVALID": "Panjang kata kunci pencarian harus antara 1 hingga 100 karakter",
+      "INVALID_VALUE": "Nilai tidak valid"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "Kata sandi tidak benar",
       "SIGN_FILE_MISSING": "File tanda ruang terenkripsi hilang atau kosong",
-      "SPACE_DB_INVALID": "Database indeks ruang terenkripsi hilang atau rusak"
+      "SPACE_DB_INVALID": "Database indeks ruang terenkripsi hilang atau rusak",
+      "SPACE_FOLDER_MISSING": "Folder ruang terenkripsi tidak ada atau sudah dipindahkan. Silakan periksa path lalu coba lagi"
     },
     "apiSetting": {
       "FETCH_SUCCESS": "Berhasil diambil",
@@ -352,7 +422,14 @@
       "ERROR": "Terjadi kesalahan",
       "NOT_FOUND": "Tidak ditemukan",
       "UNAUTHORIZED": "Tidak diizinkan",
-      "FORBIDDEN": "Dilarang"
+      "FORBIDDEN": "Dilarang",
+      "DELETE_SUCCESS": "Berhasil dihapus",
+      "DUPLICATE": "Entri dengan nama yang sama sudah ada",
+      "INVALID_PARAMS": "Parameter tidak valid",
+      "PARAM_ERROR": "Kesalahan parameter",
+      "ENDPOINT_NOT_FOUND": "Endpoint tidak ditemukan",
+      "INTERNAL_SERVER_ERROR": "Kesalahan server internal",
+      "RESOURCE_NOT_FOUND": "Sumber daya tidak ditemukan"
     },
     "mediaTool": {
       "INVALID_PARAMS": "Parameter tidak valid",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "Perintah Docker gagal dijalankan",
       "CONFIG_SAVE_FAILED": "Gagal menyimpan konfigurasi Docker",
       "INVALID_PROXY_URL": "Format URL proxy tidak valid",
-      "TASK_NOT_FOUND": "Tugas Docker tidak ditemukan"
+      "TASK_NOT_FOUND": "Tugas Docker tidak ditemukan",
+      "IMAGE_ARCHIVE_NOT_FOUND": "Berkas arsip image tidak ditemukan",
+      "IMAGE_ARCHIVE_REQUIRED": "Berkas arsip image wajib dipilih",
+      "IMAGE_IN_USE": "Image sedang digunakan oleh container dan tidak dapat dihapus",
+      "INVALID_CONFIG_JSON": "Format JSON konfigurasi tidak valid",
+      "INVALID_IMAGE_ARCHIVE": "Berkas arsip image tidak valid",
+      "START_FAILED": "Gagal dimulai",
+      "STOP_FAILED": "Gagal dihentikan",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "Tugas yang sedang berjalan tidak dapat dihapus"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "Plugin yang diperlukan untuk fitur ini masih diunduh. Silakan coba lagi nanti."
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "Gagal memulai mount penyimpanan cloud. Silakan coba lagi",
+      "START_FAILED": "Gagal memulai mount penyimpanan cloud",
+      "START_TIMEOUT": "Waktu memulai mount penyimpanan cloud habis. Silakan coba lagi",
+      "STOP_TIMEOUT": "Waktu menghentikan mount penyimpanan cloud habis",
+      "WORKER_SEND_FAILED": "Gagal berkomunikasi dengan proses mount OpenList",
+      "STORAGE_SYNC_FAILED": "Gagal menyinkronkan konfigurasi penyimpanan cloud",
+      "STORAGE_NOT_FOUND": "Penyimpanan tidak ditemukan di OpenList",
+      "INVALID_MOUNT_NAME": "Nama mount tidak valid (nama folder)",
+      "MOUNT_PARENT_NO_ACCESS": "Path induk mount harus dapat dibaca dan ditulis",
+      "OBSCURE_FAILED": "Gagal mengenkripsi kata sandi di server. Silakan coba lagi",
+      "SERVICE_START_TIMEOUT": "Waktu memulai layanan OpenList habis",
+      "BINARY_NOT_FOUND": "Berkas binary OpenList tidak ditemukan",
+      "PLATFORM_NOT_SUPPORTED": "Fitur ini tidak didukung pada platform saat ini",
+      "ADMIN_PASSWORD_MISSING": "Kata sandi admin OpenList belum dikonfigurasi",
+      "ADMIN_SET_FAILED": "Gagal mengatur akun admin OpenList",
+      "ADMIN_TOKEN_FAILED": "Gagal mendapatkan token admin OpenList",
+      "ADMIN_TOKEN_PARSE_FAILED": "Gagal mengurai token admin OpenList",
+      "BASE_URL_MISSING": "URL dasar OpenList belum dikonfigurasi",
+      "DB_INIT_FAILED": "Gagal menginisialisasi basis data OpenList",
+      "DB_NOT_READY": "Basis data OpenList belum siap",
+      "DRIVER_NOT_ALLOWED": "Driver penyimpanan tidak didukung",
+      "MOUNT_PARENT_NOT_DIR": "Path induk mount harus berupa direktori",
+      "MOUNT_PARENT_NOT_FOUND": "Path induk mount tidak ditemukan",
+      "STOP_FAILED": "Gagal menghentikan mount",
+      "STORAGE_INIT_FAILED": "Gagal menginisialisasi penyimpanan cloud: %s",
+      "TIMEOUT": "Operasi habis waktu. Silakan coba lagi"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "Layanan unduh (Transmission) tidak tersedia. Silakan instal dan jalankan transmission-daemon terlebih dahulu",
+      "STARTED": "Layanan unduh dimulai",
+      "START_FAILED": "Gagal memulai layanan unduh",
+      "START_FAILED_DETAIL": "Gagal memulai layanan unduh: %s",
+      "STOPPED": "Layanan unduh dihentikan",
+      "STOP_FAILED": "Gagal menghentikan layanan unduh",
+      "STOP_FAILED_DETAIL": "Gagal menghentikan layanan unduh: %s",
+      "RESTARTED": "Layanan unduh dimulai ulang",
+      "CONFIG_SAVED": "Konfigurasi disimpan",
+      "TORRENT_ADDED": "Tugas ditambahkan",
+      "TORRENT_FILE_REQUIRED": "Silakan pilih file torrent untuk ditambahkan",
+      "DOWNLOAD_DIR_REQUIRED": "Silakan tentukan direktori unduhan",
+      "PORT_INVALID": "Port %s tidak valid. Silakan masukkan port antara 1024 dan 65535",
+      "PORT_DISABLED": "Port itu dicadangkan sistem (0-1023). Silakan gunakan port di atas 1024",
+      "PORT_RESERVED": "Port itu sudah digunakan layanan lain. Silakan pilih port lain",
+      "RPC_ERROR": "Layanan unduh mengembalikan kesalahan: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "Silakan pilih notebook terlebih dahulu",
+      "NOTEBOOK_NOT_FOUND": "Notebook tidak ada atau sudah dihapus",
+      "NOTEBOOK_INVALID": "Nama notebook tidak valid. Silakan gunakan 1-50 karakter",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "Notebook ini masih berisi catatan dan tidak dapat dihapus",
+      "GROUP_NOT_EMPTY": "Grup ini masih berisi notebook dan tidak dapat dihapus"
+    },
+    "system": {
+      "NOT_SUPPORTED": "Operasi ini tidak didukung dalam mode operasi saat ini"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "Daftar aplikasi berhasil diambil",
+      "SET_HIDE_APPS_SUCCESS": "Visibilitas aplikasi berhasil diperbarui",
+      "HIDE_APP_SUCCESS": "Aplikasi disembunyikan",
+      "UNHIDE_APP_SUCCESS": "Aplikasi ditampilkan",
+      "SET_APPS_ORDER_SUCCESS": "Urutan aplikasi disimpan"
     }
   },
   "places365": {

@@ -307,9 +307,12 @@ class ExpressWorker {
       gracefulShutdown('uncaughtException');
     });
 
+    // unhandledRejection 只说明某个 promise 没人接住，进程状态并未损坏，
+    // 和其余 25 个 worker 一样只记录不退出。这里曾经直接 gracefulShutdown，
+    // 等于任意一个路由漏一次 await 就把整个 API worker 连带它承载的所有
+    // HTTP 请求一起干掉。
     process.on('unhandledRejection', (reason, promise) => {
       Logger.error('❌ Unhandled rejection:', reason);
-      gracefulShutdown('unhandledRejection');
     });
   }
 

@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "Este arquivo de legenda expirou. Baixe outra legenda.",
-      "SUBTITLE_DELETE_FAILED": "Falha ao excluir a legenda"
+      "SUBTITLE_DELETE_FAILED": "Falha ao excluir a legenda",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "Falha ao remover a legenda enviada",
+      "GET_INFO_FAILED": "Falha ao ler as informações do vídeo",
+      "INVALID_PARAMS": "Parâmetros inválidos",
+      "SAVE_PREFERENCE_FAILED": "Falha ao salvar as preferências de reprodução",
+      "SUBTITLE_DOWNLOAD_FAILED": "Falha ao baixar a legenda",
+      "SUBTITLE_SEARCH_FAILED": "Falha ao pesquisar legendas",
+      "SUBTITLE_UNSUPPORTED": "Formato de legenda não suportado",
+      "TRANSCODE_FAILED": "Falha na transcodificação. Tente novamente",
+      "UPLOAD_SUBTITLE_FAILED": "Falha ao enviar a legenda"
     },
     "fileMount": {
       "START_FAILED": "Falha ao iniciar montagem: %s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "Login realizado em novo dispositivo %s (Versão do SO: %s)",
       "UNKNOWN_DEVICE": "Dispositivo desconhecido",
       "IP_BLACKLIST_ADMIN_TITLE": "Alerta de segurança",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "O IP %s foi bloqueado temporariamente após várias tentativas incorretas de nome de usuário ou senha. Se não foi você, altere a senha imediatamente e ative o 2FA para proteger a conta."
+      "IP_BLACKLIST_ADMIN_MESSAGE": "O IP %s foi bloqueado temporariamente após várias tentativas incorretas de nome de usuário ou senha. Se não foi você, altere a senha imediatamente e ative o 2FA para proteger a conta.",
+      "ADD_SUCCESS": "Adicionado com sucesso",
+      "CLEAR_SUCCESS": "Esvaziado com sucesso",
+      "DELETE_SUCCESS": "Exclusão bem-sucedida",
+      "MARK_READ_SUCCESS": "Marcado como lido",
+      "MESSAGE_ID_REQUIRED": "O ID da mensagem é obrigatório",
+      "MESSAGE_NOT_FOUND": "Mensagem não encontrada",
+      "MESSAGE_REQUIRED": "O conteúdo da mensagem é obrigatório"
     },
     "auth": {
       "SYS_NO_INIT": "Sistema não inicializado",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "Devido a razões de segurança, esta operação só é suportada dentro da mesma rede local",
       "RECOVER_ADMIN_LAN_ONLY": "Este endpoint é apenas para recuperar a senha do administrador e só funciona na rede local. Informe um nome de usuário de administrador. Usuários comuns devem pedir a um administrador para alterar a senha em «Gerenciamento de usuários».",
       "PASSWORD_RESET_SUCCESS": "Redefinição de senha de administrador bem-sucedida",
-      "PASSWORD_RESET_FAILED": "Falha na redefinição de senha de administrador"
+      "PASSWORD_RESET_FAILED": "Falha na redefinição de senha de administrador",
+      "GET_ONLINE_USERS_FAILED": "Falha ao obter a lista de usuários online",
+      "RECOVER_INFO_FETCH_FAILED": "Falha ao obter as informações de recuperação",
+      "RECOVER_INFO_FETCH_SUCCESS": "Informações de recuperação obtidas com sucesso",
+      "UNAUTHORIZED": "Não autorizado. Por favor, faça login novamente",
+      "SUPER_ADMIN_CHECK_SUCCESS": "Verificação de superadministrador concluída",
+      "SERVER_STATUS_CHECK_SUCCESS": "Status do servidor obtido com sucesso"
     },
     "security": {
       "IP_BLACKLISTED": "Este IP está banido. Por favor, tente novamente mais tarde",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "Autenticação de dois fatores é necessária. Por favor, ative-a primeiro",
       "TWO_FACTOR_REQUIRED": "Autenticação de dois fatores necessária. Por favor, insira seu código 2FA",
       "INVALID_CODE": "Código de verificação inválido",
-      "TOO_MANY_ATTEMPTS": "Muitas tentativas de verificação. Por favor, tente novamente mais tarde"
+      "TOO_MANY_ATTEMPTS": "Muitas tentativas de verificação. Por favor, tente novamente mais tarde",
+      "MASTER_KEY_MISSING": "O servidor não tem uma chave mestra de 2FA configurada; não é possível ativar a autenticação de dois fatores",
+      "NOT_ENABLED": "A autenticação de dois fatores não está ativada",
+      "NO_SECRET": "A autenticação de dois fatores ainda não foi vinculada. Por favor, conclua a vinculação primeiro",
+      "SECRET_DECRYPT_FAILED": "Falha ao descriptografar o segredo 2FA. Por favor, vincule-o novamente"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "Falha ao obter lista de usuários",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "Registros de login obtidos com sucesso",
       "LOGIN_RECORDS_FETCH_FAILED": "Falha ao obter registros de login",
       "SCOPED_TOKEN_CREATE_SUCCESS": "Token scoped criado com sucesso",
-      "SCOPED_TOKEN_CREATE_FAILED": "Falha ao criar token scoped"
+      "SCOPED_TOKEN_CREATE_FAILED": "Falha ao criar token scoped",
+      "CANNOT_DELETE_SUPER_ADMIN": "A conta de super administrador não pode ser excluída"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "Lista de permissões obtida com sucesso",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "Nome é obrigatório",
       "CUSTOM_PATH_PATH_EXISTS": "Caminho já existe",
       "CUSTOM_PATH_REMOVE_SUCCESS": "Caminho personalizado removido com sucesso",
-      "CUSTOM_PATH_SAVE_FAILED": "Falha ao salvar caminhos personalizados"
+      "CUSTOM_PATH_SAVE_FAILED": "Falha ao salvar caminhos personalizados",
+      "CHECK_CHUNK_SUCCESS": "Parte verificada com sucesso",
+      "CHUNK_MISMATCH": "A soma de verificação da parte não corresponde. Por favor, envie esta parte novamente",
+      "CONFIG_FETCH_SUCCESS": "Configurações de índice obtidas com sucesso",
+      "CONFIG_RESET_SUCCESS": "Configurações de índice redefinidas com sucesso",
+      "CONFIG_SAVE_SUCCESS": "Configurações de índice salvas com sucesso",
+      "DIRECTORY_LIST_TIMEOUT": "Tempo esgotado ao listar o diretório. Tente novamente",
+      "DIRECTORY_LIST_WORKER_ERROR": "O processo de listagem de diretórios retornou um erro",
+      "DIRECTORY_LIST_WORKER_EXITED": "O processo de listagem de diretórios foi encerrado inesperadamente (código %s). Tente novamente",
+      "DOWNLOAD_FAILED": "Falha no download",
+      "FILE_NOT_EXIST": "O arquivo não existe",
+      "GET_ATTRIBUTES_FAILED": "Falha ao obter os atributos do arquivo",
+      "GLOBAL_SEARCH_SUCCESS": "Pesquisa concluída",
+      "LOG_CANNOT_CANCEL": "A tarefa já foi iniciada e não pode ser cancelada",
+      "LOG_CLEAR_FAILED": "Falha ao limpar os logs",
+      "LOG_CLEAR_SUCCESS": "Logs limpos com sucesso",
+      "LOG_NOT_FOUND": "Registro de log não encontrado",
+      "MISSING_PREVIOUS_CHUNKS": "Faltam partes anteriores. Por favor, envie-as em ordem",
+      "NOT_FOUND": "Não encontrado",
+      "NO_FILE_SELECTED": "Nenhum arquivo selecionado",
+      "OPERATION_CANCELLED": "Operação cancelada",
+      "OPERATION_CANCEL_FAILED": "Falha ao cancelar a operação",
+      "PERMISSION_DENIED": "Permissão negada",
+      "RECENT_CLEAR_FAILED": "Falha ao limpar a lista de recentes",
+      "RECENT_CLEAR_SUCCESS": "Lista de recentes limpa com sucesso",
+      "RENAME_SUCCESS": "Renomeado com sucesso",
+      "TINY_PENDING": "A miniatura está sendo gerada. Tente novamente",
+      "TINY_TIMEOUT": "Tempo esgotado ao gerar a miniatura. Tente novamente",
+      "UNKNOWN_WORKER_TASK": "Tipo de tarefa em segundo plano desconhecido",
+      "UPLOAD_CHUNK_SUCCESS": "Parte enviada com sucesso",
+      "UPLOAD_COMPLETED": "Envio concluído"
     },
     "quickShare": {
       "INVALID_TOKEN": "Token de compartilhamento inválido",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "Foto restaurada da lixeira com sucesso",
       "TRASH_DELETE_SUCCESS": "Foto excluída da lixeira com sucesso",
       "TRASH_EMPTY_SUCCESS": "Lixeira esvaziada com sucesso",
-      "PHOTO_COLLECTION_NAME_EXISTS": "Nome da coleção de fotos já existe"
+      "PHOTO_COLLECTION_NAME_EXISTS": "Nome da coleção de fotos já existe",
+      "PHOTO_SOURCE_LIST_EMPTY": "Nenhum diretório de origem de fotos foi adicionado",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "O índice da fonte de fotos está fora do intervalo"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "Fontes de vídeo obtidas com sucesso",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "Falha ao serializar informações do usuário",
       "USER_PARSE_FAILED": "Falha ao analisar informações do usuário",
       "DB_WRITE_FAILED": "Falha ao gravar configuração",
-      "DB_CONNECTION_FAILED": "Falha na conexão com o banco de dados"
+      "DB_CONNECTION_FAILED": "Falha na conexão com o banco de dados",
+      "P2P_BIND_FAILED": "Falha no pareamento P2P. Tente novamente",
+      "TEMP_CODE_FAILED": "Falha ao obter o código temporário",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "A API de código de pareamento personalizado não está disponível. Tente novamente mais tarde",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "Falha ao definir o código de pareamento personalizado. Tente novamente mais tarde",
+      "DDNS_NOT_CONFIGURED": "O DNS dinâmico ainda não está configurado. Por favor, defina um nome de domínio nas configurações primeiro",
+      "DEVICE_NOT_BOUND": "Este dispositivo não está vinculado a uma conta. Por favor, vincule o dispositivo primeiro",
+      "NEED_VIP": "Este recurso requer uma assinatura. Por favor, faça o upgrade e tente novamente",
+      "DEVICE_COUNT_LIMIT": "A conta atingiu o limite de dispositivos. Por favor, desvincule outro dispositivo primeiro",
+      "REMOTE_ERROR": "O serviço remoto retornou um erro: %s"
     },
     "terminal": {
       "START_FAILED": "Falha ao iniciar terminal",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "Número da página deve ser um inteiro positivo",
       "LIMIT_INVALID": "Limite deve ser um inteiro entre 1 e 100",
       "ID_INVALID": "ID deve ser um inteiro positivo",
-      "KEYWORD_LENGTH_INVALID": "Comprimento da palavra-chave de pesquisa deve estar entre 1 e 100 caracteres"
+      "KEYWORD_LENGTH_INVALID": "Comprimento da palavra-chave de pesquisa deve estar entre 1 e 100 caracteres",
+      "INVALID_VALUE": "Valor inválido"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "Senha incorreta",
       "SIGN_FILE_MISSING": "Arquivo de assinatura do espaço criptografado está ausente ou vazio",
-      "SPACE_DB_INVALID": "Banco de dados de índice do espaço criptografado está ausente ou corrompido"
+      "SPACE_DB_INVALID": "Banco de dados de índice do espaço criptografado está ausente ou corrompido",
+      "SPACE_FOLDER_MISSING": "A pasta do espaço criptografado está ausente ou foi movida. Verifique o caminho e tente novamente"
     },
     "apiSetting": {
       "FETCH_SUCCESS": "Obtido com sucesso",
@@ -352,7 +422,14 @@
       "ERROR": "Ocorreu um erro",
       "NOT_FOUND": "Não encontrado",
       "UNAUTHORIZED": "Não autorizado",
-      "FORBIDDEN": "Proibido"
+      "FORBIDDEN": "Proibido",
+      "DELETE_SUCCESS": "Exclusão bem-sucedida",
+      "DUPLICATE": "Já existe um registro com o mesmo nome",
+      "INVALID_PARAMS": "Parâmetros inválidos",
+      "PARAM_ERROR": "Parâmetro inválido",
+      "ENDPOINT_NOT_FOUND": "Endpoint não encontrado",
+      "INTERNAL_SERVER_ERROR": "Erro interno do servidor",
+      "RESOURCE_NOT_FOUND": "Recurso não encontrado"
     },
     "mediaTool": {
       "INVALID_PARAMS": "Parâmetros inválidos",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "Falha ao executar o comando Docker",
       "CONFIG_SAVE_FAILED": "Falha ao salvar a configuração do Docker",
       "INVALID_PROXY_URL": "Formato de URL de proxy inválido",
-      "TASK_NOT_FOUND": "Tarefa do Docker não encontrada"
+      "TASK_NOT_FOUND": "Tarefa do Docker não encontrada",
+      "IMAGE_ARCHIVE_NOT_FOUND": "O arquivo de imagem não existe",
+      "IMAGE_ARCHIVE_REQUIRED": "Um arquivo de imagem é obrigatório",
+      "IMAGE_IN_USE": "A imagem está em uso por um contêiner e não pode ser excluída",
+      "INVALID_CONFIG_JSON": "JSON de configuração inválido",
+      "INVALID_IMAGE_ARCHIVE": "Arquivo de imagem inválido",
+      "START_FAILED": "Falha ao iniciar",
+      "STOP_FAILED": "Falha ao parar",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "Uma tarefa em execução não pode ser excluída"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "Os plugins necessários para este recurso ainda estão sendo baixados. Tente novamente mais tarde."
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "Falha ao iniciar a montagem na nuvem. Tente novamente",
+      "START_FAILED": "Falha ao iniciar a montagem na nuvem",
+      "START_TIMEOUT": "Tempo esgotado ao iniciar a montagem na nuvem. Tente novamente",
+      "STOP_TIMEOUT": "Tempo esgotado ao parar a montagem na nuvem",
+      "WORKER_SEND_FAILED": "Falha ao comunicar com o processo de montagem do OpenList",
+      "STORAGE_SYNC_FAILED": "Falha ao sincronizar a configuração do armazenamento em nuvem",
+      "STORAGE_NOT_FOUND": "Armazenamento não encontrado no OpenList",
+      "INVALID_MOUNT_NAME": "Nome de montagem inválido (nome de pasta)",
+      "MOUNT_PARENT_NO_ACCESS": "Caminho pai da montagem deve ser legível e gravável",
+      "OBSCURE_FAILED": "Falha ao criptografar a senha no servidor. Tente novamente",
+      "SERVICE_START_TIMEOUT": "Tempo esgotado ao iniciar o serviço OpenList",
+      "BINARY_NOT_FOUND": "Executável do OpenList não encontrado",
+      "PLATFORM_NOT_SUPPORTED": "Este recurso não é suportado na plataforma atual.",
+      "ADMIN_PASSWORD_MISSING": "A senha de administrador do OpenList não está configurada",
+      "ADMIN_SET_FAILED": "Falha ao definir a conta de administrador do OpenList",
+      "ADMIN_TOKEN_FAILED": "Falha ao obter o token de administrador do OpenList",
+      "ADMIN_TOKEN_PARSE_FAILED": "Falha ao analisar o token de administrador do OpenList",
+      "BASE_URL_MISSING": "A URL base do OpenList não está configurada",
+      "DB_INIT_FAILED": "Falha ao inicializar o banco de dados do OpenList",
+      "DB_NOT_READY": "O banco de dados do OpenList não está pronto",
+      "DRIVER_NOT_ALLOWED": "Driver de armazenamento não suportado",
+      "MOUNT_PARENT_NOT_DIR": "Caminho pai da montagem deve ser um diretório",
+      "MOUNT_PARENT_NOT_FOUND": "Caminho pai da montagem não existe",
+      "STOP_FAILED": "Falha ao parar a montagem na nuvem",
+      "STORAGE_INIT_FAILED": "Falha ao inicializar o armazenamento em nuvem: %s",
+      "TIMEOUT": "A operação expirou. Tente novamente"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "O serviço de download (Transmission) não está disponível. Por favor, instale e inicie o transmission-daemon primeiro",
+      "STARTED": "Serviço de download iniciado",
+      "START_FAILED": "Falha ao iniciar o serviço de download",
+      "START_FAILED_DETAIL": "Falha ao iniciar o serviço de download: %s",
+      "STOPPED": "Serviço de download parado",
+      "STOP_FAILED": "Falha ao parar o serviço de download",
+      "STOP_FAILED_DETAIL": "Falha ao parar o serviço de download: %s",
+      "RESTARTED": "Serviço de download reiniciado",
+      "CONFIG_SAVED": "Configuração salva",
+      "TORRENT_ADDED": "Tarefa adicionada",
+      "TORRENT_FILE_REQUIRED": "Por favor, selecione um arquivo torrent para adicionar",
+      "DOWNLOAD_DIR_REQUIRED": "Por favor, informe um diretório de download",
+      "PORT_INVALID": "Porta inválida: %s. Por favor, informe uma porta entre 1024 e 65535",
+      "PORT_DISABLED": "Essa porta está reservada pelo sistema (0-1023). Por favor, use uma porta acima de 1024",
+      "PORT_RESERVED": "Essa porta já está em uso por outro serviço. Por favor, escolha outra porta",
+      "RPC_ERROR": "O serviço de download retornou um erro: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "Por favor, selecione um caderno primeiro",
+      "NOTEBOOK_NOT_FOUND": "O caderno não existe ou foi excluído",
+      "NOTEBOOK_INVALID": "Nome do caderno inválido. Por favor, use de 1 a 50 caracteres",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "Este caderno ainda contém notas e não pode ser excluído",
+      "GROUP_NOT_EMPTY": "Este grupo ainda contém cadernos e não pode ser excluído"
+    },
+    "system": {
+      "NOT_SUPPORTED": "Esta operação não é suportada no modo de execução atual"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "Lista de aplicativos obtida com sucesso",
+      "SET_HIDE_APPS_SUCCESS": "Visibilidade dos aplicativos atualizada com sucesso",
+      "HIDE_APP_SUCCESS": "Aplicativo oculto",
+      "UNHIDE_APP_SUCCESS": "Aplicativo visível",
+      "SET_APPS_ORDER_SUCCESS": "Ordem dos aplicativos salva"
     }
   },
   "places365": {

@@ -152,6 +152,12 @@ function handleRequestAppRestart({ initUtil, Logger, message }) {
     try {
       process.exit(0);
     } catch (_) {}
+
+    // 两条退出路径都没能终结进程（electron 的 app.quit 抛异常、process.exit
+    // 也被吞掉）。此时若继续把 restartInProgress 留在 true，之后所有重启
+    // 请求都会被这个函数第一行的 if 静默吞掉，服务再也无法通过该接口重启。
+    initUtil.restartInProgress = false;
+    Logger.warn('⚠️ Restart requested but the process did not exit; lock released for retry');
   }, 300);
 }
 

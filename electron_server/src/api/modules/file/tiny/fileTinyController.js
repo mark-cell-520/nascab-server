@@ -14,10 +14,13 @@ async function getTiny(req, res) {
       return res.sendStatus(404);
     }
   } catch (err) {
-    if (err.message !== 'file.TINY_PENDING') {
+    // NOT_FILE：传进来的是目录（文件树给目录也要一张缩略图）。目录没有缩略图，
+    // 回 404 让前端显示文件夹图标即可；原先会掉到 TINY_FAILED 记一条 500 错误日志。
+    if (err.message !== 'file.TINY_PENDING' && err.message !== 'file.NOT_FILE') {
       console.log(err, req.query.path);
     }
     if (err.message === 'file.NOT_FOUND') return res.sendStatus(404);
+    if (err.message === 'file.NOT_FILE') return res.sendStatus(404);
     if (err.message === 'file.TINY_PENDING') return res.status(202).set('Retry-After', '2').end();
     if (err.message === 'file.UNSUPPORTED_TYPE') return res.sendStatus(415);
     return ResponseUtil.error(req, res, 'file.TINY_FAILED', 500, { error: err.message });

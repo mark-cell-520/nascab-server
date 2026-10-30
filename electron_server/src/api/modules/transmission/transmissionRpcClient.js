@@ -67,7 +67,11 @@ function assertRpcSuccess(result, method) {
     throw err;
   }
   if (status !== 200 || (body.result && body.result !== 'success')) {
-    const err = new Error(body.result || `rpc_error_${status}`);
+    // body.result 是 transmission 的原话（如 "no fields specified"、"invalid ids"），
+    // 直接当 Error message 会让前端把一句没头没尾的英文亮给用户。按 `键:原文` 抛出，
+    // i18nUtil 会拆开翻译前面的键、把原文作为 %s 插值。
+    const raw = typeof body.result === 'string' && body.result.trim() ? body.result.trim() : `rpc_error_${status}`;
+    const err = new Error(`transmission.RPC_ERROR:${raw}`);
     err.statusCode = 502;
     err.details = body;
     Logger.warn('[transmissionRpcClient] RPC failed', { method, status, result: body.result });
@@ -88,7 +92,9 @@ async function callTransmissionRpc(cfg, method, args = {}) {
     }
     return assertRpcSuccess(result, method);
   }
-  throw new Error('rpc_session_failed');
+  // 两次都拿到需要重试的 session id 才走到这里：把原文换成 i18n 键，
+  // 否则 "rpc_session_failed" 会原样显示给用户。
+  throw new Error('transmission.RPC_ERROR:rpc session handshake failed');
 }
 
 class TransmissionRpcClient {

@@ -20,3 +20,6 @@ web/main/**/*
 .tmp*
 .sharp-probe/
 .workbuddy
+
+# winston 运行时日志，不入库
+logs/

@@ -13,6 +13,7 @@ const { spawnSync } = require('node:child_process');
 const config = require('../../../config/config');
 const FileUtil = require('../../../utils/fileUtil');
 const { hasPermission } = require('../../../utils/permissionUtil');
+const Logger = require('../../../utils/logger');
 const thunderSubtitleService = require('./thunderSubtitleService');
 
 ffmpeg.setFfmpegPath(ffmpegPath.path);
@@ -484,7 +485,7 @@ class VideoPlayerController {
       const { filePath } = req.query;
       console.log('获取视频信息请求参数', filePath);
       if (!filePath) {
-        return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+        return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
       }
 
       // Permission check could be done here or in middleware
@@ -523,7 +524,7 @@ class VideoPlayerController {
         Number.isFinite(subtitleIndexRaw) && subtitleIndexRaw >= 0 ? Math.floor(subtitleIndexRaw) : null;
 
       if ((!filePathRaw && !subtitlePathRaw) || subtitleIndex == null) {
-        return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+        return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
       }
 
       // source can be a video file (embedded tracks) or an external subtitle file
@@ -540,7 +541,7 @@ class VideoPlayerController {
         sourcePath = path.resolve(filePathRaw);
       }
       if (!sourcePath || !fs.existsSync(sourcePath)) {
-        return ResponseUtil.error(req, res, 'file.FILE_NOT_EXIST');
+        return ResponseUtil.error(req, res, 'file.FILE_NOT_EXIST', 404);
       }
 
       // For embedded subtitles, validate codec (bitmap not supported as VTT)
@@ -573,7 +574,7 @@ class VideoPlayerController {
 
       const fileHash = await FileUtil.getFileHash(sourcePath);
       if (!fileHash) {
-        return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+        return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
       }
 
       const cacheDir = path.join(config.getCachePath(), 'subtitleVtt', String(fileHash));
@@ -673,7 +674,7 @@ class VideoPlayerController {
       const { filePath, playId, seek, width, resolution, bitrate, audioIndex, subtitleIndex, subtitlePath, subtitleBurn, client, device_id, deviceId } = req.query;
 
       if (!filePath || !playId) {
-        return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+        return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
       }
       // console.log('转码请求参数', req.query);
 
@@ -1225,7 +1226,7 @@ class VideoPlayerController {
       const { filePath, internalPath, playback_position, subtitle_label, audio_label } = req.body || {};
       console.log('saveVideoPreference', filePath, playback_position);
       if (!filePath) {
-        return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+        return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
       }
 
       await videoPlayerService.saveVideoPreference(req.dbVideo, req.user.id, filePath, {
@@ -1287,16 +1288,21 @@ class VideoPlayerController {
     return uploader(req, res, async err => {
       try {
         if (err) {
-          return ResponseUtil.error(req, res, err.message || 'operation_failed');
+          // multer 的 message 是英文原文（"File too large"/"Unexpected field"），
+          // 原样透出等于把机器话亮给用户；原文只进日志。
+          Logger.error('[videoPlayer/uploadSubtitle] multer 拒绝上传:', err);
+          return ResponseUtil.error(req, res, 'videoPlayer.UPLOAD_SUBTITLE_FAILED', 500);
         }
         const filePath = req.body && req.body.filePath ? String(req.body.filePath).trim() : '';
-        if (!filePath) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+        if (!filePath) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
         const ok = await hasPermission(req.dbMain, req.user, ['download', 'view'], filePath, 'file');
         if (!ok) {
           return ResponseUtil.error(req, res, 'auth.PERMISSION_DENIED', 403);
         }
         const uploaded = req.file;
-        if (!uploaded || !uploaded.path) return ResponseUtil.error(req, res, 'operation_failed');
+        if (!uploaded || !uploaded.path) {
+          return ResponseUtil.error(req, res, 'videoPlayer.UPLOAD_SUBTITLE_FAILED', 500);
+        }
 
         let savedPath = path.resolve(String(uploaded.path));
         const ext = path.extname(savedPath).toLowerCase();
@@ -1304,7 +1310,7 @@ class VideoPlayerController {
           try {
             await fsExtra.remove(savedPath);
           } catch (_) {}
-          return ResponseUtil.error(req, res, 'videoPlayer.SUBTITLE_UNSUPPORTED');
+          return ResponseUtil.error(req, res, 'videoPlayer.SUBTITLE_UNSUPPORTED', 400);
         }
 
         // 处理同名冲突：存在则自动加后缀
@@ -1325,7 +1331,7 @@ class VideoPlayerController {
 
         const resolved = path.resolve(filePath);
         const videoHash = await FileUtil.getFileHash(resolved);
-        if (!videoHash) return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+        if (!videoHash) return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
 
         const originalNameRaw = uploaded.originalname
           ? String(uploaded.originalname).trim()
@@ -1358,13 +1364,13 @@ class VideoPlayerController {
       const uid = req.user && req.user.id ? Number(req.user.id) : 0;
       if (!uid) return ResponseUtil.error(req, res, 'auth.UNAUTHORIZED', 401);
       const filePath = req.body && req.body.filePath ? String(req.body.filePath).trim() : '';
-      if (!filePath) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+      if (!filePath) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
       const ok = await hasPermission(req.dbMain, req.user, ['download', 'view'], filePath, 'file');
       if (!ok) return ResponseUtil.error(req, res, 'auth.PERMISSION_DENIED', 403);
 
       const resolved = path.resolve(filePath);
       const videoHash = await FileUtil.getFileHash(resolved);
-      if (!videoHash) return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+      if (!videoHash) return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
 
       const base = config.getSubtitleUploadPath();
       const dir = path.join(base, String(videoHash), String(uid));
@@ -1398,7 +1404,7 @@ class VideoPlayerController {
   async searchSubtitle(req, res) {
     try {
       const filePath = req.body && req.body.filePath ? String(req.body.filePath).trim() : '';
-      if (!filePath) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+      if (!filePath) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
 
       const ok = await hasPermission(req.dbMain, req.user, ['download', 'view'], filePath, 'file');
       if (!ok) return ResponseUtil.error(req, res, 'auth.PERMISSION_DENIED', 403);
@@ -1441,7 +1447,7 @@ class VideoPlayerController {
       const surl = req.body && req.body.surl ? String(req.body.surl).trim() : '';
       const sname = req.body && req.body.sname ? String(req.body.sname).trim() : '';
       const language = req.body && req.body.language ? String(req.body.language).trim() : '';
-      if (!filePath || !surl) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+      if (!filePath || !surl) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
 
       const ok = await hasPermission(req.dbMain, req.user, ['download', 'view'], filePath, 'file');
       if (!ok) return ResponseUtil.error(req, res, 'auth.PERMISSION_DENIED', 403);
@@ -1474,7 +1480,7 @@ class VideoPlayerController {
       const filePath = req.body && req.body.filePath ? String(req.body.filePath).trim() : '';
       const subtitlePathRaw =
         req.body && req.body.subtitlePath ? String(req.body.subtitlePath).trim() : '';
-      if (!filePath || !subtitlePathRaw) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+      if (!filePath || !subtitlePathRaw) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
 
       const ok = await hasPermission(req.dbMain, req.user, ['download', 'view'], filePath, 'file');
       if (!ok) return ResponseUtil.error(req, res, 'auth.PERMISSION_DENIED', 403);
@@ -1484,11 +1490,11 @@ class VideoPlayerController {
         subtitlePath = decodeURIComponent(subtitlePathRaw);
       } catch (_) {}
       const resolvedSub = path.resolve(String(subtitlePath || '').trim());
-      if (!resolvedSub) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS');
+      if (!resolvedSub) return ResponseUtil.error(req, res, 'videoPlayer.INVALID_PARAMS', 400);
 
       const resolvedVideo = path.resolve(String(filePath).trim());
       const videoHash = await FileUtil.getFileHash(resolvedVideo);
-      if (!videoHash) return ResponseUtil.error(req, res, 'file.INVALID_PATH');
+      if (!videoHash) return ResponseUtil.error(req, res, 'file.INVALID_PATH', 400);
 
       const base = config.getSubtitleUploadPath();
       const allowedDir = path.join(base, String(videoHash), String(uid));

@@ -72,11 +72,11 @@ class PhotoSourceController {
       const { path } = req.body || {};
       // 检查系统关键目录
       if (FileUtil.isProtectedPath(path)) {
-        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
       }
       // 检查目录是否存在
       if (!fs.existsSync(path)) {
-        return ResponseUtil.error(req, res, 'file.FOLDER_NOT_EXIST');
+        return ResponseUtil.error(req, res, 'file.FOLDER_NOT_EXIST', 404);
       }
 
       const result = await service.addSource(path);
@@ -232,7 +232,7 @@ class PhotoSourceController {
       const id = req.params && req.params.id;
       const { new_path: newPath } = req.body || {};
       if (FileUtil.isProtectedPath(newPath)) {
-        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+        return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
       }
       if (!newPath) {
         return ResponseUtil.error(req, res, 'validation.VALIDATION_ERROR', 400);

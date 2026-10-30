@@ -193,10 +193,10 @@ class UploadController {
     try {
       const { hash, targetDir, chunkSize, fileName, nameStrategy, relativePath, saveType } = req.body;
       const headerStrategy = req.headers['x-name-strategy'];
-      if (!hash || !chunkSize) return ResponseUtil.error(req, res, 'file.INVALID_PARAMS');
+      if (!hash || !chunkSize) return ResponseUtil.error(req, res, 'file.INVALID_PARAMS', 400);
 
       if (!targetDir) {
-        return ResponseUtil.error(req, res, 'file.NO_WRITE_PERMISSION');
+        return ResponseUtil.error(req, res, 'file.NO_WRITE_PERMISSION', 403);
       }
 
       const strategy = ((headerStrategy || nameStrategy || 'skip') + '').toLowerCase();
@@ -253,7 +253,7 @@ class UploadController {
 
       if (!hash || index === undefined || !file || !targetDir || !chunkSize || !fileName || !totalChunks) {
         if (file) await fs.remove(file.path);
-        return ResponseUtil.error(req, res, 'file.INVALID_PARAMS');
+        return ResponseUtil.error(req, res, 'file.INVALID_PARAMS', 400);
       }
 
       const strategyEarly = ((headerStrategy || nameStrategy || 'skip') + '').toLowerCase();
@@ -295,7 +295,7 @@ class UploadController {
       } else {
         if (!(await fs.pathExists(partialPath))) {
           await fs.remove(file.path);
-          return ResponseUtil.error(req, res, 'file.MISSING_PREVIOUS_CHUNKS');
+          return ResponseUtil.error(req, res, 'file.MISSING_PREVIOUS_CHUNKS', 400);
         }
 
         const stats = await fs.stat(partialPath);

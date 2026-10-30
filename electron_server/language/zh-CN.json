@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "该字幕文件已失效，请下载其他字幕",
-      "SUBTITLE_DELETE_FAILED": "字幕删除失败"
+      "SUBTITLE_DELETE_FAILED": "字幕删除失败",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "清除已上传字幕失败",
+      "GET_INFO_FAILED": "获取视频信息失败",
+      "INVALID_PARAMS": "参数无效",
+      "SAVE_PREFERENCE_FAILED": "保存播放偏好失败",
+      "SUBTITLE_DOWNLOAD_FAILED": "字幕下载失败",
+      "SUBTITLE_SEARCH_FAILED": "字幕搜索失败",
+      "SUBTITLE_UNSUPPORTED": "不支持该字幕格式",
+      "TRANSCODE_FAILED": "转码失败，请稍后重试",
+      "UPLOAD_SUBTITLE_FAILED": "字幕上传失败"
     },
     "fileMount": {
       "START_FAILED": "挂载启动失败：%s",
@@ -60,7 +69,20 @@
       "OBSCURE_FAILED": "密码加密失败，请检查服务端环境后重试",
       "SERVICE_START_TIMEOUT": "OpenList 服务启动超时",
       "BINARY_NOT_FOUND": "未找到 OpenList 可执行文件",
-      "PLATFORM_NOT_SUPPORTED": "当前平台不支持此功能"
+      "PLATFORM_NOT_SUPPORTED": "当前平台不支持此功能",
+      "ADMIN_PASSWORD_MISSING": "未配置 OpenList 管理密码",
+      "ADMIN_SET_FAILED": "设置 OpenList 管理员失败",
+      "ADMIN_TOKEN_FAILED": "获取 OpenList 管理令牌失败",
+      "ADMIN_TOKEN_PARSE_FAILED": "解析 OpenList 管理令牌失败",
+      "BASE_URL_MISSING": "未配置 OpenList 服务地址",
+      "DB_INIT_FAILED": "OpenList 数据库初始化失败",
+      "DB_NOT_READY": "OpenList 数据库未就绪",
+      "DRIVER_NOT_ALLOWED": "不支持的挂载类型",
+      "MOUNT_PARENT_NOT_DIR": "挂载父路径必须是目录",
+      "MOUNT_PARENT_NOT_FOUND": "挂载父路径不存在",
+      "STOP_FAILED": "网盘挂载停止失败",
+      "STORAGE_INIT_FAILED": "网盘存储初始化失败：%s",
+      "TIMEOUT": "操作超时，请稍后重试"
     },
     "fileBackup": {
       "SOURCE_TARGET_PATH_CONFLICT": "来源目录不能和目标目录一致，也不能相互包含",
@@ -72,7 +94,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "在新设备%s上进行了登录，OS版本：%s",
       "UNKNOWN_DEVICE": "未知设备",
       "IP_BLACKLIST_ADMIN_TITLE": "安全提醒",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP:%s由于多次输入错误的用户名/密码，IP已被临时封禁，如果不是您本人操作，请尽快修改密码以及开启2FA增加账户安全性"
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP:%s由于多次输入错误的用户名/密码，IP已被临时封禁，如果不是您本人操作，请尽快修改密码以及开启2FA增加账户安全性",
+      "ADD_SUCCESS": "添加成功",
+      "CLEAR_SUCCESS": "清空成功",
+      "DELETE_SUCCESS": "删除成功",
+      "MARK_READ_SUCCESS": "已标记为已读",
+      "MESSAGE_ID_REQUIRED": "缺少消息ID",
+      "MESSAGE_NOT_FOUND": "消息不存在",
+      "MESSAGE_REQUIRED": "消息内容不能为空"
     },
     "auth": {
       "SYS_NO_INIT": "系统未初始化",
@@ -109,7 +138,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "由于安全原因,此操作仅支持在同一局域网内部",
       "RECOVER_ADMIN_LAN_ONLY": "此接口仅限于找回管理员密码，且仅支持局域网内使用，请输入管理员账号，普通用户修改密码请联系管理员在\"用户管理\"中修改",
       "PASSWORD_RESET_SUCCESS": "管理员密码重置成功",
-      "PASSWORD_RESET_FAILED": "管理员密码重置失败"
+      "PASSWORD_RESET_FAILED": "管理员密码重置失败",
+      "GET_ONLINE_USERS_FAILED": "获取在线用户列表失败",
+      "RECOVER_INFO_FETCH_FAILED": "获取找回密码信息失败",
+      "RECOVER_INFO_FETCH_SUCCESS": "获取找回密码信息成功",
+      "UNAUTHORIZED": "未授权，请重新登录",
+      "SUPER_ADMIN_CHECK_SUCCESS": "超级管理员检测完成",
+      "SERVER_STATUS_CHECK_SUCCESS": "服务器状态获取成功"
     },
     "security": {
       "IP_BLACKLISTED": "当前IP已被封禁，请稍后再试",
@@ -119,7 +154,11 @@
       "REQUIRE_ADMIN_SETUP": "当前服务器已强制开启2FA，请联系管理员绑定后再登录",
       "TWO_FACTOR_REQUIRED": "需要二次验证，请输入2FA验证码",
       "INVALID_CODE": "验证码错误",
-      "TOO_MANY_ATTEMPTS": "尝试次数过多，请稍后再试"
+      "TOO_MANY_ATTEMPTS": "尝试次数过多，请稍后再试",
+      "MASTER_KEY_MISSING": "服务端未配置2FA主密钥，无法启用两步验证",
+      "NOT_ENABLED": "未开启两步验证",
+      "NO_SECRET": "尚未绑定2FA，请先完成绑定",
+      "SECRET_DECRYPT_FAILED": "2FA密钥解密失败，请重新绑定"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "获取用户列表失败",
@@ -134,7 +173,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "获取登录记录成功",
       "LOGIN_RECORDS_FETCH_FAILED": "获取登录记录失败",
       "SCOPED_TOKEN_CREATE_SUCCESS": "受限token创建成功",
-      "SCOPED_TOKEN_CREATE_FAILED": "受限token创建失败"
+      "SCOPED_TOKEN_CREATE_FAILED": "受限token创建失败",
+      "CANNOT_DELETE_SUPER_ADMIN": "不能删除超级管理员"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "获取权限列表成功",
@@ -184,7 +224,7 @@
       "RECENT_SUCCESS": "获取最近访问成功",
       "RECENT_FAILED": "获取最近访问失败",
       "NOT_FILE": "不是文件",
-      "UNSUPPORTED_TYPE": "不支持的文件类型",
+      "UNSUPPORTED_TYPE": "不支持的文件类型：%s",
       "TINY_FAILED": "获取缩略图失败",
       "OPERATION_QUEUED": "操作已加入队列",
       "OPERATION_FAILED": "操作失败",
@@ -203,7 +243,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "名称不能为空",
       "CUSTOM_PATH_PATH_EXISTS": "路径已存在",
       "CUSTOM_PATH_REMOVE_SUCCESS": "移除自定义路径成功",
-      "CUSTOM_PATH_SAVE_FAILED": "保存自定义路径失败"
+      "CUSTOM_PATH_SAVE_FAILED": "保存自定义路径失败",
+      "CHECK_CHUNK_SUCCESS": "分片校验成功",
+      "CHUNK_MISMATCH": "分片校验不一致，请重新上传该分片",
+      "CONFIG_FETCH_SUCCESS": "获取索引配置成功",
+      "CONFIG_RESET_SUCCESS": "重置索引配置成功",
+      "CONFIG_SAVE_SUCCESS": "保存索引配置成功",
+      "DIRECTORY_LIST_TIMEOUT": "读取目录超时，请稍后重试",
+      "DIRECTORY_LIST_WORKER_ERROR": "目录读取进程返回错误",
+      "DIRECTORY_LIST_WORKER_EXITED": "目录读取进程意外退出（退出码 %s），请重试",
+      "DOWNLOAD_FAILED": "下载失败",
+      "FILE_NOT_EXIST": "文件不存在",
+      "GET_ATTRIBUTES_FAILED": "获取文件属性失败",
+      "GLOBAL_SEARCH_SUCCESS": "搜索完成",
+      "LOG_CANNOT_CANCEL": "该任务已开始执行，无法取消",
+      "LOG_CLEAR_FAILED": "日志清空失败",
+      "LOG_CLEAR_SUCCESS": "日志清空成功",
+      "LOG_NOT_FOUND": "日志记录不存在",
+      "MISSING_PREVIOUS_CHUNKS": "缺少前置分片，请按顺序上传",
+      "NOT_FOUND": "不存在",
+      "NO_FILE_SELECTED": "未选择文件",
+      "OPERATION_CANCELLED": "操作已取消",
+      "OPERATION_CANCEL_FAILED": "取消操作失败",
+      "PERMISSION_DENIED": "权限不足",
+      "RECENT_CLEAR_FAILED": "清空最近访问失败",
+      "RECENT_CLEAR_SUCCESS": "最近访问已清空",
+      "RENAME_SUCCESS": "重命名成功",
+      "TINY_PENDING": "缩略图正在生成，请稍后重试",
+      "TINY_TIMEOUT": "缩略图生成超时，请稍后重试",
+      "UNKNOWN_WORKER_TASK": "未知的后台任务类型",
+      "UPLOAD_CHUNK_SUCCESS": "分片上传成功",
+      "UPLOAD_COMPLETED": "上传完成"
     },
     "quickShare": {
       "INVALID_TOKEN": "无效的分享凭证",
@@ -235,7 +305,9 @@
       "TRASH_RESTORE_SUCCESS": "照片已成功从回收站恢复",
       "TRASH_DELETE_SUCCESS": "照片已成功从回收站删除",
       "TRASH_EMPTY_SUCCESS": "回收站已成功清空",
-      "PHOTO_COLLECTION_NAME_EXISTS": "合集名称已存在"
+      "PHOTO_COLLECTION_NAME_EXISTS": "合集名称已存在",
+      "PHOTO_SOURCE_LIST_EMPTY": "尚未添加照片来源目录",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "照片来源序号超出范围"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "获取影音来源目录成功",
@@ -313,7 +385,16 @@
       "USER_SERIALIZE_FAILED": "用户信息序列化失败",
       "USER_PARSE_FAILED": "用户信息解析失败",
       "DB_WRITE_FAILED": "写入配置失败",
-      "DB_CONNECTION_FAILED": "数据库连接失败"
+      "DB_CONNECTION_FAILED": "数据库连接失败",
+      "P2P_BIND_FAILED": "P2P 绑定失败，请稍后重试",
+      "TEMP_CODE_FAILED": "获取临时码失败",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "自定义配对码接口不可用，请稍后重试",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "自定义配对码设置失败，请稍后重试",
+      "DDNS_NOT_CONFIGURED": "动态域名尚未配置，请先在设置中填写域名",
+      "DEVICE_NOT_BOUND": "当前设备未绑定到账号，请先完成设备绑定",
+      "NEED_VIP": "该功能需要会员权限，请升级后再试",
+      "DEVICE_COUNT_LIMIT": "账号下设备数量已达上限，请先解绑其他设备",
+      "REMOTE_ERROR": "远端服务返回错误：%s"
     },
     "docker": {
       "CONFIG_SAVED": "Docker 代理配置已保存",
@@ -339,7 +420,15 @@
       "COMMAND_FAILED": "Docker 命令执行失败",
       "CONFIG_SAVE_FAILED": "Docker 配置保存失败",
       "INVALID_PROXY_URL": "代理地址格式不正确",
-      "TASK_NOT_FOUND": "Docker 任务不存在"
+      "TASK_NOT_FOUND": "Docker 任务不存在",
+      "IMAGE_ARCHIVE_NOT_FOUND": "镜像文件不存在",
+      "IMAGE_ARCHIVE_REQUIRED": "请选择镜像文件",
+      "IMAGE_IN_USE": "镜像正在被容器使用，无法删除",
+      "INVALID_CONFIG_JSON": "配置 JSON 格式不正确",
+      "INVALID_IMAGE_ARCHIVE": "镜像文件无效",
+      "START_FAILED": "启动失败",
+      "STOP_FAILED": "停止失败",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "任务正在运行，无法删除"
     },
     "terminal": {
       "START_FAILED": "终端启动失败",
@@ -370,7 +459,8 @@
       "PAGE_NUMBER_INVALID": "页码必须是大于0的整数",
       "LIMIT_INVALID": "每页数量必须是1到100之间的整数",
       "ID_INVALID": "ID必须是大于0的整数",
-      "KEYWORD_LENGTH_INVALID": "搜索关键词长度必须在1到100个字符之间"
+      "KEYWORD_LENGTH_INVALID": "搜索关键词长度必须在1到100个字符之间",
+      "INVALID_VALUE": "无效的值"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "密码错误",
@@ -394,7 +484,14 @@
       "ERROR": "发生错误",
       "NOT_FOUND": "未找到",
       "UNAUTHORIZED": "未授权",
-      "FORBIDDEN": "禁止访问"
+      "FORBIDDEN": "禁止访问",
+      "DELETE_SUCCESS": "删除成功",
+      "DUPLICATE": "同名记录已存在",
+      "INVALID_PARAMS": "参数无效",
+      "PARAM_ERROR": "参数错误",
+      "ENDPOINT_NOT_FOUND": "接口不存在",
+      "INTERNAL_SERVER_ERROR": "服务器内部错误",
+      "RESOURCE_NOT_FOUND": "资源不存在"
     },
     "mediaTool": {
       "INVALID_PARAMS": "参数错误",
@@ -410,6 +507,41 @@
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "此功能所需插件还未下载完成，请稍后再试。"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "下载服务（Transmission）不可用，请先安装并启动 transmission-daemon",
+      "STARTED": "下载服务已启动",
+      "START_FAILED": "下载服务启动失败",
+      "START_FAILED_DETAIL": "下载服务启动失败：%s",
+      "STOPPED": "下载服务已停止",
+      "STOP_FAILED": "下载服务停止失败",
+      "STOP_FAILED_DETAIL": "下载服务停止失败：%s",
+      "RESTARTED": "下载服务已重启",
+      "CONFIG_SAVED": "配置已保存",
+      "TORRENT_ADDED": "任务已添加",
+      "TORRENT_FILE_REQUIRED": "请选择要添加的种子文件",
+      "DOWNLOAD_DIR_REQUIRED": "请填写下载目录",
+      "PORT_INVALID": "无效端口：%s，请输入 1024-65535 之间的端口",
+      "PORT_DISABLED": "该端口已被系统保留（0-1023），请改用 1024 以上的端口",
+      "PORT_RESERVED": "该端口已被其他服务占用，请更换端口",
+      "RPC_ERROR": "下载服务返回错误：%s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "请先选择笔记本",
+      "NOTEBOOK_NOT_FOUND": "笔记本不存在或已被删除",
+      "NOTEBOOK_INVALID": "笔记本名称无效，请使用 1-50 个字符",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "笔记本中还有笔记，无法删除",
+      "GROUP_NOT_EMPTY": "分组中还有笔记本，无法删除"
+    },
+    "system": {
+      "NOT_SUPPORTED": "当前运行模式不支持此操作"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "获取应用列表成功",
+      "SET_HIDE_APPS_SUCCESS": "批量设置应用显示状态成功",
+      "HIDE_APP_SUCCESS": "应用已隐藏",
+      "UNHIDE_APP_SUCCESS": "应用已显示",
+      "SET_APPS_ORDER_SUCCESS": "应用排序已保存"
     }
   },
   "places365": {

@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "이 자막 파일은 만료되었습니다. 다른 자막을 다운로드하세요.",
-      "SUBTITLE_DELETE_FAILED": "자막 삭제에 실패했습니다"
+      "SUBTITLE_DELETE_FAILED": "자막 삭제에 실패했습니다",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "업로드한 자막 삭제에 실패했습니다",
+      "GET_INFO_FAILED": "동영상 정보 가져오기 실패",
+      "INVALID_PARAMS": "잘못된 매개변수",
+      "SAVE_PREFERENCE_FAILED": "재생 환경 설정 저장 실패",
+      "SUBTITLE_DOWNLOAD_FAILED": "자막 다운로드 실패",
+      "SUBTITLE_SEARCH_FAILED": "자막 검색 실패",
+      "SUBTITLE_UNSUPPORTED": "지원되지 않는 자막 형식",
+      "TRANSCODE_FAILED": "트랜스코딩에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "UPLOAD_SUBTITLE_FAILED": "자막 업로드 실패"
     },
     "fileMount": {
       "START_FAILED": "마운트 시작 실패: %s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "새 기기 %s 에서 로그인함 (OS 버전: %s)",
       "UNKNOWN_DEVICE": "알 수 없는 기기",
       "IP_BLACKLIST_ADMIN_TITLE": "보안 알림",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s 는(은) 잘못된 사용자 이름 또는 비밀번호가 여러 번 입력되어 일시적으로 차단되었습니다. 본인이 아니라면 즉시 비밀번호를 변경하고 2FA 를 켜 계정을 보호하세요."
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s 는(은) 잘못된 사용자 이름 또는 비밀번호가 여러 번 입력되어 일시적으로 차단되었습니다. 본인이 아니라면 즉시 비밀번호를 변경하고 2FA 를 켜 계정을 보호하세요.",
+      "ADD_SUCCESS": "추가 성공",
+      "CLEAR_SUCCESS": "성공적으로 비워짐",
+      "DELETE_SUCCESS": "삭제 성공",
+      "MARK_READ_SUCCESS": "읽음으로 표시되었습니다",
+      "MESSAGE_ID_REQUIRED": "메시지 ID 가 필요합니다",
+      "MESSAGE_NOT_FOUND": "메시지를 찾을 수 없음",
+      "MESSAGE_REQUIRED": "메시지 내용은 비워둘 수 없습니다"
     },
     "auth": {
       "SYS_NO_INIT": "시스템이 초기화되지 않음",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "보안상의 이유로 이 작업은 동일한 로컬 네트워크 내에서만 지원됩니다",
       "RECOVER_ADMIN_LAN_ONLY": "이 API는 관리자 비밀번호 복구 전용이며 로컬 네트워크에서만 사용할 수 있습니다. 관리자 사용자 이름을 입력하세요. 일반 사용자는 관리자에게 \"사용자 관리\"에서 비밀번호 변경을 요청하세요.",
       "PASSWORD_RESET_SUCCESS": "관리자 비밀번호 재설정 성공",
-      "PASSWORD_RESET_FAILED": "관리자 비밀번호 재설정 실패"
+      "PASSWORD_RESET_FAILED": "관리자 비밀번호 재설정 실패",
+      "GET_ONLINE_USERS_FAILED": "온라인 사용자 목록 가져오기 실패",
+      "RECOVER_INFO_FETCH_FAILED": "비밀번호 복구 정보 가져오기 실패",
+      "RECOVER_INFO_FETCH_SUCCESS": "비밀번호 복구 정보를 성공적으로 가져옴",
+      "UNAUTHORIZED": "인증되지 않았습니다. 다시 로그인해 주세요.",
+      "SUPER_ADMIN_CHECK_SUCCESS": "슈퍼 관리자 확인이 완료되었습니다",
+      "SERVER_STATUS_CHECK_SUCCESS": "서버 상태를 성공적으로 가져왔습니다"
     },
     "security": {
       "IP_BLACKLISTED": "이 IP 는 차단되었습니다. 나중에 다시 시도해주세요",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "현재 서버에서 2FA 가 강제되어 있습니다. 관리자에게 연락하여 바인딩 후 로그인해주세요",
       "TWO_FACTOR_REQUIRED": "2 단계 인증이 필요합니다. 2FA 코드를 입력해주세요",
       "INVALID_CODE": "잘못된 인증 코드",
-      "TOO_MANY_ATTEMPTS": "시도 횟수가 너무 많습니다. 나중에 다시 시도해주세요"
+      "TOO_MANY_ATTEMPTS": "시도 횟수가 너무 많습니다. 나중에 다시 시도해주세요",
+      "MASTER_KEY_MISSING": "서버에 2FA 마스터 키가 설정되지 않아 2 단계 인증을 활성화할 수 없습니다",
+      "NOT_ENABLED": "2 단계 인증이 활성화되지 않았습니다",
+      "NO_SECRET": "2FA 가 아직 바인딩되지 않았습니다. 먼저 바인딩을 완료해 주세요.",
+      "SECRET_DECRYPT_FAILED": "2FA 시크릿 키 복호화에 실패했습니다. 다시 바인딩해 주세요."
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "사용자 목록 가져오기 실패",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "로그인 기록을 성공적으로 가져옴",
       "LOGIN_RECORDS_FETCH_FAILED": "로그인 기록 가져오기 실패",
       "SCOPED_TOKEN_CREATE_SUCCESS": "범위 지정 토큰이 성공적으로 생성되었습니다",
-      "SCOPED_TOKEN_CREATE_FAILED": "범위 지정 토큰 생성 실패"
+      "SCOPED_TOKEN_CREATE_FAILED": "범위 지정 토큰 생성 실패",
+      "CANNOT_DELETE_SUPER_ADMIN": "슈퍼 관리자는 삭제할 수 없습니다"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "권한 목록을 성공적으로 가져옴",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "이름은 필수입니다",
       "CUSTOM_PATH_PATH_EXISTS": "경로가 이미 존재함",
       "CUSTOM_PATH_REMOVE_SUCCESS": "사용자 지정 경로가 성공적으로 제거되었습니다",
-      "CUSTOM_PATH_SAVE_FAILED": "사용자 지정 경로 저장 실패"
+      "CUSTOM_PATH_SAVE_FAILED": "사용자 지정 경로 저장 실패",
+      "CHECK_CHUNK_SUCCESS": "청크 검증 성공",
+      "CHUNK_MISMATCH": "청크 체크섬이 일치하지 않습니다. 이 청크를 다시 업로드해 주세요.",
+      "CONFIG_FETCH_SUCCESS": "인덱스 설정을 성공적으로 가져옴",
+      "CONFIG_RESET_SUCCESS": "인덱스 설정이 성공적으로 재설정되었습니다",
+      "CONFIG_SAVE_SUCCESS": "인덱스 설정이 성공적으로 저장되었습니다",
+      "DIRECTORY_LIST_TIMEOUT": "디렉토리 읽기 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.",
+      "DIRECTORY_LIST_WORKER_ERROR": "디렉토리 목록 워커가 오류를 반환했습니다",
+      "DIRECTORY_LIST_WORKER_EXITED": "디렉토리 목록 워커가 예기치 않게 종료되었습니다(종료 코드 %s). 다시 시도해 주세요.",
+      "DOWNLOAD_FAILED": "다운로드 실패",
+      "FILE_NOT_EXIST": "파일이 존재하지 않습니다",
+      "GET_ATTRIBUTES_FAILED": "파일 속성 가져오기 실패",
+      "GLOBAL_SEARCH_SUCCESS": "검색이 완료되었습니다",
+      "LOG_CANNOT_CANCEL": "이 작업은 이미 시작되어 취소할 수 없습니다",
+      "LOG_CLEAR_FAILED": "로그 비우기 실패",
+      "LOG_CLEAR_SUCCESS": "로그가 성공적으로 비워졌습니다",
+      "LOG_NOT_FOUND": "로그 기록을 찾을 수 없음",
+      "MISSING_PREVIOUS_CHUNKS": "이전 청크가 누락되었습니다. 순서대로 업로드해 주세요.",
+      "NOT_FOUND": "찾을 수 없음",
+      "NO_FILE_SELECTED": "선택된 파일이 없습니다",
+      "OPERATION_CANCELLED": "작업이 취소되었습니다",
+      "OPERATION_CANCEL_FAILED": "작업 취소 실패",
+      "PERMISSION_DENIED": "권한이 부족합니다",
+      "RECENT_CLEAR_FAILED": "최근 항목 비우기 실패",
+      "RECENT_CLEAR_SUCCESS": "최근 항목이 성공적으로 비워졌습니다",
+      "RENAME_SUCCESS": "이름이 성공적으로 변경되었습니다",
+      "TINY_PENDING": "썸네일이 생성되는 중입니다. 잠시 후 다시 시도해 주세요.",
+      "TINY_TIMEOUT": "썸네일 생성 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.",
+      "UNKNOWN_WORKER_TASK": "알 수 없는 백그라운드 작업 유형",
+      "UPLOAD_CHUNK_SUCCESS": "청크 업로드 성공",
+      "UPLOAD_COMPLETED": "업로드가 완료되었습니다"
     },
     "quickShare": {
       "INVALID_TOKEN": "잘못된 공유 토큰",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "사진이 휴지통에서 성공적으로 복원되었습니다",
       "TRASH_DELETE_SUCCESS": "사진이 휴지통에서 성공적으로 삭제되었습니다",
       "TRASH_EMPTY_SUCCESS": "휴지통이 성공적으로 비워졌습니다",
-      "PHOTO_COLLECTION_NAME_EXISTS": "사진 컬렉션 이름이 이미 존재함"
+      "PHOTO_COLLECTION_NAME_EXISTS": "사진 컬렉션 이름이 이미 존재함",
+      "PHOTO_SOURCE_LIST_EMPTY": "사진 소스 디렉토리가 아직 추가되지 않았습니다",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "사진 소스 번호가 범위를 벗어났습니다"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "비디오 소스를 성공적으로 가져옴",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "사용자 정보 직렬화 실패",
       "USER_PARSE_FAILED": "사용자 정보 구문 분석 실패",
       "DB_WRITE_FAILED": "설정 쓰기 실패",
-      "DB_CONNECTION_FAILED": "데이터베이스 연결 실패"
+      "DB_CONNECTION_FAILED": "데이터베이스 연결 실패",
+      "P2P_BIND_FAILED": "P2P 바인딩에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "TEMP_CODE_FAILED": "임시 코드 가져오기 실패",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "사용자 지정 페어 코드 API 를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "사용자 지정 페어 코드 설정에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "DDNS_NOT_CONFIGURED": "동적 도메인이 아직 구성되지 않았습니다. 설정에서 도메인 이름을 먼저 입력해 주세요.",
+      "DEVICE_NOT_BOUND": "이 기기가 계정에 바인딩되지 않았습니다. 먼저 기기 바인딩을 완료해 주세요.",
+      "NEED_VIP": "이 기능은 멤버십 권한이 필요합니다. 업그레이드한 후 다시 시도해 주세요.",
+      "DEVICE_COUNT_LIMIT": "계정의 기기 수가 한도에 도달했습니다. 다른 기기를 먼저 바인딩 해제해 주세요.",
+      "REMOTE_ERROR": "원격 서비스가 오류를 반환했습니다: %s"
     },
     "terminal": {
       "START_FAILED": "터미널 시작 실패",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "페이지 번호는 양의 정수여야 합니다",
       "LIMIT_INVALID": "제한은 1~100 사이의 정수여야 합니다",
       "ID_INVALID": "ID 는 양의 정수여야 합니다",
-      "KEYWORD_LENGTH_INVALID": "검색 키워드 길이는 1~100 자 사이여야 합니다"
+      "KEYWORD_LENGTH_INVALID": "검색 키워드 길이는 1~100 자 사이여야 합니다",
+      "INVALID_VALUE": "값이 유효하지 않습니다"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "비밀번호가 잘못됨",
       "SIGN_FILE_MISSING": "암호화 공간 서명 파일이 없거나 비어있음",
-      "SPACE_DB_INVALID": "암호화 공간 인덱스 데이터베이스가 없거나 손상됨"
+      "SPACE_DB_INVALID": "암호화 공간 인덱스 데이터베이스가 없거나 손상됨",
+      "SPACE_FOLDER_MISSING": "암호화 공간 디렉토리가 존재하지 않거나 이동되었습니다. 경로를 확인한 후 다시 시도해 주세요."
     },
     "apiSetting": {
       "FETCH_SUCCESS": "성공적으로 가져옴",
@@ -352,7 +422,14 @@
       "ERROR": "오류 발생",
       "NOT_FOUND": "찾을 수 없음",
       "UNAUTHORIZED": "인증되지 않음",
-      "FORBIDDEN": "금지됨"
+      "FORBIDDEN": "금지됨",
+      "DELETE_SUCCESS": "삭제 성공",
+      "DUPLICATE": "같은 이름의 레코드가 이미 존재합니다",
+      "INVALID_PARAMS": "잘못된 매개변수",
+      "PARAM_ERROR": "매개변수 오류",
+      "ENDPOINT_NOT_FOUND": "엔드포인트를 찾을 수 없음",
+      "INTERNAL_SERVER_ERROR": "서버 내부 오류",
+      "RESOURCE_NOT_FOUND": "리소스를 찾을 수 없습니다"
     },
     "mediaTool": {
       "INVALID_PARAMS": "잘못된 매개변수",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "Docker 명령 실행에 실패했습니다",
       "CONFIG_SAVE_FAILED": "Docker 설정 저장에 실패했습니다",
       "INVALID_PROXY_URL": "프록시 URL 형식이 올바르지 않습니다",
-      "TASK_NOT_FOUND": "Docker 작업을 찾을 수 없습니다"
+      "TASK_NOT_FOUND": "Docker 작업을 찾을 수 없습니다",
+      "IMAGE_ARCHIVE_NOT_FOUND": "이미지 아카이브 파일을 찾을 수 없습니다",
+      "IMAGE_ARCHIVE_REQUIRED": "이미지 아카이브 파일을 선택해 주세요.",
+      "IMAGE_IN_USE": "이미지가 컨테이너에서 사용 중이므로 삭제할 수 없습니다",
+      "INVALID_CONFIG_JSON": "설정 JSON 형식이 올바르지 않습니다",
+      "INVALID_IMAGE_ARCHIVE": "이미지 아카이브 파일이 유효하지 않습니다",
+      "START_FAILED": "시작 실패",
+      "STOP_FAILED": "중지 실패",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "작업이 실행 중이므로 삭제할 수 없습니다"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "이 기능에 필요한 플러그인이 아직 다운로드 중입니다. 잠시 후 다시 시도해 주세요."
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "OpenList 마운트 시작에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "START_FAILED": "OpenList 마운트 시작 실패",
+      "START_TIMEOUT": "OpenList 마운트 시작 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.",
+      "STOP_TIMEOUT": "OpenList 마운트 중지 시간이 초과되었습니다",
+      "WORKER_SEND_FAILED": "OpenList 마운트 워커와 통신하지 못했습니다",
+      "STORAGE_SYNC_FAILED": "클라우드 저장소 설정 동기화에 실패했습니다",
+      "STORAGE_NOT_FOUND": "OpenList 에서 해당 저장소를 찾을 수 없습니다",
+      "INVALID_MOUNT_NAME": "잘못된 마운트 이름 (폴더 이름)",
+      "MOUNT_PARENT_NO_ACCESS": "마운트 부모 경로는 읽기 및 쓰기 가능해야 함",
+      "OBSCURE_FAILED": "서버에서 비밀번호 암호화에 실패했습니다. 서버 환경을 확인한 후 다시 시도하세요",
+      "SERVICE_START_TIMEOUT": "OpenList 서비스 시작 시간이 초과되었습니다",
+      "BINARY_NOT_FOUND": "OpenList 실행 파일을 찾을 수 없습니다",
+      "PLATFORM_NOT_SUPPORTED": "현재 플랫폼에서는 이 기능을 지원하지 않습니다",
+      "ADMIN_PASSWORD_MISSING": "OpenList 관리자 비밀번호가 설정되지 않았습니다",
+      "ADMIN_SET_FAILED": "OpenList 관리자 설정에 실패했습니다",
+      "ADMIN_TOKEN_FAILED": "OpenList 관리자 토큰 가져오기 실패",
+      "ADMIN_TOKEN_PARSE_FAILED": "OpenList 관리자 토큰 구문 분석 실패",
+      "BASE_URL_MISSING": "OpenList 서비스 주소가 설정되지 않았습니다",
+      "DB_INIT_FAILED": "OpenList 데이터베이스 초기화에 실패했습니다",
+      "DB_NOT_READY": "OpenList 데이터베이스가 준비되지 않았습니다",
+      "DRIVER_NOT_ALLOWED": "지원되지 않는 저장소 드라이버",
+      "MOUNT_PARENT_NOT_DIR": "마운트 부모 경로는 디렉토리여야 함",
+      "MOUNT_PARENT_NOT_FOUND": "마운트 부모 경로가 존재하지 않음",
+      "STOP_FAILED": "OpenList 마운트 중지 실패",
+      "STORAGE_INIT_FAILED": "클라우드 저장소 초기화에 실패했습니다: %s",
+      "TIMEOUT": "작업 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "다운로드 서비스(Transmission)를 사용할 수 없습니다. transmission-daemon 을 먼저 설치하고 시작해 주세요.",
+      "STARTED": "다운로드 서비스가 시작되었습니다",
+      "START_FAILED": "다운로드 서비스 시작 실패",
+      "START_FAILED_DETAIL": "다운로드 서비스 시작 실패: %s",
+      "STOPPED": "다운로드 서비스가 중지되었습니다",
+      "STOP_FAILED": "다운로드 서비스 중지 실패",
+      "STOP_FAILED_DETAIL": "다운로드 서비스 중지 실패: %s",
+      "RESTARTED": "다운로드 서비스가 다시 시작되었습니다",
+      "CONFIG_SAVED": "설정이 저장되었습니다",
+      "TORRENT_ADDED": "작업이 추가되었습니다",
+      "TORRENT_FILE_REQUIRED": "추가할 토렌트 파일을 선택해 주세요.",
+      "DOWNLOAD_DIR_REQUIRED": "다운로드 디렉토리를 입력해 주세요.",
+      "PORT_INVALID": "잘못된 포트: %s 1024~65535 사이의 포트를 입력해 주세요.",
+      "PORT_DISABLED": "해당 포트는 시스템에서 예약되어 있습니다(0-1023). 1024 이상의 포트를 사용해 주세요.",
+      "PORT_RESERVED": "해당 포트는 다른 서비스에서 이미 사용 중입니다. 다른 포트를 선택해 주세요.",
+      "RPC_ERROR": "다운로드 서비스가 오류를 반환했습니다: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "먼저 노트북을 선택해 주세요.",
+      "NOTEBOOK_NOT_FOUND": "노트북이 존재하지 않거나 삭제되었습니다",
+      "NOTEBOOK_INVALID": "노트북 이름이 유효하지 않습니다. 1~50 자를 사용해 주세요.",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "이 노트북에 아직 노트가 있어 삭제할 수 없습니다",
+      "GROUP_NOT_EMPTY": "이 그룹에 아직 노트북이 있어 삭제할 수 없습니다"
+    },
+    "system": {
+      "NOT_SUPPORTED": "현재 실행 모드에서는 이 작업을 지원하지 않습니다"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "앱 목록을 성공적으로 가져왔습니다",
+      "SET_HIDE_APPS_SUCCESS": "앱 표시 상태를 성공적으로 업데이트했습니다",
+      "HIDE_APP_SUCCESS": "앱이 숨겨졌습니다",
+      "UNHIDE_APP_SUCCESS": "앱이 표시됩니다",
+      "SET_APPS_ORDER_SUCCESS": "앱 순서가 저장되었습니다"
     }
   },
   "places365": {

@@ -2,7 +2,16 @@
   "messages": {
     "videoPlayer": {
       "SUBTITLE_EXPIRED": "Diese Untertiteldatei ist abgelaufen. Bitte laden Sie einen anderen Untertitel herunter.",
-      "SUBTITLE_DELETE_FAILED": "Untertitel konnte nicht gelöscht werden"
+      "SUBTITLE_DELETE_FAILED": "Untertitel konnte nicht gelöscht werden",
+      "CLEAR_UPLOADED_SUBTITLE_FAILED": "Entfernen des hochgeladenen Untertitels fehlgeschlagen",
+      "GET_INFO_FAILED": "Abruf der Videoinformationen fehlgeschlagen",
+      "INVALID_PARAMS": "Ungültige Parameter",
+      "SAVE_PREFERENCE_FAILED": "Speichern der Wiedergabeeinstellungen fehlgeschlagen",
+      "SUBTITLE_DOWNLOAD_FAILED": "Download des Untertitels fehlgeschlagen",
+      "SUBTITLE_SEARCH_FAILED": "Untertitel-Suche fehlgeschlagen",
+      "SUBTITLE_UNSUPPORTED": "Nicht unterstütztes Untertitelformat",
+      "TRANSCODE_FAILED": "Transkodierung fehlgeschlagen, bitte versuchen Sie es später erneut",
+      "UPLOAD_SUBTITLE_FAILED": "Upload des Untertitels fehlgeschlagen"
     },
     "fileMount": {
       "START_FAILED": "Mount-Start fehlgeschlagen: %s",
@@ -57,7 +66,14 @@
       "NEW_DEVICE_LOGIN_CONTENT_WITH_OS": "Angemeldet auf neuem Gerät %s (OS-Version: %s)",
       "UNKNOWN_DEVICE": "Unbekanntes Gerät",
       "IP_BLACKLIST_ADMIN_TITLE": "Sicherheitshinweis",
-      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s wurde nach mehreren falschen Benutzername-/Passwortversuchen vorübergehend gesperrt. Wenn Sie das nicht waren, ändern Sie Ihr Passwort umgehend und aktivieren Sie 2FA zum Schutz Ihres Kontos."
+      "IP_BLACKLIST_ADMIN_MESSAGE": "IP %s wurde nach mehreren falschen Benutzername-/Passwortversuchen vorübergehend gesperrt. Wenn Sie das nicht waren, ändern Sie Ihr Passwort umgehend und aktivieren Sie 2FA zum Schutz Ihres Kontos.",
+      "ADD_SUCCESS": "Erfolgreich hinzugefügt",
+      "CLEAR_SUCCESS": "Geleert",
+      "DELETE_SUCCESS": "Erfolgreich gelöscht",
+      "MARK_READ_SUCCESS": "Als gelesen markiert",
+      "MESSAGE_ID_REQUIRED": "Nachrichten-ID ist erforderlich",
+      "MESSAGE_NOT_FOUND": "Nachricht nicht gefunden",
+      "MESSAGE_REQUIRED": "Nachrichteninhalt ist erforderlich"
     },
     "auth": {
       "SYS_NO_INIT": "System nicht initialisiert",
@@ -94,7 +110,13 @@
       "PRIVATE_NETWORK_ONLY_OPERATION": "Aus Sicherheitsgründen wird dieser Vorgang nur im gleichen lokalen Netzwerk unterstützt",
       "RECOVER_ADMIN_LAN_ONLY": "Diese Schnittstelle dient nur zur Wiederherstellung des Administratorpassworts und ist nur im lokalen Netzwerk verfügbar. Bitte geben Sie ein Administratorkonto ein. Normale Benutzer wenden sich zur Passwortänderung an einen Administrator unter „Benutzerverwaltung“.",
       "PASSWORD_RESET_SUCCESS": "Admin-Passwort zurückgesetzt",
-      "PASSWORD_RESET_FAILED": "Zurücksetzen des Admin-Passworts fehlgeschlagen"
+      "PASSWORD_RESET_FAILED": "Zurücksetzen des Admin-Passworts fehlgeschlagen",
+      "GET_ONLINE_USERS_FAILED": "Abruf der Liste der Online-Benutzer fehlgeschlagen",
+      "RECOVER_INFO_FETCH_FAILED": "Abruf der Informationen zur Passwortwiederherstellung fehlgeschlagen",
+      "RECOVER_INFO_FETCH_SUCCESS": "Informationen zur Passwortwiederherstellung erfolgreich abgerufen",
+      "UNAUTHORIZED": "Nicht autorisiert, bitte melden Sie sich erneut an",
+      "SUPER_ADMIN_CHECK_SUCCESS": "Super-Admin-Prüfung abgeschlossen",
+      "SERVER_STATUS_CHECK_SUCCESS": "Serverstatus erfolgreich abgerufen"
     },
     "security": {
       "IP_BLACKLISTED": "Diese IP ist gesperrt. Bitte versuchen Sie es später erneut",
@@ -104,7 +126,11 @@
       "REQUIRE_ADMIN_SETUP": "Der Server hat 2FA obligatorisch aktiviert. Bitte wenden Sie sich an den Administrator, um es zu binden, bevor Sie sich anmelden",
       "TWO_FACTOR_REQUIRED": "Zwei-Faktor-Authentifizierung erforderlich. Bitte geben Sie Ihren 2FA-Code ein",
       "INVALID_CODE": "Ungültiger Verifizierungscode",
-      "TOO_MANY_ATTEMPTS": "Zu viele Versuche. Bitte versuchen Sie es später erneut"
+      "TOO_MANY_ATTEMPTS": "Zu viele Versuche. Bitte versuchen Sie es später erneut",
+      "MASTER_KEY_MISSING": "Der Server hat keinen 2FA-Hauptschlüssel konfiguriert, die Zwei-Faktor-Authentifizierung kann nicht aktiviert werden",
+      "NOT_ENABLED": "Zwei-Faktor-Authentifizierung ist nicht aktiviert",
+      "NO_SECRET": "2FA ist noch nicht verknüpft, bitte schließen Sie die Verknüpfung zuerst ab",
+      "SECRET_DECRYPT_FAILED": "Entschlüsselung des 2FA-Schlüssels fehlgeschlagen, bitte verknüpfen Sie ihn erneut"
     },
     "user": {
       "USER_LIST_FETCH_FAILED": "Abruf der Benutzerliste fehlgeschlagen",
@@ -119,7 +145,8 @@
       "LOGIN_RECORDS_FETCH_SUCCESS": "Anmeldedatensätze erfolgreich abgerufen",
       "LOGIN_RECORDS_FETCH_FAILED": "Abruf der Anmeldedatensätze fehlgeschlagen",
       "SCOPED_TOKEN_CREATE_SUCCESS": "Scoped-Token erfolgreich erstellt",
-      "SCOPED_TOKEN_CREATE_FAILED": "Erstellung des Scoped-Token fehlgeschlagen"
+      "SCOPED_TOKEN_CREATE_FAILED": "Erstellung des Scoped-Token fehlgeschlagen",
+      "CANNOT_DELETE_SUPER_ADMIN": "Das Super-Admin-Konto kann nicht gelöscht werden"
     },
     "permission": {
       "PERMISSION_LIST_FETCH_SUCCESS": "Berechtigungsliste erfolgreich abgerufen",
@@ -188,7 +215,37 @@
       "CUSTOM_PATH_NAME_REQUIRED": "Name ist erforderlich",
       "CUSTOM_PATH_PATH_EXISTS": "Pfad existiert bereits",
       "CUSTOM_PATH_REMOVE_SUCCESS": "Benutzerdefinierter Pfad entfernt",
-      "CUSTOM_PATH_SAVE_FAILED": "Speichern der benutzerdefinierten Pfade fehlgeschlagen"
+      "CUSTOM_PATH_SAVE_FAILED": "Speichern der benutzerdefinierten Pfade fehlgeschlagen",
+      "CHECK_CHUNK_SUCCESS": "Chunk verifiziert",
+      "CHUNK_MISMATCH": "Chunk-Prüfsumme stimmt nicht überein, bitte laden Sie diesen Chunk erneut hoch",
+      "CONFIG_FETCH_SUCCESS": "Indexeinstellungen erfolgreich abgerufen",
+      "CONFIG_RESET_SUCCESS": "Indexeinstellungen zurückgesetzt",
+      "CONFIG_SAVE_SUCCESS": "Indexeinstellungen gespeichert",
+      "DIRECTORY_LIST_TIMEOUT": "Zeitüberschreitung beim Abrufen des Verzeichnisinhalts, bitte versuchen Sie es später erneut",
+      "DIRECTORY_LIST_WORKER_ERROR": "Der Worker zum Abrufen des Verzeichnisinhalts hat einen Fehler gemeldet",
+      "DIRECTORY_LIST_WORKER_EXITED": "Der Worker zum Abrufen des Verzeichnisinhalts wurde unerwartet beendet (Code %s), bitte versuchen Sie es erneut",
+      "DOWNLOAD_FAILED": "Download fehlgeschlagen",
+      "FILE_NOT_EXIST": "Datei existiert nicht",
+      "GET_ATTRIBUTES_FAILED": "Abruf der Dateiattribute fehlgeschlagen",
+      "GLOBAL_SEARCH_SUCCESS": "Suche abgeschlossen",
+      "LOG_CANNOT_CANCEL": "Diese Aufgabe wurde bereits gestartet und kann nicht abgebrochen werden",
+      "LOG_CLEAR_FAILED": "Leeren der Logs fehlgeschlagen",
+      "LOG_CLEAR_SUCCESS": "Logs geleert",
+      "LOG_NOT_FOUND": "Log-Eintrag nicht gefunden",
+      "MISSING_PREVIOUS_CHUNKS": "Vorherige Chunks fehlen, bitte laden Sie sie in der richtigen Reihenfolge hoch",
+      "NOT_FOUND": "Nicht gefunden",
+      "NO_FILE_SELECTED": "Keine Datei ausgewählt",
+      "OPERATION_CANCELLED": "Vorgang abgebrochen",
+      "OPERATION_CANCEL_FAILED": "Abbrechen des Vorgangs fehlgeschlagen",
+      "PERMISSION_DENIED": "Keine Berechtigung",
+      "RECENT_CLEAR_FAILED": "Leeren der zuletzt verwendeten fehlgeschlagen",
+      "RECENT_CLEAR_SUCCESS": "Zuletzt verwendete geleert",
+      "RENAME_SUCCESS": "Erfolgreich umbenannt",
+      "TINY_PENDING": "Das Thumbnail wird generiert, bitte versuchen Sie es später erneut",
+      "TINY_TIMEOUT": "Zeitüberschreitung bei der Thumbnail-Generierung, bitte versuchen Sie es später erneut",
+      "UNKNOWN_WORKER_TASK": "Unbekannter Hintergrundtask",
+      "UPLOAD_CHUNK_SUCCESS": "Chunk hochgeladen",
+      "UPLOAD_COMPLETED": "Upload abgeschlossen"
     },
     "quickShare": {
       "INVALID_TOKEN": "Ungültiges Freigabetoken",
@@ -220,7 +277,9 @@
       "TRASH_RESTORE_SUCCESS": "Foto erfolgreich aus dem Papierkorb wiederhergestellt",
       "TRASH_DELETE_SUCCESS": "Foto erfolgreich aus dem Papierkorb gelöscht",
       "TRASH_EMPTY_SUCCESS": "Papierkorb erfolgreich geleert",
-      "PHOTO_COLLECTION_NAME_EXISTS": "Name der Fotosammlung existiert bereits"
+      "PHOTO_COLLECTION_NAME_EXISTS": "Name der Fotosammlung existiert bereits",
+      "PHOTO_SOURCE_LIST_EMPTY": "Es wurden noch keine Fotoquellenverzeichnisse hinzugefügt",
+      "PHOTO_SOURCE_OUT_OF_RANGE": "Index der Fotoquelle außerhalb des gültigen Bereichs"
     },
     "video": {
       "VIDEO_SOURCE_LIST_SUCCESS": "Videoquellen erfolgreich abgerufen",
@@ -298,7 +357,16 @@
       "USER_SERIALIZE_FAILED": "Serialisierung der Benutzerinformationen fehlgeschlagen",
       "USER_PARSE_FAILED": "Parsing der Benutzerinformationen fehlgeschlagen",
       "DB_WRITE_FAILED": "Schreiben der Konfiguration fehlgeschlagen",
-      "DB_CONNECTION_FAILED": "Datenbankverbindung fehlgeschlagen"
+      "DB_CONNECTION_FAILED": "Datenbankverbindung fehlgeschlagen",
+      "P2P_BIND_FAILED": "P2P-Bindung fehlgeschlagen, bitte versuchen Sie es später erneut",
+      "TEMP_CODE_FAILED": "Abruf des temporären Codes fehlgeschlagen",
+      "P2P_CUSTOM_PAIR_CODE_API_NOT_AVAILABLE": "Die API für benutzerdefinierte Pair-Codes ist nicht verfügbar. Bitte versuchen Sie es später erneut",
+      "P2P_CUSTOM_PAIR_CODE_FAILED": "Festlegen des benutzerdefinierten Pair-Codes fehlgeschlagen. Bitte versuchen Sie es später erneut",
+      "DDNS_NOT_CONFIGURED": "Dynamisches DNS ist noch nicht konfiguriert. Bitte legen Sie zuerst einen Domänennamen in den Einstellungen fest",
+      "DEVICE_NOT_BOUND": "Dieses Gerät ist nicht mit einem Konto verknüpft. Bitte verknüpfen Sie das Gerät zuerst",
+      "NEED_VIP": "Diese Funktion erfordert eine Mitgliedschaft. Bitte führen Sie ein Upgrade durch und versuchen Sie es erneut",
+      "DEVICE_COUNT_LIMIT": "Das Konto hat die maximale Anzahl an Geräten erreicht. Bitte trennen Sie zuerst die Bindung eines anderen Geräts",
+      "REMOTE_ERROR": "Der Remotedienst hat einen Fehler zurückgegeben: %s"
     },
     "terminal": {
       "START_FAILED": "Start des Terminals fehlgeschlagen",
@@ -329,12 +397,14 @@
       "PAGE_NUMBER_INVALID": "Seitennummer muss eine positive Ganzzahl sein",
       "LIMIT_INVALID": "Limit muss eine Ganzzahl zwischen 1 und 100 sein",
       "ID_INVALID": "ID muss eine positive Ganzzahl sein",
-      "KEYWORD_LENGTH_INVALID": "Suchbegriff muss zwischen 1 und 100 Zeichen lang sein"
+      "KEYWORD_LENGTH_INVALID": "Suchbegriff muss zwischen 1 und 100 Zeichen lang sein",
+      "INVALID_VALUE": "Ungültiger Wert"
     },
     "encryptedSpace": {
       "PASSWORD_INCORRECT": "Falsches Passwort",
       "SIGN_FILE_MISSING": "Verschlüsselter Speicher-Signaturdatei fehlt oder ist leer",
-      "SPACE_DB_INVALID": "Verschlüsselter Speicher-Indexdatenbank fehlt oder ist beschädigt"
+      "SPACE_DB_INVALID": "Verschlüsselter Speicher-Indexdatenbank fehlt oder ist beschädigt",
+      "SPACE_FOLDER_MISSING": "Der Ordner des verschlüsselten Speichers fehlt oder wurde verschoben. Bitte prüfen Sie den Pfad und versuchen Sie es erneut"
     },
     "apiSetting": {
       "FETCH_SUCCESS": "Erfolgreich abgerufen",
@@ -352,7 +422,14 @@
       "ERROR": "Fehler aufgetreten",
       "NOT_FOUND": "Nicht gefunden",
       "UNAUTHORIZED": "Nicht autorisiert",
-      "FORBIDDEN": "Verboten"
+      "FORBIDDEN": "Verboten",
+      "DELETE_SUCCESS": "Erfolgreich gelöscht",
+      "DUPLICATE": "Ein Eintrag mit demselben Namen existiert bereits",
+      "INVALID_PARAMS": "Ungültige Parameter",
+      "PARAM_ERROR": "Ungültiger Parameter",
+      "ENDPOINT_NOT_FOUND": "Endpunkt nicht gefunden",
+      "INTERNAL_SERVER_ERROR": "Interner Serverfehler",
+      "RESOURCE_NOT_FOUND": "Ressource nicht gefunden"
     },
     "mediaTool": {
       "INVALID_PARAMS": "Ungültige Parameter",
@@ -390,10 +467,81 @@
       "COMMAND_FAILED": "Docker-Befehl fehlgeschlagen",
       "CONFIG_SAVE_FAILED": "Speichern der Docker-Konfiguration fehlgeschlagen",
       "INVALID_PROXY_URL": "Ungültiges Proxy-URL-Format",
-      "TASK_NOT_FOUND": "Docker-Aufgabe nicht gefunden"
+      "TASK_NOT_FOUND": "Docker-Aufgabe nicht gefunden",
+      "IMAGE_ARCHIVE_NOT_FOUND": "Image-Archiv nicht gefunden",
+      "IMAGE_ARCHIVE_REQUIRED": "Ein Image-Archiv ist erforderlich",
+      "IMAGE_IN_USE": "Das Image wird von einem Container verwendet und kann nicht gelöscht werden",
+      "INVALID_CONFIG_JSON": "Ungültiges Konfigurations-JSON",
+      "INVALID_IMAGE_ARCHIVE": "Ungültiges Image-Archiv",
+      "START_FAILED": "Start fehlgeschlagen",
+      "STOP_FAILED": "Stoppen fehlgeschlagen",
+      "TASK_DELETE_RUNNING_FORBIDDEN": "Eine laufende Aufgabe kann nicht gelöscht werden"
     },
     "mountShare": {
       "PLUGIN_NOT_READY": "Erforderliche Plugins für diese Funktion werden noch heruntergeladen. Bitte versuchen Sie es später erneut."
+    },
+    "openlistMount": {
+      "RCLONE_START_FAILED": "Start des Cloud-Speicher-Mounts fehlgeschlagen. Bitte versuchen Sie es später erneut.",
+      "START_FAILED": "Start des Cloud-Speicher-Mounts fehlgeschlagen",
+      "START_TIMEOUT": "Zeitüberschreitung beim Starten des Cloud-Speicher-Mounts. Bitte erneut versuchen",
+      "STOP_TIMEOUT": "Zeitüberschreitung beim Beenden des Cloud-Speicher-Mounts",
+      "WORKER_SEND_FAILED": "Kommunikation mit dem OpenList-Mount-Worker fehlgeschlagen",
+      "STORAGE_SYNC_FAILED": "Synchronisierung der Cloud-Speicher-Konfiguration fehlgeschlagen",
+      "STORAGE_NOT_FOUND": "Speicher in OpenList nicht gefunden",
+      "INVALID_MOUNT_NAME": "Ungültiger Mount-Name (Ordnername)",
+      "MOUNT_PARENT_NO_ACCESS": "Mount-Elternpfad muss lesbar und beschreibbar sein",
+      "OBSCURE_FAILED": "Passwort konnte auf dem Server nicht verschlüsselt werden. Bitte erneut versuchen",
+      "SERVICE_START_TIMEOUT": "Zeitüberschreitung beim Starten des OpenList-Dienstes",
+      "BINARY_NOT_FOUND": "OpenList-Binärdatei nicht gefunden",
+      "PLATFORM_NOT_SUPPORTED": "Diese Funktion wird auf der aktuellen Plattform nicht unterstützt.",
+      "ADMIN_PASSWORD_MISSING": "OpenList-Admin-Passwort ist nicht konfiguriert",
+      "ADMIN_SET_FAILED": "Einrichten des OpenList-Admin-Kontos fehlgeschlagen",
+      "ADMIN_TOKEN_FAILED": "Abruf des OpenList-Admin-Tokens fehlgeschlagen",
+      "ADMIN_TOKEN_PARSE_FAILED": "Parsing des OpenList-Admin-Tokens fehlgeschlagen",
+      "BASE_URL_MISSING": "OpenList-Basis-URL ist nicht konfiguriert",
+      "DB_INIT_FAILED": "Initialisierung der OpenList-Datenbank fehlgeschlagen",
+      "DB_NOT_READY": "OpenList-Datenbank ist nicht bereit",
+      "DRIVER_NOT_ALLOWED": "Nicht unterstützter Speicher-Treiber",
+      "MOUNT_PARENT_NOT_DIR": "Mount-Elternpfad muss ein Verzeichnis sein",
+      "MOUNT_PARENT_NOT_FOUND": "Mount-Elternpfad existiert nicht",
+      "STOP_FAILED": "Beenden des Mounts fehlgeschlagen",
+      "STORAGE_INIT_FAILED": "Initialisierung des Cloud-Speichers fehlgeschlagen: %s",
+      "TIMEOUT": "Zeitüberschreitung des Vorgangs, bitte versuchen Sie es später erneut"
+    },
+    "transmission": {
+      "SERVICE_UNAVAILABLE": "Der Download-Dienst (Transmission) ist nicht verfügbar. Bitte installieren und starten Sie zuerst transmission-daemon",
+      "STARTED": "Download-Dienst gestartet",
+      "START_FAILED": "Start des Download-Dienstes fehlgeschlagen",
+      "START_FAILED_DETAIL": "Start des Download-Dienstes fehlgeschlagen: %s",
+      "STOPPED": "Download-Dienst gestoppt",
+      "STOP_FAILED": "Stoppen des Download-Dienstes fehlgeschlagen",
+      "STOP_FAILED_DETAIL": "Stoppen des Download-Dienstes fehlgeschlagen: %s",
+      "RESTARTED": "Download-Dienst neu gestartet",
+      "CONFIG_SAVED": "Konfiguration gespeichert",
+      "TORRENT_ADDED": "Aufgabe hinzugefügt",
+      "TORRENT_FILE_REQUIRED": "Bitte wählen Sie eine Torrent-Datei zum Hinzufügen aus",
+      "DOWNLOAD_DIR_REQUIRED": "Bitte geben Sie ein Download-Verzeichnis an",
+      "PORT_INVALID": "Ungültiger Port: %s. Bitte geben Sie einen Port zwischen 1024 und 65535 ein",
+      "PORT_DISABLED": "Dieser Port ist vom System reserviert (0-1023). Bitte verwenden Sie einen Port über 1024",
+      "PORT_RESERVED": "Dieser Port wird bereits von einem anderen Dienst verwendet. Bitte wählen Sie einen anderen Port.",
+      "RPC_ERROR": "Der Download-Dienst hat einen Fehler zurückgegeben: %s"
+    },
+    "notes": {
+      "NOTEBOOK_NOT_SELECTED": "Bitte wählen Sie zuerst ein Notizbuch aus",
+      "NOTEBOOK_NOT_FOUND": "Notizbuch existiert nicht oder wurde gelöscht",
+      "NOTEBOOK_INVALID": "Ungültiger Notizbuchname. Bitte verwenden Sie 1-50 Zeichen",
+      "NOTEBOOK_FOLDER_NOT_EMPTY": "Dieses Notizbuch enthält noch Notizen und kann nicht gelöscht werden",
+      "GROUP_NOT_EMPTY": "Diese Gruppe enthält noch Notizbücher und kann nicht gelöscht werden"
+    },
+    "system": {
+      "NOT_SUPPORTED": "Dieser Vorgang wird im aktuellen Betriebsmodus nicht unterstützt"
+    },
+    "apps": {
+      "GET_APPS_SUCCESS": "App-Liste erfolgreich abgerufen",
+      "SET_HIDE_APPS_SUCCESS": "App-Sichtbarkeit erfolgreich aktualisiert",
+      "HIDE_APP_SUCCESS": "App ausgeblendet",
+      "UNHIDE_APP_SUCCESS": "App eingeblendet",
+      "SET_APPS_ORDER_SUCCESS": "App-Reihenfolge gespeichert"
     }
   },
   "places365": {

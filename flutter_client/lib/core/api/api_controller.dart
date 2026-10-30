@@ -175,9 +175,19 @@ class ApiController extends GetxController {
         return AppConfig.localhostBaseUrl;
       } else {
         // Web端：获取当前浏览器的地址栏基础URL 打包模式获取地址栏
-        final currentUrl = Uri.base.toString();
-        final uri = Uri.parse(currentUrl);
-        return '${uri.scheme}://${uri.authority}';
+        final uri = Uri.base;
+        // 【本机改造】反代子路径部署时必须带上同样的子路径前缀。
+        // 改造前只取 origin，/api/... 会被反代站点根路径上的其他应用接管
+        // （本机 nginx 的 / 与 /api/ 都指向另一个服务）。Flutter Web 默认是
+        // hash 路由，Uri.base.path 恒等于 <base href> 的路径，不随导航变化，
+        // 与 video_platform_web / pdf_viewer_util 里的 _webP2pBasePath 同一套约定。
+        // 部署在根路径时前缀为空串，返回值与改造前逐字节一致。
+        var basePath = uri.path;
+        if (basePath.isNotEmpty && basePath != '/' && !basePath.endsWith('/')) {
+          basePath = '$basePath/';
+        }
+        if (basePath == '/') basePath = '';
+        return '${uri.scheme}://${uri.authority}$basePath';
       }
     } else {
       // 非Web端：默认URL，可以后续修改

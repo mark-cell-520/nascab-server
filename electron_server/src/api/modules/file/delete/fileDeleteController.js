@@ -26,7 +26,7 @@ async function remove(req, res) {
     for (const p of targets) {
       if (typeof p === 'string' && p) {
         if (FileUtil.isProtectedPath(p)) {
-          return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+          return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
         }
 
         const canDelete = await hasPermission(req.dbMain, req.user, 'delete', p);

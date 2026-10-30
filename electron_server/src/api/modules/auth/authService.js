@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const NetUtil = require('../../../utils/netUtil');
 const userUtil = require('../../../utils/userUtil');
+const Logger = require('../../../utils/logger');
 const { TwoFAService } = require('./2fa/twofaService');
 
 class AuthService {
@@ -365,7 +366,13 @@ class AuthService {
    */
   async getUserProfile({ knexMain }, userId) {
     try {
-      const user = await knexMain('user').where({ id: userId }).select('id', 'username', 'role', 'create_time', 'updated_at').first();
+      // user 表没有 role / updated_at 列——用户等级是 type，时间戳只有 create_time。
+      // 选中不存在的列会让 SQLite 直接报 "no column named ..."，
+      // 再被下面的 catch 换成一句 auth.PROFILE_FETCH_FAILED，真实原因全丢。
+      const user = await knexMain('user')
+        .where({ id: userId })
+        .select('id', 'username', 'type', 'create_time')
+        .first();
 
       if (!user) {
         throw new Error('auth.USER_NOT_FOUND');
@@ -374,6 +381,7 @@ class AuthService {
       return user;
     } catch (error) {
       if (error.message.startsWith('auth.')) throw error;
+      Logger.error('getUserProfile failed', error, { userId });
       throw new Error('auth.PROFILE_FETCH_FAILED');
     }
   }
@@ -404,7 +412,10 @@ class AuthService {
         filteredData.answer = await bcrypt.hash(filteredData.answer, 10);
       }
 
-      filteredData.updated_at = new Date();
+      // 注意：不能给 user 表写 updated_at——该表没有这一列，
+      // 会以 "table user has no column named updated_at" 失败。
+      // 另外 allowedFields 里没有 password，所以下面这个分支永远进不来；
+      // 改密码请走 /api/user/... 的专用路由，别在这里加。
 
       const result = await knexMain('user').where({ id: userId }).update(filteredData);
 
@@ -415,6 +426,7 @@ class AuthService {
       return { success: true };
     } catch (error) {
       if (error.message.startsWith('auth.')) throw error;
+      Logger.error('updateUserProfile failed', error, { userId });
       throw new Error('auth.UPDATE_USER_PROFILE_FAILED');
     }
   }

@@ -36,7 +36,7 @@ async function create(req, res) {
       return ResponseUtil.error(req, res, 'file.INVALID_PARAMS', 400);
     }
     if (FileUtil.isProtectedPath(resolvedBase)) {
-      return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH');
+      return ResponseUtil.error(req, res, 'file.SYSTEM_PROTECTED_PATH', 403);
     }
 
     const filename = normalizeCreateFilename(name, type);

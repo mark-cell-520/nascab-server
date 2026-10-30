@@ -406,7 +406,6 @@ class FileService {
     }
 
     if (!stat.isFile()) {
-      console.log(resolvedPath);
       throw new Error('file.NOT_FILE');
     }
 

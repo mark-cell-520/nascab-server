@@ -191,7 +191,7 @@ class PhotoTimeLineController {
     try {
       const { file_hashes, is_favorite } = req.body;
       if (!Array.isArray(file_hashes)) {
-        return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+        return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
       }
       await photoTimeLineService.batchFavorite(req.user, file_hashes, is_favorite);
       return ResponseUtil.success(req, res, null, 'common.SUCCESS');
@@ -208,7 +208,7 @@ class PhotoTimeLineController {
     try {
       const { file_hash } = req.body;
       if (!file_hash) {
-        return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+        return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
       }
       const result = await photoTimeLineService.toggleFavorite(req.user, file_hash);
       return ResponseUtil.success(req, res, result, 'common.SUCCESS', 200);
@@ -225,7 +225,7 @@ class PhotoTimeLineController {
     try {
       const { ids } = req.body;
       if (!Array.isArray(ids)) {
-        return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+        return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
       }
       await photoTimeLineService.batchTrash(ids, true, req.user);
       return ResponseUtil.success(req, res, null, 'photo.TRASH_ADD_SUCCESS', 200);
@@ -271,7 +271,7 @@ class PhotoTimeLineController {
         await photoTimeLineService.restoreAllFromTrash(req.user);
         return ResponseUtil.success(req, res, null, 'photo.TRASH_RESTORE_SUCCESS', 200);
       }
-      if (!Array.isArray(ids)) return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+      if (!Array.isArray(ids)) return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
       await photoTimeLineService.restoreFromTrash(ids);
       return ResponseUtil.success(req, res, null, 'photo.TRASH_RESTORE_SUCCESS', 200);
     } catch (error) {
@@ -287,7 +287,7 @@ class PhotoTimeLineController {
     try {
       const { ids, recycle = false, delete_livephoto_file = 0, delete_raw_file = 0 } = req.body;
       if (!Array.isArray(ids)) {
-        return ResponseUtil.error(req, res, 'common.PARAM_ERROR');
+        return ResponseUtil.error(req, res, 'common.PARAM_ERROR', 400);
       }
       await photoTimeLineService.deleteFromTrash(ids, recycle, req.user, {
         deleteLivePhotoFile: delete_livephoto_file,

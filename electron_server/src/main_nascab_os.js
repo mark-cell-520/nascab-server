@@ -36,6 +36,13 @@ try {
 console.log('process.env.NODE_ENV', process.env.NODE_ENV);
 /** 是否为 Electron 环境（桌面应用）；false 表示 Docker/无界面模式，不做窗口、托盘、检查更新等 */
 const isElectronAvailable = !!(app && shell && ipcMain);
+// 无界面模式下没有 electron.shell，worker 里 `process.send` 却依然存在，
+// 于是 /api/file/system/open 这类"交给主进程调 shell.openPath"的接口会照常回 200，
+// 消息打到主进程后 handleShell 因 shell 为 undefined 直接 return——前端提示成功，
+// 用户屏幕上什么都不会发生。把能力缺失写进 env，fork 出来的 worker 天然继承。
+if (!isElectronAvailable) {
+  process.env.NASCAB_CLIENTLESS = '1';
+}
 let mainWindow;
 
 //检测mac的完全磁盘访问权限
