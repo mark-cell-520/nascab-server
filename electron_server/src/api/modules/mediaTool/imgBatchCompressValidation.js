@@ -44,6 +44,11 @@ const ImgBatchCompressValidation = {
       return res.status(400).json({
         success: false,
         message: errorMessages,
+        // code 必须给：客户端的 ApiResponse.fromJson 只认 code 字段做错误分流，
+        // 缺了它就只能退回读 message，失去"这是参数错误"的分类信息。
+        // 取第一个错误本身的键（validation.VALIDATION_ERROR / validation.ID_INVALID ...），
+        // 与 ResponseUtil.error 的单键语义一致；message 仍是全部错误的本地化拼接。
+        code: (errors.array()[0] && errors.array()[0].msg) || 'validation.VALIDATION_ERROR',
       });
     }
     next();
