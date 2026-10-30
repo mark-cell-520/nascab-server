@@ -355,7 +355,13 @@ class FaceController {
     } catch (err) {
       Logger.error('Face download error', err);
       if (!res.headersSent) {
-        return ResponseUtil.error(req, res, 'common.ERROR', 500);
+        // listFacePhotoIndexRows 会抛带 statusCode 的业务错误（缺 face_ids 为 400、face 不存在为 404），
+        // 这里必须透传，否则前端只会看到一个没有信息量的 500「发生错误」
+        const msgKey = err && err.message ? err.message : 'common.ERROR';
+        const statusCode = err && err.statusCode ? Number(err.statusCode)
+          : msgKey === 'common.NOT_FOUND' ? 404
+            : msgKey === 'common.PARAM_ERROR' ? 400 : 500;
+        return ResponseUtil.error(req, res, msgKey, statusCode);
       }
       res.destroy(err instanceof Error ? err : new Error('Face download error'));
     }

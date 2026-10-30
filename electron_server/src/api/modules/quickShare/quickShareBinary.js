@@ -65,6 +65,17 @@ function readBool(buf, offset0) {
   return { value: buf[offset0] !== 0, offset: offset0 + 1 };
 }
 
+/// 把请求体安全转成 Buffer；非二进制类型（如 express.raw 未解析时留下的空对象 {}）返回 null
+function toBufferOrNull(buf) {
+  if (Buffer.isBuffer(buf)) return buf;
+  if (buf instanceof Uint8Array) return Buffer.from(buf);
+  if (typeof buf === 'string') {
+    const b = Buffer.from(buf, 'utf8');
+    return b.length > 0 ? b : null;
+  }
+  return null;
+}
+
 function encodeEnvelope({ msgType, ok, code, writePayload } = {}) {
   const parts = [MAGIC, Buffer.from([msgType & 0xff])];
   writeBool(parts, ok === true);
@@ -76,7 +87,8 @@ function encodeEnvelope({ msgType, ok, code, writePayload } = {}) {
 }
 
 function decodeAuthRequest(buf) {
-  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf || []);
+  const b = toBufferOrNull(buf);
+  if (!b) return null;
   if (b.length < 5) return null;
   if (!b.slice(0, 4).equals(MAGIC)) return null;
   if (b[4] !== MSG_AUTH_REQ) return null;
@@ -165,7 +177,8 @@ function encodeListResponse({ share, base, segments, items } = {}) {
 }
 
 function decodeEnvelope(buf) {
-  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf || []);
+  const b = toBufferOrNull(buf);
+  if (!b) return null;
   if (b.length < 6) return null;
   if (!b.slice(0, 4).equals(MAGIC)) return null;
   const msgType = b[4] & 0xff;

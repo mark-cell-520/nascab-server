@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../../../core/api/api_controller.dart';
+import '../../../../../core/api/ws_path_util.dart';
 import '../../../../../core/routes/app_routes.dart';
 import '../../../../../utils/local_web_asset_server.dart';
 import '../../../../../utils/file_util.dart';
@@ -533,7 +534,8 @@ class _LatLngMapInnerState extends State<_LatLngMapInner> {
     }
 
     final tileBase = isP2p
-        ? (isWeb ? '/__p2p__' : (_localProxyBase?.toString() ?? ''))
+        // 必须带反代子路径：少了它请求打到站点根路径，SW scope 拦不到 → 瓦片全 404
+        ? (isWeb ? '${Uri.base.origin}${webBasePathPrefix()}__p2p__' : (_localProxyBase?.toString() ?? ''))
         : widget.baseUrl;
     final urlTemplate = tileBase.isEmpty
         ? ''

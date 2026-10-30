@@ -50,6 +50,10 @@ function matchApi(allowedList, reqApi) {
 async function hasPermission(knex, user, action, resPath, resType = tableUserPermission.RES_TYPES.FILE) {
   if (!knex) return false;
   if (!user) return false;
+
+  const userType = typeof user.type === 'string' ? user.type.toLowerCase() : '';
+  if (userType === tableUser.TYPE_SUPER_ADMIN || userType === tableUser.TYPE_ADMIN) return true;
+
   const normalizedPath = typeof resPath === 'string' && resPath.trim() ? normalizePathItem(resPath.trim()) : '';
   if (!normalizedPath) return false;
 
@@ -67,9 +71,6 @@ async function hasPermission(knex, user, action, resPath, resType = tableUserPer
     }
     if (!ok) return false;
   }
-
-  const userType = typeof user.type === 'string' ? user.type.toLowerCase() : '';
-  if (userType === tableUser.TYPE_SUPER_ADMIN || userType === tableUser.TYPE_ADMIN) return true;
 
   const uidRaw = user.id ?? user.userId ?? user.uid ?? user.user_id;
   const uid = Number(uidRaw);

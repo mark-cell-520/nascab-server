@@ -181,9 +181,11 @@
       function isVideoPlayerPath(url) {
         try {
           const p = new URL(url, window.location.href).pathname;
-          return p.startsWith('/api/videoPlayer/hls/') ||
-              p.startsWith('/api/videoPlayer/transcode') ||
-              p === '/api/videoPlayer/rawFile' ||
+          // 部署在子路径（如 /nascab/）时 pathname 带前缀，
+          // startsWith('/api/...') 一律失配，播放器关闭时就 abort 不掉这些请求。
+          // 这几个路径段足够独特，用 includes 判断不会误匹配。
+          return p.includes('/api/videoPlayer/hls/') ||
+              p.includes('/api/videoPlayer/transcode') ||
               p.endsWith('/api/videoPlayer/rawFile');
         } catch (_) {
           return false;

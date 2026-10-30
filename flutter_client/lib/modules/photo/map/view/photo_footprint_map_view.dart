@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:get/get.dart';
 import '../../../../core/api/api_controller.dart';
+import '../../../../core/api/ws_path_util.dart';
 import '../../../../utils/device_utils.dart';
 import '../../../../utils/local_web_asset_server.dart';
 import '../../../base/components/custom_extended_image.dart';
@@ -125,7 +126,8 @@ class _PhotoFootprintMapViewState extends State<PhotoFootprintMapView> {
 
           final tileBase = isP2p
               ? (DeviceUtils.isWeb
-                    ? '/__p2p__'
+                    // 必须带反代子路径：少了它请求打到站点根路径，SW scope 拦不到 → 瓦片全 404
+                    ? '${Uri.base.origin}${webBasePathPrefix()}__p2p__'
                     : (_localProxyBase?.toString() ?? ''))
               : baseUrl;
           final urlTemplate = tileBase.isEmpty

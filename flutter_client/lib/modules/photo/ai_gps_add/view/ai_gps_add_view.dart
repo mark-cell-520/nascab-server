@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:get/get.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/api/api_controller.dart';
+import '../../../../core/api/ws_path_util.dart';
 import '../../../../modules/base/components/custom_extended_image.dart';
 import '../../../../modules/base/components/custom_no_data.dart';
 import '../../../../modules/base/components/custom_glass_card.dart';
@@ -1044,7 +1045,10 @@ class _EditableGpsMapState extends State<_EditableGpsMap> {
     }
 
     final tileBase = isP2p
-        ? (DeviceUtils.isWeb ? '/__p2p__' : (_localProxyBase?.toString() ?? ''))
+        // 必须带反代子路径：少了它请求打到站点根路径，SW scope 拦不到 → 瓦片全 404
+        ? (DeviceUtils.isWeb
+              ? '${Uri.base.origin}${webBasePathPrefix()}__p2p__'
+              : (_localProxyBase?.toString() ?? ''))
         : baseUrl;
     final urlTemplate = tileBase.isEmpty
         ? ''
