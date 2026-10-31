@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "挂载启动失败：%s",
+      "FUSE_UNAVAILABLE": "当前环境无法使用 FUSE，远程挂载不可用：%s",
       "INVALID_MOUNT_NAME": "挂载名称不合法（需符合文件夹命名规范）",
       "MOUNT_PARENT_NOT_FOUND": "挂载父路径不存在",
       "MOUNT_PARENT_NOT_DIR": "挂载父路径必须是目录",
@@ -84,6 +85,7 @@
       "MOUNT_PARENT_NOT_FOUND": "挂载父路径不存在",
       "STOP_FAILED": "网盘挂载停止失败",
       "STORAGE_INIT_FAILED": "网盘存储初始化失败：%s",
+      "FUSE_UNAVAILABLE": "当前环境无法使用 FUSE，网盘挂载不可用：%s",
       "TIMEOUT": "操作超时，请稍后重试"
     },
     "fileBackup": {

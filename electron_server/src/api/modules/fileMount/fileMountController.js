@@ -82,6 +82,10 @@ function mapStartStopErrorToResponse(errorCode) {
   if (code === 'fileMount.OBSCURE_FAILED') {
     return { msgKey: 'fileMount.OBSCURE_FAILED', statusCode: 500 };
   }
+  if (code === 'fileMount.FUSE_UNAVAILABLE') {
+    // 语言文件里这句带 %s，detail 是 FUSE 预检给出的 errno 原文
+    return { msgKey: 'fileMount.FUSE_UNAVAILABLE', statusCode: 500, withDetail: true };
+  }
   if (code === 'start_timeout' || code === 'fileMount.START_TIMEOUT') {
     return { msgKey: 'fileMount.START_TIMEOUT', statusCode: 504 };
   }
@@ -136,6 +140,9 @@ class FileMountController {
       const detail = data && data.detail !== undefined && data.detail !== null ? String(data.detail) : '';
       const mapped = mapStartStopErrorToResponse(errCode);
       if (mapped.msgKey !== 'common.ERROR') {
+        if (mapped.withDetail) {
+          throw buildHttpErrorWithArgs(mapped.msgKey, [detail || '—'], mapped.statusCode);
+        }
         if (mapped.msgKey === 'fileMount.RCLONE_UNKNOWN') {
           throw buildHttpErrorWithArgs(mapped.msgKey, [detail || '—'], mapped.statusCode);
         }

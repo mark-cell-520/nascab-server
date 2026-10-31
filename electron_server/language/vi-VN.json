@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "Bắt đầu mount thất bại: %s",
+      "FUSE_UNAVAILABLE": "FUSE không khả dụng trong môi trường này nên không thể bắt đầu gắn kết từ xa: %s",
       "INVALID_MOUNT_NAME": "Tên mount không hợp lệ (tên thư mục)",
       "MOUNT_PARENT_NOT_FOUND": "Đường dẫn cha của mount không tồn tại",
       "MOUNT_PARENT_NOT_DIR": "Đường dẫn cha của mount phải là thư mục",
@@ -508,6 +509,7 @@
       "MOUNT_PARENT_NOT_FOUND": "Đường dẫn cha của mount không tồn tại",
       "STOP_FAILED": "Dừng gắn thất bại",
       "STORAGE_INIT_FAILED": "Khởi tạo lưu trữ đám mây thất bại: %s",
+      "FUSE_UNAVAILABLE": "FUSE không khả dụng trong môi trường này nên không thể bắt đầu gắn kết lưu trữ đám mây: %s",
       "TIMEOUT": "Thao tác hết thời gian. Vui lòng thử lại"
     },
     "transmission": {

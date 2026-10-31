@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "Error al iniciar el montaje: %s",
+      "FUSE_UNAVAILABLE": "FUSE no está disponible en este entorno, no se puede iniciar el montaje remoto: %s",
       "INVALID_MOUNT_NAME": "Nombre de montaje no válido (debe cumplir las normas de nombres de carpeta)",
       "MOUNT_PARENT_NOT_FOUND": "La ruta padre del montaje no existe",
       "MOUNT_PARENT_NOT_DIR": "La ruta padre del montaje debe ser un directorio",
@@ -508,6 +509,7 @@
       "MOUNT_PARENT_NOT_FOUND": "La ruta padre del montaje no existe",
       "STOP_FAILED": "Error al detener el montaje en la nube",
       "STORAGE_INIT_FAILED": "Error al inicializar el almacenamiento en la nube: %s",
+      "FUSE_UNAVAILABLE": "FUSE no está disponible en este entorno, no se puede iniciar el montaje en la nube: %s",
       "TIMEOUT": "La operación expiró. Inténtelo de nuevo"
     },
     "transmission": {

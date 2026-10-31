@@ -126,7 +126,13 @@ class OpenlistMountController {
       const { id } = req.body || {};
       const data = await sendIpc('startOpenlistMount', { id }, 'openlistMountStartResponse', 60000);
       if (!data.ok) {
-        throw buildHttpError(data.error || 'openlistMount.START_FAILED', 500);
+        // worker 给的 detail 是真实原因（rclone stderr / FUSE 预检的 errno）。
+        // 拼成 `模块.键:原文`：ResponseUtil.error 认识这种形态——前半拿去做 i18n
+        // 查询、原文交给语言文件里的 %s 插值，code 只留键本身，客户端照样查表命中。
+        // 不拼的话用户永远只看到 "网盘挂载启动失败，请稍后重试"。
+        const detail = data.detail ? String(data.detail).replace(/[\r\n]+/g, ' ').trim() : '';
+        const baseKey = data.error || 'openlistMount.START_FAILED';
+        throw buildHttpError(detail ? `${baseKey}:${detail}` : baseKey, 500);
       }
       return ResponseUtil.success(req, res, data, 'common.SUCCESS', 200);
     } catch (e) {

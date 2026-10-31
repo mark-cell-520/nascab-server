@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "마운트 시작 실패: %s",
+      "FUSE_UNAVAILABLE": "이 환경에서는 FUSE를 사용할 수 없어 원격 마운트를 시작할 수 없습니다: %s",
       "INVALID_MOUNT_NAME": "잘못된 마운트 이름 (폴더 이름)",
       "MOUNT_PARENT_NOT_FOUND": "마운트 부모 경로가 존재하지 않음",
       "MOUNT_PARENT_NOT_DIR": "마운트 부모 경로는 디렉토리여야 함",
@@ -508,6 +509,7 @@
       "MOUNT_PARENT_NOT_FOUND": "마운트 부모 경로가 존재하지 않음",
       "STOP_FAILED": "OpenList 마운트 중지 실패",
       "STORAGE_INIT_FAILED": "클라우드 저장소 초기화에 실패했습니다: %s",
+      "FUSE_UNAVAILABLE": "이 환경에서는 FUSE를 사용할 수 없어 클라우드 마운트를 시작할 수 없습니다: %s",
       "TIMEOUT": "작업 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
     },
     "transmission": {

@@ -13,6 +13,7 @@ const {
   parentCheckToCode,
   autoMountSkipCode,
 } = require('../../utils/fileMountErrorCodes');
+const { checkFuseAvailable } = require('../../utils/fuseCheck');
 
 function safeJsonParse(text) {
   if (!text) return null;
@@ -699,6 +700,28 @@ class FileMountWorker {
     if (!resolvedRemote) {
       await this._updateRow(idNum, { status: 'error', last_error: 'common.INVALID_PARAMS' });
       this._reply('fileMountStartResponse', { requestId, ok: false, error: 'common.INVALID_PARAMS' });
+      return;
+    }
+
+    // FUSE 预检放在网络探测之前：rclone mount 一定要 /dev/fuse，容器里这个
+    // 设备常常节点在、open 却被 device cgroup 拒掉（EPERM），rclone 只往
+    // stderr 写一行 "fusermount3: failed to open /dev/fuse: Operation not
+    // permitted" 然后秒退。不预检的话，一个注定失败的挂载会先白跑一遍
+    // SMB/WebDAV 探测，最后落在 RCLONE_START_FAILED 上，用户看不出是环境
+    // 问题还是密码问题。
+    const fuseReason = checkFuseAvailable();
+    if (fuseReason) {
+      fmWorkerLog('fuse_unavailable', { requestId, idNum, resolvedRemote, reason: fuseReason });
+      await this._updateRow(idNum, {
+        status: 'error',
+        last_error: packLastError({ code: 'fileMount.FUSE_UNAVAILABLE', detail: fuseReason }),
+      });
+      this._reply('fileMountStartResponse', {
+        requestId,
+        ok: false,
+        error: 'fileMount.FUSE_UNAVAILABLE',
+        detail: fuseReason,
+      });
       return;
     }
 

@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "Échec du démarrage du montage: %s",
+      "FUSE_UNAVAILABLE": "FUSE n'est pas disponible dans cet environnement, le montage distant ne peut donc pas démarrer : %s",
       "INVALID_MOUNT_NAME": "Nom de montage invalide (nom de dossier)",
       "MOUNT_PARENT_NOT_FOUND": "Le chemin parent du montage n'existe pas",
       "MOUNT_PARENT_NOT_DIR": "Le chemin parent du montage doit être un répertoire",
@@ -508,6 +509,7 @@
       "MOUNT_PARENT_NOT_FOUND": "Le chemin parent du montage n'existe pas",
       "STOP_FAILED": "Échec de l'arrêt du montage",
       "STORAGE_INIT_FAILED": "Échec de l'initialisation du stockage cloud: %s",
+      "FUSE_UNAVAILABLE": "FUSE n'est pas disponible dans cet environnement, le montage cloud ne peut donc pas démarrer : %s",
       "TIMEOUT": "Délai de l'opération dépassé, veuillez réessayer plus tard"
     },
     "transmission": {

@@ -233,6 +233,10 @@ function handleStartOpenlistMount({ expressWorker, singletonWorkerManager, initU
             pid: res.pid || null,
             error: res.error || null,
             mountPath: res.mountPath || null,
+            // worker 已经把真实原因放在 detail 里（rclone 的 stderr、
+            // FUSE 预检的 errno），不往下透传的话用户只会看到一句
+            // "网盘挂载启动失败，请稍后重试"，排查无从下手。
+            detail: res.detail || null,
           },
         });
       }

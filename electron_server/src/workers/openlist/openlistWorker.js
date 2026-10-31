@@ -3,6 +3,8 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const Logger = require('../../utils/logger');
 const jwtUtil = require('../../utils/jwtUtil');
+const FileUtil = require('../../utils/fileUtil');
+const { checkFuseAvailable } = require('../../utils/fuseCheck');
 const rclonePath = require('../../libsPath/rclonePath');
 const openlistPath = require('../../libsPath/openlistPath');
 const dbUtil = require('../../db/dbUtil');
@@ -451,12 +453,34 @@ class OpenlistWorker {
   async _waitForPing(maxMs = 30000) {
     const start = Date.now();
     while (Date.now() - start < maxMs) {
+      // 只探测 /ping 会误判：端口上应答的可能是别的进程（手工起的 openlist、
+      // 上次残留实例），ping 一样通，worker 会把自己 bind 失败的子进程当成
+      // 健康的，继续往下走 listStorages，最后报一个毫不相干的 STORAGE_NOT_FOUND。
+      // 所以等待期间必须同时确认这个端口是自家子进程占的。
+      if (this.openlistChild && (this.openlistChild.killed || this.openlistChild.exitCode !== null)) {
+        return false;
+      }
       try {
         if (await this.api.ping()) return true;
       } catch (_) {}
       await new Promise(r => setTimeout(r, 400));
     }
     return false;
+  }
+
+  /**
+   * rclone mount 走 FUSE。容器里 /dev/fuse 常常节点在、设备打不开
+   * （device cgroup 直接拒 EPERM），rclone 只往 stderr 写一行
+   *   fusermount3: failed to open /dev/fuse: Operation not permitted
+   * 然后秒退，上层只看到一句 RCLONE_START_FAILED，用户完全无从下手。
+   * 这里提前自己开一次，把真实原因带回给用户。
+   * 返回 null 表示可用，否则返回可读的原因串。
+   *
+   * 实现在 src/utils/fuseCheck.js：fileMount（SMB/NFS/SFTP/WebDAV/FTP）走
+   * 同样的 rclone mount，也得做同一道检查，抽出来免得两处各写一遍。
+   */
+  _checkFuseAvailable() {
+    return checkFuseAvailable();
   }
 
   async ensureOpenListRunning({ requestId } = {}) {
@@ -730,6 +754,30 @@ class OpenlistWorker {
       const code = `openlistMount.${parentErr.toUpperCase()}`;
       await this._updateRow(idNum, { status: auto ? 'stopped' : 'error', last_error: code });
       this._reply('openlistMountStartResponse', { requestId, ok: false, error: code });
+      return;
+    }
+
+    // upsert 从 6cb619b 起就挡系统目录，但 start 这条路一直没补——历史行
+    // （比如 mount_path=/boot/电影）能一路点启动，rclone 真的往 /boot 上挂。
+    // 这里补上同一道关，避免只堵住新建、堵不住启动。
+    if (FileUtil.isProtectedPath(path.resolve(parentPath))) {
+      await this._updateRow(idNum, { status: 'error', last_error: 'openlistMount.PROTECTED_MOUNT_PATH' });
+      this._reply('openlistMountStartResponse', { requestId, ok: false, error: 'openlistMount.PROTECTED_MOUNT_PATH' });
+      return;
+    }
+
+    // FUSE 预检：不通过就直接说明白，不再 spawn 一个注定秒退的 rclone，
+    // 也不再把 "fusermount3: ... Operation not permitted" 埋进日志里。
+    const fuseReason = this._checkFuseAvailable();
+    if (fuseReason) {
+      Logger.warn('[openlistWorker] FUSE 不可用，放弃启动 rclone', fuseReason);
+      await this._updateRow(idNum, { status: 'error', last_error: `openlistMount.FUSE_UNAVAILABLE:${fuseReason}` });
+      this._reply('openlistMountStartResponse', {
+        requestId,
+        ok: false,
+        error: 'openlistMount.FUSE_UNAVAILABLE',
+        detail: fuseReason,
+      });
       return;
     }
 

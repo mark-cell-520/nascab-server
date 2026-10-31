@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "マウントの起動に失敗しました：%s",
+      "FUSE_UNAVAILABLE": "この環境では FUSE が利用できないため、リモートマウントを開始できません：%s",
       "INVALID_MOUNT_NAME": "マウント名が無効です（フォルダ名の規則に従ってください）",
       "MOUNT_PARENT_NOT_FOUND": "マウントの親パスが存在しません",
       "MOUNT_PARENT_NOT_DIR": "マウントの親パスはディレクトリである必要があります",
@@ -508,6 +509,7 @@
       "MOUNT_PARENT_NOT_FOUND": "マウントの親パスが存在しません",
       "STOP_FAILED": "クラウドディスクのマウント停止に失敗しました",
       "STORAGE_INIT_FAILED": "クラウドストレージの初期化に失敗しました：%s",
+      "FUSE_UNAVAILABLE": "この環境では FUSE が利用できないため、クラウドマウントを開始できません：%s",
       "TIMEOUT": "操作がタイムアウトしました。しばらくしてからお試しください"
     },
     "transmission": {

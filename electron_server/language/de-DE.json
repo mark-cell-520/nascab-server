@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "Mount-Start fehlgeschlagen: %s",
+      "FUSE_UNAVAILABLE": "FUSE ist in dieser Umgebung nicht verfügbar, das Remote-Mount kann nicht gestartet werden: %s",
       "INVALID_MOUNT_NAME": "Ungültiger Mount-Name (Ordnername)",
       "MOUNT_PARENT_NOT_FOUND": "Mount-Elternpfad existiert nicht",
       "MOUNT_PARENT_NOT_DIR": "Mount-Elternpfad muss ein Verzeichnis sein",
@@ -508,6 +509,7 @@
       "MOUNT_PARENT_NOT_FOUND": "Mount-Elternpfad existiert nicht",
       "STOP_FAILED": "Beenden des Mounts fehlgeschlagen",
       "STORAGE_INIT_FAILED": "Initialisierung des Cloud-Speichers fehlgeschlagen: %s",
+      "FUSE_UNAVAILABLE": "FUSE ist in dieser Umgebung nicht verfügbar, das Cloud-Mount kann nicht gestartet werden: %s",
       "TIMEOUT": "Zeitüberschreitung des Vorgangs, bitte versuchen Sie es später erneut"
     },
     "transmission": {

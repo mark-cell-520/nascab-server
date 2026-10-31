@@ -15,6 +15,7 @@
     },
     "fileMount": {
       "START_FAILED": "Mount gagal dimulai: %s",
+      "FUSE_UNAVAILABLE": "FUSE tidak tersedia di lingkungan ini, sehingga mount jarak jauh tidak dapat dijalankan: %s",
       "INVALID_MOUNT_NAME": "Nama mount tidak valid (nama folder)",
       "MOUNT_PARENT_NOT_FOUND": "Path induk mount tidak ditemukan",
       "MOUNT_PARENT_NOT_DIR": "Path induk mount harus berupa direktori",
@@ -508,6 +509,7 @@
       "MOUNT_PARENT_NOT_FOUND": "Path induk mount tidak ditemukan",
       "STOP_FAILED": "Gagal menghentikan mount",
       "STORAGE_INIT_FAILED": "Gagal menginisialisasi penyimpanan cloud: %s",
+      "FUSE_UNAVAILABLE": "FUSE tidak tersedia di lingkungan ini, sehingga mount cloud tidak dapat dijalankan: %s",
       "TIMEOUT": "Operasi habis waktu. Silakan coba lagi"
     },
     "transmission": {
